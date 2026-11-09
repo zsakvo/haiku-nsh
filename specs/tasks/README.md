@@ -8,6 +8,7 @@
 - 测试写在项目里（`cargo test`、`*.test.tsx`、`nsh_testing`），作为可重复运行的回归测试；不写一次性的诊断脚本。确实需要临时排查时，排查完删除，不留在仓库或 `.artifacts/` 中。
 - 不要用 lldb、AppleScript、辅助功能 API、CGEvent 等手段自动操作 GUI。界面交互由 Headless 测试覆盖；真实窗口只需要 `nsh run` 加一张截图。需要人工点击确认的，在汇报中列为“待人工确认”。
 - 不要更换工具链重跑同一套命令（例如分别用 huacnlee/cargo 和 rustup cargo 各跑一遍）。
+- “无 warn”要求的已知例外（来自依赖或工具链，不需处理）：`block 0.1.6` 的 future-incompat 提示；开发 host 链接器的 `__eh_frame` 过大提示。出现其他警告仍要处理或汇报。
 - 证据：每条命令保存一个日志到 `.artifacts/<任务号>/`，截图另存，不额外生成汇总 JSON 或 hash 清单。
 - 某项验证失败时：先定位原因，最多尝试两种修复思路；仍不通过就记录现象和原因，然后停下汇报，不要无限扩展排查范围。
 

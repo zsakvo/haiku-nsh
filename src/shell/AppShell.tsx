@@ -1,15 +1,13 @@
-import { cleanup, effect, keymap, signal, Text, View } from "nsh";
-import { Button as BaseButton } from "nsh/base";
-import { Menu as DesktopMenu, Window, titleBar } from "nsh/desktop";
+import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
+import { Menu as DesktopMenu, Window } from "nsh/desktop";
 import { Core } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
-import { SidebarItem, SectionLabel, Kbd } from "../ui/Navigation";
+import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
-import { Icon } from "../ui/Icon";
-import { Tooltip } from "../ui/Surfaces";
-import { focus } from "../ui/Button";
+import { CommandTrigger } from "../ui/SearchField";
+import { ChromeSpacer, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
-import { createNavigation, destinations, type PageKind } from "./navigation";
+import { createNavigation, destinations } from "./navigation";
 import { Settings } from "./Settings";
 import { CommandPalette } from "./CommandPalette";
 
@@ -33,7 +31,7 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
   effect(() => {
     Core.initialize();
     Window.setTitle("Haiku");
-    Window.setTitleBar({ style: "hidden", height: 56 });
+    Window.setTitleBar({ style: "hidden", height: token("toolbar-height") });
   });
   effect(() => {
     DesktopMenu.setApplicationMenu([
@@ -65,48 +63,38 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
     }
     closeOverlay();
   }
-  return <View class="flex-1 flex-row bg-background">
-    <View class="w-55 shrink-0 bg-sidebar border-r border-border">
-      <View class="h-14" desktop={{ windowDrag: true }} />
-      <Text class="px-6 pb-4 text-xl font-semibold text-foreground">Haiku</Text>
-      <View class="flex-1 gap-1 px-3">
-        <SectionLabel label="发现" />
-        {destinations.filter((page) => page.group === "发现").map((page) =>
-          <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
-            selected={nav.current().kind === page.id} onPress={() => nav.navigate({ kind: page.id })} />)}
-        <SectionLabel label="音乐库" />
-        {destinations.filter((page) => page.group === "音乐库").map((page) =>
-          <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
-            selected={nav.current().kind === page.id} onPress={() => nav.navigate({ kind: page.id })} />)}
-        <SectionLabel label="歌单" />
-        <View class="h-4" />
-        <View class="h-px mx-3 my-2 bg-border" />
+  return <ShellFrame>
+    <ShellSidebar>
+      <ChromeSpacer />
+      <View class="flex-1 min-h-0 gap-4 px-2 pb-4">
+        {["发现", "音乐库"].map((group) => <View class="gap-0.5">
+          <SectionLabel label={group} />
+          {destinations.filter((page) => page.group === group).map((page) =>
+            <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
+              selected={nav.current().kind === page.id} onPress={() => nav.navigate({ kind: page.id })} />)}
+        </View>)}
+        <View><SectionLabel label="歌单" /></View>
+        <View class="flex-1" />
         <SidebarItem testID="nav-downloads" icon="download" label="下载"
           selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
       </View>
       <View class="h-24 shrink-0" />
-    </View>
-    <View class="flex-1 min-w-0">
-      <View class="shrink-0 flex-row items-center gap-2 px-6 border-b border-border"
-        style={{ height: Math.max(56, titleBar().height) }} desktop={{ windowDrag: true }}>
+    </ShellSidebar>
+    <WindowPanel>
+      <ShellToolbar>
         <IconButton icon="left" label="后退" hint={`后退 · ${keymap.label(shortcuts.back)}`}
           disabled={!nav.canBack()} onPress={goBack} />
         <IconButton icon="right" label="前进" hint={`前进 · ${keymap.label(shortcuts.forward)}`}
           disabled={!nav.canForward()} onPress={goForward} />
-        <Text testID="page-title" role="header" class="ml-3 text-base font-semibold text-foreground">{currentTitle()}</Text>
+        <Text testID="page-title" role="header" class="ml-2 text-base font-semibold text-foreground">{currentTitle()}</Text>
         <View class="flex-1" />
-        <BaseButton accessibilityLabel="打开命令面板" onPress={showCommands}
-          tooltip={<Tooltip label={`命令面板 · ${keymap.label(shortcuts.commands)}`} />}
-          class={`flex-row items-center gap-3 rounded-(--radius) border border-border bg-card px-3 py-1.5 hover:bg-accent active:bg-muted ${focus}`}>
-          <Icon name="search" small color="muted-foreground" />
-          <Text class="text-sm text-muted-foreground">前往…</Text><Kbd label={keymap.label(shortcuts.commands)} />
-        </BaseButton>
+        <CommandTrigger shortcut={keymap.label(shortcuts.commands)} onPress={showCommands} />
         <IconButton icon="settings" label="打开设置" hint={`设置 · ${keymap.label(shortcuts.settings)}`} onPress={showSettings} />
-      </View>
+      </ShellToolbar>
       <View class="flex-1 min-h-0">
         {destinations.map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
       </View>
-    </View>
+    </WindowPanel>
     <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} />
     <CommandPalette open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
       items={[
@@ -114,5 +102,5 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
         { id: "settings", label: "打开设置…", group: "应用", shortcut: shortcuts.settings },
         ...modes.map((mode) => ({ id: `mode:${mode.id}`, label: `外观：${mode.label}`, group: "外观", checked: appearance.mode() === mode.id })),
       ]} />
-  </View>;
+  </ShellFrame>;
 }

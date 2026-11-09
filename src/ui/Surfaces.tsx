@@ -20,7 +20,7 @@ export function Overlay(props: { open: boolean; onClose: () => void; children?: 
   effect(() => {
     if (props.open) return keymap.bind("escape", () => props.onClose(), { when: "always" });
   });
-  return <BaseDialog open={props.open} animation="none" class="flex-1 bg-background"
+  return <BaseDialog open={props.open} animation="none" class="flex-1 bg-sidebar"
     closeOnBackdropPress={false} onOpenChange={(event) => { if (!event.open) props.onClose(); }}>
     {props.children}
   </BaseDialog>;

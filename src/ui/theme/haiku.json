@@ -1,9 +1,17 @@
 {
   "cssVars": {
     "theme": {
-      "radius": "0.375rem",
-      "radius-surface": "0.75rem",
-      "radius-inset": "0.25rem",
+      "radius": "0.5rem",
+      "radius-surface": "0.875rem",
+      "radius-inset": "0.375rem",
+      "radius-panel": "0.625rem",
+      "sidebar-width": "12.5rem",
+      "toolbar-height": "3rem",
+      "content-inset": "1.25rem",
+      "panel-gap": "0.5rem",
+      "navigation-row-height": "1.75rem",
+      "compact-control-height": "1.75rem",
+      "brand-option-min-width": "7rem",
       "font-sans": "system-ui",
       "font-mono": "monospace"
     },

@@ -8,7 +8,7 @@ export function PlaceholderPage(props: { page: typeof destinations[number]; acti
   const query = signal("");
   return <View testID={`page-${props.page.id}`} class="flex-1 flex-col min-h-0"
     style={{ display: props.active ? "flex" : "none" }}>
-    {props.page.id === "search" && <View class="px-6 pt-6 max-w-xl">
+    {props.page.id === "search" && <View class="px-(--content-inset) pt-4 max-w-xl">
       <SearchField label="搜索词" value={query()} onChange={(value) => query.set(value)} placeholder="保留一个搜索词" />
     </View>}
     <EmptyState title={props.page.title} description={props.page.description} />

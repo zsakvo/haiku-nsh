@@ -14,7 +14,16 @@ import right from "../../assets/icons/nav-arrow-right.svg";
 import close from "../../assets/icons/xmark.svg";
 import check from "../../assets/icons/check.svg";
 import palette from "../../assets/icons/palette.svg";
-const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, close, check, palette };
+import user from "../../assets/icons/user.svg";
+import play from "../../assets/icons/play.svg";
+import captions from "../../assets/icons/closed-captions-tag.svg";
+import folder from "../../assets/icons/folder.svg";
+import plug from "../../assets/icons/plug-type-a.svg";
+import sync from "../../assets/icons/refresh-double.svg";
+import keyboard from "../../assets/icons/key-command.svg";
+import code from "../../assets/icons/code-brackets.svg";
+const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, close, check, palette,
+  user, play, captions, folder, plug, sync, keyboard, code };
 export type IconName = keyof typeof icons;
 export function Icon(props: {
   name: IconName;

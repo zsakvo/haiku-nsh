@@ -19,7 +19,7 @@
 
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
-| F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01：Headless 4/4、四种真实窗口截图；workspace 153 通过、1 忽略 | 页面内容、来源选择、PlayerDock 待后续任务；构建仍有依赖未来兼容警告 |
+| F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01 已审阅通过；M1-01b check/build/test 通过，原有 Headless 4/4 | M1-01b 截图捕获失败，视觉验收待补；页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
 | F02 插件包与来源生命周期 | 未实现 | | | |
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
@@ -249,3 +249,20 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未覆盖：窗口缩放/大字号、真实鼠标与菜单交互、此次启动后的关闭隐藏/Dock 恢复人工复验、其他平台、外观持久化；M0 人工确认保留。
 - 需审阅者判断是否接受现有依赖未来兼容警告作为“无 warn”例外；未屏蔽警告或修改上游。
 - 本次仅自行修改 STATUS；按任务授权一并纳入原有未提交 specs 修改，以 `M1-01: design system foundations and app shell` 提交一次后停止；Rex 会话名保持不变。
+
+## 2026-11-10 M1-01b：外壳视觉修订（截图验收受阻）
+
+- 先更新 STANDARDS 与主题，再调整组件/外壳；侧栏 200pt、条目最小 28pt、正文 14pt/选中 medium、图标 16pt/图文距 8pt、行间距 2pt、组间距 16pt。
+- 顶栏 48pt（以实际 titleBar 高度为下限）、图标按钮/搜索入口目标 28pt、页面/顶栏水平内距 20pt；红绿灯拖动区与顶栏共用高度。
+- 圆角：radius 8pt、inset 6pt、panel 10pt、surface 14pt；主内容/设置右侧共用四周 8pt 留白的圆角面板，侧栏底色延伸，面板底部无 96pt 预留。
+- 删除侧栏 Haiku/设置标题及下载上方分隔线；下载锚定侧栏底部，并保留侧栏未来 PlayerDock 的 96pt 空间。
+- 新增 `src/ui/{Chrome,AppearanceOptions}.tsx`；模式选项采用 panel 卡片，品牌色等宽自适应网格，固定勾槽位，选中用 ring+勾；命令列表内距 6pt/选中圆角 8pt。
+- 设置 12 类分别配置语义图标；新增 8 个实际使用的 Iconoir SVG，保留 MIT LICENSE，其中 Command/代码括号取自相同 Iconify 分发源的 Iconoir 7.12.2。
+- Image 无单独路径 tint 接口，新增深色插画资源：浅色块映射主题 card/muted，细线映射 muted-foreground，保留紫色主色；浅深资源随 colorScheme 切换。
+- `nsh check -v`、`nsh build -v`、`nsh test -v` 均退出 0，原有四个 Headless 测试全部通过，断言与选择器均未改；日志 `.artifacts/m1-01b/nsh-{check,build,test}.log`。
+- UI 颜色检查通过：主题目录外无颜色字面量或调色板 class；SVG 资源为任务允许的浅深插画数据。证据 `theme-colors.log`。
+- 构建/运行仅有约定允许的 block 0.1.6 future-incompat 与开发 host __eh_frame 提示；未跑全 workspace、Clippy、release 或额外探针。
+- `nsh run ShellPreview.tsx --target macos -v` 成功连接；但 screencapture 返回 `could not create image from window`，窗口信息复核/重试与显式 `--display 1` 后仍失败，按修复上限停止。
+- 运行日志 `run-light.log`、`run-light-display1.log`；捕获失败日志 `capture-light{,-repair1,-display1}.log` 与只读 `window-light*.log`，均在 `.artifacts/m1-01b/`。
+- 四张截图均未完成，未确认实际裁切、网格、圆角及深色插画视觉；未用旧截图充当证据，失败原因尚未确认，已 Ctrl+C 停止 host。
+- 按任务提交一次，纳入已有任务文件及通用约定修改；仅自行更新 specs/STATUS.md，Rex/上游/参考项目未修改。视觉验收需后续补齐，无新增架构决策。
