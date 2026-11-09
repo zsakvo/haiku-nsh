@@ -1,6 +1,7 @@
 import { cleanup, effect, signal, Text, View } from "nsh";
 import { Spike, SpikeCounter, SpikeTrackList } from "haiku/native";
 import { Button } from "../ui/Button";
+import { GlassStrip } from "./Glass";
 
 /** Disposable S5/S6/S8 surface, sharing the existing app button and theme. */
 export function PlatformSpikes() {
@@ -22,11 +23,16 @@ export function PlatformSpikes() {
     }
   }
   effect(() => {
+    if (path) {
+      try { console.log(`S5 install: ${Spike.installNative()}`); }
+      catch (error) { console.error(`S5 install failed: ${String(error)}`); }
+    }
     if (path) void play();
     const timer = setInterval(() => {
       const seconds = Spike.position();
       position.set(seconds);
       if (path) console.log(`S5 position()=${seconds.toFixed(3)}`);
+      if (path) console.log(`S4 media.snapshot=${Spike.nativeTick()}`);
     }, 1000);
     return () => clearInterval(timer);
   });
@@ -44,9 +50,10 @@ export function PlatformSpikes() {
         <Text class="text-sm text-foreground">{playback()} · {position().toFixed(1)} 秒</Text>
       </View>
       <Text class="text-sm text-muted-foreground">
-        S5：当前 NSH 无关闭拦截与重新激活钩子；S6：10000 行，选中状态按曲目 ID 保存
+        S5：原生关闭隐藏与 Dock 恢复；S6：10000 行，选中状态按曲目 ID 保存
       </Text>
       <SpikeTrackList class="flex-1" />
+      <GlassStrip />
     </View>
   );
 }

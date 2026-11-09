@@ -1,6 +1,8 @@
 //! Disposable M0 platform spikes; no application feature state lives here.
 
 mod audio;
+#[cfg(target_os = "macos")]
+mod macos;
 mod tracks;
 pub use tracks::SpikeTrackList;
 
@@ -12,6 +14,30 @@ pub struct Spike;
 
 #[module]
 impl Spike {
+    /// Installs M0 main-thread integrations while retaining NSH delegates.
+    pub fn install_native() -> Result<String, String> {
+        #[cfg(target_os = "macos")]
+        {
+            macos::install()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Ok("macOS spike unavailable".into())
+        }
+    }
+
+    /// Drains native events on the engine thread and reads media-center state.
+    pub fn native_tick() -> String {
+        #[cfg(target_os = "macos")]
+        {
+            macos::tick()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            "unsupported".into()
+        }
+    }
+
     /// Doubles a number in an isolated plugin VM, verifying MD5 and Buffer.
     pub async fn plugin_echo(n: f64) -> Result<f64, String> {
         background(haiku_plugins::plugin_echo(n))

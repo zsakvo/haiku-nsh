@@ -1,0 +1,55 @@
+//! Keep NSH's delegate object and all its callbacks, overriding close only.
+use nsh_platform_macos::{
+    objc2::{
+        runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel},
+        sel, MainThreadMarker,
+    },
+    objc2_app_kit::{NSApplication, NSWindow},
+};
+
+unsafe extern "C" fn hide_on_close(_: *mut AnyObject, _: Sel, window: *mut NSWindow) -> Bool {
+    assert!(MainThreadMarker::new().is_some());
+    unsafe { &*window }.orderOut(None);
+    eprintln!("S5 windowShouldClose: orderOut (engine retained)");
+    Bool::NO
+}
+
+/// Install on the existing main window. Called from the engine, never the UI thread.
+pub fn install() -> Result<String, String> {
+    dispatch::Queue::main().exec_sync(|| {
+        let mtm = MainThreadMarker::new().expect("GCD main queue");
+        let app = NSApplication::sharedApplication(mtm);
+        let window = app.mainWindow().or_else(|| app.keyWindow())
+            .or_else(|| app.windows().firstObject()).ok_or("NSH window not ready")?;
+        let delegate = window.delegate().ok_or("NSH window has no delegate")?;
+        let object: &AnyObject = delegate.as_ref();
+        let original = object.class();
+        if original.name() == c"HaikuNshCloseDelegate" {
+            return Ok("HaikuNshCloseDelegate already installed".into());
+        }
+        // This spike knows the exact installed NSH class. Fail closed for other hosts.
+        if original.name() != c"NshAppDelegate" {
+            return Err(format!("Unsupported NSH delegate: {original:?}"));
+        }
+        let app_delegate = app.delegate().ok_or("NSH application has no delegate")?;
+        let app_object: &AnyObject = app_delegate.as_ref();
+        if !std::ptr::eq(object, app_object) {
+            return Err("NSH window/application delegates differ".into());
+        }
+        let subclass = AnyClass::get(c"HaikuNshCloseDelegate").unwrap_or_else(|| {
+            let mut builder = ClassBuilder::new(c"HaikuNshCloseDelegate", original).unwrap();
+            // Exact NSWindowDelegate ABI; no ivars or other method overrides.
+            unsafe { builder.add_method(sel!(windowShouldClose:),
+                hide_on_close as unsafe extern "C" fn(*mut AnyObject, Sel, *mut NSWindow) -> Bool) };
+            builder.register()
+        });
+        if subclass.superclass() != Some(original) || subclass.instance_size() != original.instance_size() {
+            return Err("Delegate subclass layout mismatch".into());
+        }
+        // Both delegates refer to this same object. Main-thread confinement excludes
+        // concurrent mutation; subclass has exactly the original instance layout.
+        let previous = unsafe { AnyObject::set_class(object, subclass) };
+        assert_eq!(previous, original);
+        Ok("NSApp sharedApplication; mainWindow/keyWindow/windows; delegate identity retained; reopen/quit inherited".into())
+    })
+}

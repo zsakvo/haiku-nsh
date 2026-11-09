@@ -2,7 +2,7 @@
 
 use std::sync::{
     Arc, OnceLock,
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     mpsc,
 };
 
@@ -12,6 +12,7 @@ use haiku_model::events::EventSink;
 static PLAYER: OnceLock<Result<Arc<Player>, String>> = OnceLock::new();
 static POSITION: AtomicU64 = AtomicU64::new(0);
 static GENERATION: AtomicU64 = AtomicU64::new(1);
+static PLAYING: AtomicBool = AtomicBool::new(false);
 
 fn player() -> Result<Arc<Player>, String> {
     PLAYER
@@ -28,7 +29,11 @@ fn player() -> Result<Arc<Player>, String> {
                                 POSITION.store(event.data.position.to_bits(), Ordering::Release);
                             }
                             PlaybackEventKind::Error => {
+                                PLAYING.store(false, Ordering::Release);
                                 eprintln!("S5 playback error: {}", event.data.message);
+                            }
+                            PlaybackEventKind::Finished => {
+                                PLAYING.store(false, Ordering::Release);
                             }
                             _ => {}
                         }
@@ -54,12 +59,34 @@ pub async fn play_local(path: String) -> Result<(), String> {
             },
             GENERATION.fetch_add(1, Ordering::AcqRel),
         )
-        .await
+        .await?;
+    PLAYING.store(true, Ordering::Release);
+    Ok(())
 }
 
 pub fn pause() {
     if let Some(Ok(player)) = PLAYER.get() {
         player.pause();
+        PLAYING.store(false, Ordering::Release);
+    }
+}
+
+pub fn playing() -> bool {
+    PLAYING.load(Ordering::Acquire)
+}
+
+pub fn resume() {
+    if let Some(Ok(player)) = PLAYER.get() {
+        player.resume();
+        PLAYING.store(true, Ordering::Release);
+    }
+}
+
+pub fn next() {
+    if let Some(Ok(player)) = PLAYER.get() {
+        // The spike has no queue. Use the real engine handoff path and report
+        // whether a prefetched successor exists.
+        eprintln!("S4 skip_to_next={}", player.skip_to_next());
     }
 }
 

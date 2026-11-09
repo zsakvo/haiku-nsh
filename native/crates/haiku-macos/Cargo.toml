@@ -15,6 +15,16 @@ cocoa.workspace = true
 objc.workspace = true
 dispatch.workspace = true
 block.workspace = true
+nsh-platform-macos = "=0.4.0"
+block2 = "=0.6.2"
+objc2-foundation = { version = "=0.3.2", features = ["NSHTTPCookie"] }
+# haiku-store uses loro 1.13.6. Its permissive internal range otherwise selects
+# incompatible 1.17.x in NSH's separate generated workspace (which has its own lock).
+loro-internal = "=1.13.6"
+
+[[test]]
+name = "web_cookies"
+harness = false
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }

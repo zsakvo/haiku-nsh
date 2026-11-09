@@ -4,6 +4,13 @@ use nsh_core::prelude::*;
 mod spike;
 use spike::{Spike, SpikeCounter, SpikeTrackList};
 
+/// Native backgrounds for the M0 platform surface.
+#[cfg(target_os = "macos")]
+#[native_components(macos)]
+fn macos_components(components: &nsh_platform_macos::Components) {
+    haiku_macos::glass::register(components);
+}
+
 /// The native API imported by the TSX entry.
 #[native_module("haiku/native")]
 fn native(registry: &mut Registry) {

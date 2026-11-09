@@ -8,11 +8,11 @@
 |---|---|---|---|
 | S1 | nsh CLI 与 mixed 模板 | 已验证（当前完整应用重新通过） | 2026-11-09 M0-02：移除 CJRT 后，当前应用 `nsh check/build/test` 通过，build 无 warn；开发窗口与打包版均显示 `Plugin echo(21) = 42`。证据 `.artifacts/m0-02/nsh-{check,build,test,run,package}.log`、`run-window.png`、`package-window.png`；开发 host 的独立链接器提示见下文 |
 | S2 | 插件运行时与 NSH 共用一份 QuickJS | 已验证（M0 最小内核，macOS arm64） | `haiku-jsrt` 与 NSH 使用同一组 `quickjs-jit/stdlib 0.14.1`；仅一份 sys，无 CJRT/rquickjs-sys。运行时测试 11/11；16 worker 共 1000 次调用全部正确，同时有 173 次 UI JS 计算 tick，双向全局变量隔离通过；release 打包无 warn，`_JS_NewRuntime` 一个定义。证据 `.artifacts/m0-02/{jsrt-test,nsh-test,nsh-package}.log`、`cargo-tree-duplicates.log`、`nm-release.txt` 及两张窗口截图 |
-| S3 | NSH webview 读取 HttpOnly Cookie | 未开始 | |
-| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 部分实现（仅迁移，未接入 NSH） | M0-03：haiku-macos 编译、6 个纯逻辑测试通过；`.artifacts/m0-03/{cargo-test,cargo-clippy}.log`。真实原生交互未覆盖 |
-| S5 | 后台播放与窗口恢复 | 部分实现（播放接口运行，关闭/恢复受阻） | M0-04：可见窗口 position 0.628→34.995 秒；NSH 0.4.0 无关闭拦截、窗口隐藏或 reopen 钩子。`.artifacts/m0-04/{nsh-run,platform-api}.log`；隐藏后 10 秒与恢复未覆盖 |
+| S3 | NSH webview 读取 HttpOnly Cookie | 已验证（macOS 原生回退） | M0-05：NSH 公开 WebView 接口无 Cookie 读取；独立 WKWebsiteDataStore 读取本地 fixture 的两个 Cookie（含 HttpOnly），第一会话存活时第二会话为空。`.artifacts/m0-05/web-cookies-repair2.log` |
+| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 部分实现（媒体快照、状态栏安装已验证） | M0-05：正确标题、playback_state 1→2；菜单栏截图可见曲名和控制按钮，channel 接回引擎线程。`.artifacts/m0-05/nsh-run.log`、`menubar.png`；实际按钮/媒体键回调待人工确认，NSPanel 未覆盖 |
+| S5 | 后台播放与窗口恢复 | 部分实现（原生关闭策略已安装，交互待人工确认） | M0-05：原 delegate 实例加无 ivar 子类，只覆盖关闭；reopen/quit 继承 NSH。可见窗口 position 0.603→34.995。`.artifacts/m0-05/nsh-run.log`；关闭后 10 秒、open -a 恢复、Cmd+Q 退出未覆盖 |
 | S6 | virtual_list 1 万行 | 已验证（跳转、选中回收与中部截图） | M0-04：Headless 1/1，跳转第 9000 行、选中第 5 行往返底部无串行；`.artifacts/m0-04/nsh-test-trace.log`、`list-middle.png`。trace 是提交耗时，未证明实际帧率 |
-| S7 | 原生玻璃视图嵌入 | 未开始 | |
+| S7 | 原生玻璃视图嵌入 | 部分实现（嵌入、叠放与按钮已验证；模糊未证实） | M0-05：Headless 1/1，空原生视图保留 64pt 布局，NSH 按钮可触发；真实截图文字/按钮层级正确，但玻璃区仍均匀灰色，两种修复后不再扩展排查。`.artifacts/m0-05/glass-headless-repair1.log`、`native-window.png` |
 | S8 | 第二个窗口共用 Core | 部分实现（Rust 计数器，第二窗口受阻） | M0-04：Rust 持有值、TSX listener 镜像已实现；当前 nsh/desktop 无窗口创建/标识 API，三项双窗口验收均未覆盖。`.artifacts/m0-04/platform-api.log` |
 
 ## 功能要求
@@ -196,3 +196,26 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 本任务只跑上述 Headless/trace 和一次真实窗口运行，未跑全 workspace、check、Clippy、打包或额外探针。沿用同一 toolchain Cargo 路径；`cargo update --workspace --offline` 仅维护 app 的依赖锁，0 个包升级，证据 cargo-lock.log。
 - 未覆盖：真实音频听感、暂停按钮人工交互、S5 关闭/恢复、S8 所有真实双窗交互、真实滚动 FPS、其他平台。应用仍为 spike；不开展 S3/S4/S7 或 M1。
 - 随一次提交 `M0-04: data root fix, NSH platform spikes (S5, S6, S8)` 收尾；用户已有 ARCHITECTURE 修改和未跟踪 M0-04 任务文件保持原样，不纳入本次提交。其余 specs、README、参考项目、NSH/依赖源码、Rex 均未修改。
+
+## 2026-11-09 M0-05：macOS 原生验证（S3、S4、S5、S7）
+
+- 新增 `haiku-macos/{lifecycle,glass,web_auth}.rs`；应用接线位于 `native/app/src/spike/macos.rs` 与 `src/spike/`，通过 app 根部 `#[native_components(macos)]` 注册玻璃背景。
+- 主线程入口：从引擎用 GCD `Queue::main().exec_sync` 派发；原生组件工厂及 WebKit 集成测试本身在主线程，以 MainThreadMarker 约束。
+- NSApp：`NSApplication::sharedApplication`；主窗口：`mainWindow`，回退 `keyWindow`、`windows().firstObject()`。
+- S5：确认 NSApplication/NSWindow 共用现有 NshAppDelegate 实例；运行时添加无 ivar、等实例大小的子类，只覆盖 windowShouldClose→orderOut/NO，保留实例身份与原有回调。
+- reopen 与 Cmd+Q 继续继承 NSH 原 delegate 的实现；默认应用菜单已有 Close（Cmd+W）。未知 delegate 类型或布局不匹配时拒绝安装。
+- S4：复用 system.rs、menubar.rs，发布固定 fixture 标题、35 秒时长、实际位置和播放状态；媒体与状态栏事件经 channel，由 NSH 引擎线程 tick 收取，再调用同一播放器的 play/pause/toggle/next。
+- S3：查过 NSH 0.4.0 的 WebView/ElementRef 接口，无 Cookie 读取入口；采用独立 nonPersistentDataStore + WKHTTPCookieStore，未完整实现 NSH WebView 方案。
+- `cargo test --manifest-path native/Cargo.toml -p haiku-macos --test web_cookies`：最终退出 0，本地 Rust HTTP fixture 的两个 Cookie（含 HttpOnly）正确；第一会话仍存活时新会话为空。证据 `web-cookies-repair2.log`。
+- Cookie 测试使用 harness=false，保持 WebKit 和 run loop 在进程主线程；此前两次编译修复为 objc2 类型/feature 与方法 ABI 签名，原始日志保留。
+- `nsh test src/spike/Glass.test.tsx --filter S7`：最终退出 0、1/1；原生空视图保留 64pt 底栏，叠放按钮触发一次。证据 `glass-headless-repair1.log`。
+- 该命令首次被生成 host 锁中的 loro-internal 1.17.1 与 loro 1.13.6 不兼容阻断；对齐为 1.13.6，并在 haiku-macos manifest 精确约束，供 NSH 独立 workspace 解析。证据 `host-lock-alignment.log`；native 锁已同步。
+- `HAIKU_SPIKE_AUDIO=<M0-04 的 silence-35s.flac> nsh run --target macos`：host 运行、delegate 安装成功，可见窗口 position 0.603→34.995；media.snapshot 标题为 M0-05 local fixture，播放态 1、结束后 2。证据 `nsh-run.log`。
+- 截图：`native-window.png` 显示玻璃背景区域及上层 NSH 文字/按钮；`menubar.png` 显示曲名和播放控件。截图均在 `.artifacts/m0-05/`，已实际查看。
+- S7 视觉缺口：WithinWindow 呈均匀灰色；先改 BehindWindow/Sidebar，再尝试透明 NSWindow，仍未从截图证实背景模糊。已到两种修复上限，停止进一步排查，不标玻璃视觉验收通过。
+- S5 未覆盖/待人工确认：关闭按钮、Cmd+W、隐藏后 10 秒播放增长、open -a 恢复、恢复截图、Cmd+Q 正常退出。终端以 Ctrl+C 收尾（退出 1），不能代替 Cmd+Q 验收。
+- S4 待人工确认：媒体键/控制中心暂停、菜单栏按钮点击，以及事件实际抵达引擎；NSPanel 不在本次安装范围。
+- 全部新增原生实现使用 Rust/objc2，无新增 .m、build.rs 或独立 dylib；已迁移的媒体/状态栏继续使用原 objc/cocoa 实现。
+- 构建有 CLI 汇总的 2/3 个 warnings；未额外重跑以展开。Cookie 测试提示原有 block 0.1.6 的 future incompatibility；未做全量测试、Clippy、release 或额外审计。
+- 建议审阅者把 D18/API 描述限定为“NSH 公开接口不可配置”；其 macOS 内部 delegate 已实现 reopen/quit，本次直接保留。S3 记录 macOS 原生回退可行；S7 暂保留 NSH 半透明回退，待视觉结论后再决定。
+- 本次一并提交审阅者已修改的 SPEC、ARCHITECTURE、UI、MACOS 及未提交任务文件；未自行修改这些正文，未修改 Rex 会话名、上游或参考项目。

@@ -9,7 +9,7 @@
 - `MPNowPlayingInfoCenter`：标题、艺术家、专辑、时长、位置、播放状态、封面（先把需要认证的封面 URL 下载为本地图片：单张不超过 8MB，缓存最多 32 个文件、32MB）、能否上一首/下一首、喜欢状态。可选显示当前歌词行。
 - `MPRemoteCommandCenter`：play/pause/toggle/stop/next/previous/seek/favorite/repeat/shuffle，全部走与界面相同的控制器。
 - 媒体键：由 MPRemoteCommandCenter 处理。
-- 后台播放：Cmd+W 或点击关闭按钮只隐藏窗口，音频继续播放；点击 Dock 图标或菜单中的“显示主窗口”时恢复窗口。
+- 后台播放（D18，NSH 不提供这些钩子）：接管主 NSWindow 的关闭（`windowShouldClose:` 返回 NO 并 `orderOut:`），Cmd+W 或点击关闭按钮只隐藏窗口，音频继续播放；处理 NSApplication 的 reopen（Dock 点击）和菜单中的“显示主窗口”，恢复窗口；Cmd+Q 正常退出。实现时必须保留 NSH 原有的 delegate 行为（转发而不是替换），不修改 NSH 源码。
 - 防息屏：IOPMAssertion `PreventUserIdleDisplaySleep`，仅在正在播放页可见且设置开启时持有。
 - 退出时清理媒体信息并释放 assertion。
 

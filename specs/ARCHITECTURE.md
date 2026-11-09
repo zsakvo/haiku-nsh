@@ -62,6 +62,12 @@ haiku-nsh/
   specs/
 ```
 
+M0-03 迁移时确定的归属：
+- `haiku-model::events::EventSink`：所有核心事件的统一出口（替代参考版的 stdout bridge），保留 generation。
+- `haiku-library::tags`：音频标签读写（`AudioTags`、`write_tag`），本地曲库与下载共用；`haiku-services` 依赖 `haiku-library`。
+- `haiku-store::data_root`：数据根解析（默认目录见 DATA.md §1）。
+- `haiku-macos` 中三个 ObjC ivar 访问函数局部允许了 `clippy::mut_from_ref`，M6 接入时需要复核其中的指针别名是否安全。
+
 依赖规则：
 
 - 领域 crate 之间单向依赖：`model ← audio/lyrics/store ← plugins/library ← playback/services ← app`。
@@ -135,9 +141,9 @@ haiku-nsh/
 | S2 | **插件运行时与 NSH 共用一份 QuickJS**：haiku-jsrt 基于 `quickjs-jit`，在独立线程上创建与 NSH UI VM 隔离的 runtime | 完整应用 debug/release 构建无重复符号；TSX 持续执行 JS 时，并发 1000 次插件调用结果全部正确；release 打包成功 | 已排除：CJRT 直接链接（M0-01 证实 234 个 QuickJS 符号冲突、被静默覆盖，且 RustCrypto 版本冲突）。最后手段：插件宿主独立成子进程 |
 | S3 | NSH webview 能否在独立会话中读取目标域 Cookie（含 HttpOnly） | 本地 HTTP fixture 写入的 HttpOnly Cookie 可读 | macOS 复用参考版 `web_auth.m`（WKWebView + WKHTTPCookieStore） |
 | S4 | `haiku-macos` 能否在 NSH 的 NSApplication 中安装 NSStatusItem、NSPanel，并注册 MPRemoteCommandCenter | 菜单栏组件可点击；媒体键事件回到引擎线程 | 调查 NSH 的 macOS 后端扩展点，必要时在 app 内持有主线程派发器 |
-| S5 | cpal 输出在 NSH 进程中稳定；Cmd+W 隐藏窗口后继续播放，Dock 点击后恢复窗口 | 关闭窗口后音频不中断，窗口可恢复 | 查 NSH 窗口生命周期 API |
+| S5 | cpal 输出在 NSH 进程中稳定；Cmd+W 隐藏窗口后继续播放，Dock 点击后恢复窗口 | 关闭窗口后音频不中断，窗口可恢复 | NSH 没有对应 API（M0-04）：由 haiku-macos 接管主 NSWindow 的关闭与 NSApplication 的 reopen（D18），在 M0-05 验证 |
 | S6 | `virtual_list` 1 万首歌的滚动、行回收与跳转 | 滚动无掉帧；回收后行状态正确 | — |
 | S7 | `#[native_components(macos)]` 嵌入 NSVisualEffectView 作为玻璃底栏 | 与 NSH 内容正确叠放、可点击 | 底栏改用 NSH 绘制的半透明回退 |
-| S8 | 第二个 NSH 窗口（设置窗口）与主窗口共用 Core | 两窗口状态同步，关闭设置窗口不影响主窗口 | — |
+| S8 | 第二个 NSH 窗口（设置窗口）与主窗口共用 Core | 两窗口状态同步，关闭设置窗口不影响主窗口 | **不可行**（M0-04：NSH 0.4.0 无法新建窗口）。设置改为窗口内覆盖层（D18），本项关闭 |
 
 验证结论写入 STATUS.md 的 M0 小节。S2 不通过会影响插件宿主的形态，必须最先完成。
