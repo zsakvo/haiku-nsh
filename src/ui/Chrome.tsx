@@ -10,7 +10,7 @@ export function ShellSidebar(props: { children?: JSX.Element }) {
   return <View class="shrink-0 bg-sidebar" style={{ width: token("sidebar-width") }}>{props.children}</View>;
 }
 export function ChromeSpacer() {
-  return <View class="shrink-0" style={{ height: chromeHeight() }} desktop={{ windowDrag: true }} />;
+  return <View class="shrink-0 mb-(--sidebar-top-gap)" style={{ height: chromeHeight() }} desktop={{ windowDrag: true }} />;
 }
 export function WindowPanel(props: { children?: JSX.Element }) {
   return <View class="flex-1 min-w-0 min-h-0 rounded-(--radius-panel) overflow-hidden bg-background"

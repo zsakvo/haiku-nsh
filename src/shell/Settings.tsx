@@ -24,10 +24,10 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
     <ShellFrame>
       <ShellSidebar>
         <ChromeSpacer />
-        <View class="px-2 pb-2">
-          <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="查找分类" />
+        <View class="px-2 pb-(--sidebar-search-gap)">
+          <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="查找分类" compactPlaceholder />
         </View>
-        <Scroll class="flex-1" contentClass="flex-col gap-0.5 px-2 pb-2">
+        <Scroll class="flex-1" contentClass="flex-col gap-(--navigation-row-gap) px-2 pb-2">
           {categories.map((category) => <View class="flex-col"
             style={{ display: category.label.includes(query()) ? "flex" : "none" }}>
             <SidebarItem icon={category.icon} label={category.label}

@@ -19,7 +19,7 @@
 
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
-| F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01 已审阅通过；M1-01b check/build/test 通过，原有 Headless 4/4 | M1-01b 截图捕获失败，视觉验收待补；页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
+| F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
 | F02 插件包与来源生命周期 | 未实现 | | | |
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
@@ -266,3 +266,13 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 运行日志 `run-light.log`、`run-light-display1.log`；捕获失败日志 `capture-light{,-repair1,-display1}.log` 与只读 `window-light*.log`，均在 `.artifacts/m1-01b/`。
 - 四张截图均未完成，未确认实际裁切、网格、圆角及深色插画视觉；未用旧截图充当证据，失败原因尚未确认，已 Ctrl+C 停止 host。
 - 按任务提交一次，纳入已有任务文件及通用约定修改；仅自行更新 specs/STATUS.md，Rex/上游/参考项目未修改。视觉验收需后续补齐，无新增架构决策。
+
+## 2026-11-10 M1-01c：侧栏与顶栏密度微调
+
+- STANDARDS/theme/共享组件先行：两侧栏宽 200pt、条目最小 32pt、行距 4pt、组距 24pt、标题至首条目 8pt；红绿灯区后 8pt，设置搜索至首分类 12pt。
+- 主内容/设置顶栏 40pt，保留 `max(token, titleBar().height)` 下限；本次截图呈 40pt，图标按钮/搜索入口最小 28pt、垂直居中。
+- “前往…”12pt、入口最小宽 176pt（增加约 40pt）；设置 placeholder 12pt，输入后仍为 14pt（NSH 无独立 placeholder 字号，按空值切换共享组件字号）。
+- `nsh check -v`、`nsh build -v`、`nsh test -v` 均退出 0，原有 Headless 4/4、断言未改；日志 `.artifacts/m1-01c/nsh-{check,build,test}.log`，仅约定允许的 block 0.1.6 / 开发 host __eh_frame 提示。
+- 两次截图前锁屏检查均为 false；主窗口与设置预览各运行/捕获一次，已实际查看，无可见裁切；截图 `.artifacts/m1-01c/{main-light,settings-light}.png`，对应 run/capture/window/screen-lock 日志同目录，截图后 Ctrl+C 收尾。
+- 审阅者已确认 M1-01b 捕获失败原因是锁屏，用户已查看真实窗口；保留上节历史记录，本次两张新截图完成当前浅色视觉验收。
+- 未覆盖：深色截图、窗口缩放/大字号、真实鼠标/菜单交互；无新增待决策事项，纳入任务文件并按指定标题提交一次后停止。

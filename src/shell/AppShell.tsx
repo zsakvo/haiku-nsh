@@ -66,8 +66,8 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
   return <ShellFrame>
     <ShellSidebar>
       <ChromeSpacer />
-      <View class="flex-1 min-h-0 gap-4 px-2 pb-4">
-        {["发现", "音乐库"].map((group) => <View class="gap-0.5">
+      <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
+        {["发现", "音乐库"].map((group) => <View class="gap-(--navigation-row-gap)">
           <SectionLabel label={group} />
           {destinations.filter((page) => page.group === group).map((page) =>
             <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
