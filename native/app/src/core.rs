@@ -179,70 +179,7 @@ impl Core {
         Ok(())
     }
 
-    /// Development only; remove in M1-03. Play complete local files without player UI.
-    pub async fn dev_play_files(paths: Vec<String>) -> Result<Instance<Self>, JsError> {
-        let core = Self::open().await?;
-        let controller = core.with(|c| c.player.with(|p| p.bridge.controller.clone()));
-        let tracks = paths
-            .into_iter()
-            .map(|path| {
-                let path = std::path::PathBuf::from(path);
-                let path = if path.is_absolute() {
-                    path
-                } else {
-                    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                        .join("../..")
-                        .join(path)
-                };
-                Track::local(path.to_string_lossy())
-            })
-            .collect();
-        controller
-            .execute(Command::Play(tracks, 0))
-            .await
-            .map_err(js_error)?;
-        Ok(core)
-    }
 
-    /// Development acceptance only; remove in M1-03. Logs growth, pauses/resumes, and logs the natural end.
-    pub async fn dev_verify_playback(this: Instance<Self>) -> Result<(), JsError> {
-        let controller = this.with(|c| c.player.with(|p| p.bridge.controller.clone()));
-        let mut paused_at = None;
-        for second in 0..60 {
-            timer(Duration::from_secs(1)).await;
-            let state = controller.state();
-            let progress = controller.progress();
-            eprintln!(
-                "M1-02 smoke second={second} status={:?} position={:.3}",
-                state.status, progress.position
-            );
-            if state.status == Status::Error {
-                return Err(js_error(state.error.unwrap()));
-            }
-            if second == 2 {
-                controller.execute(Command::Pause).await.map_err(js_error)?;
-                paused_at = Some(controller.progress().position);
-            }
-            if second == 4 {
-                if (progress.position - paused_at.unwrap_or(-1.0)).abs() > 0.001 {
-                    return Err(JsError::Error("Position advanced after pause".into()));
-                }
-                eprintln!("M1-02 smoke pause position stable");
-                controller
-                    .execute(Command::Resume)
-                    .await
-                    .map_err(js_error)?;
-            }
-            if second > 4 && state.status == Status::Idle {
-                eprintln!(
-                    "M1-02 smoke natural finish idle, current retained, position={:.3}",
-                    progress.position
-                );
-                return Ok(());
-            }
-        }
-        Err(JsError::Error("Playback smoke timed out".into()))
-    }
 }
 
 /// Low-frequency playback commands and state subscription. All business state belongs to Rust.

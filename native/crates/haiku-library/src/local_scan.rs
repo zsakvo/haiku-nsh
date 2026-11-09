@@ -62,6 +62,8 @@ pub struct ScanOutcome {
     pub skipped: u32,
     /// 不存在或没权限的扫描根。
     pub unreadable_roots: Vec<String>,
+    pub errors: Vec<String>,
+    pub cancelled: bool,
 }
 
 /// 扫一轮。[`on_progress`] 每处理完一个文件调一次（已扫数, 总数, 当前文件名）。
@@ -71,6 +73,14 @@ pub struct ScanOutcome {
 pub fn scan(
     roots: &[String],
     cover_dir: &Path,
+    on_progress: impl FnMut(u32, u32, &str),
+) -> ScanOutcome {
+    scan_cancellable(roots, cover_dir, || false, on_progress)
+}
+
+/// Scan with cooperative cancellation during both traversal and metadata reads.
+pub fn scan_cancellable(
+    roots: &[String], cover_dir: &Path, cancelled: impl Fn() -> bool,
     mut on_progress: impl FnMut(u32, u32, &str),
 ) -> ScanOutcome {
     let mut unreadable_roots = Vec::new();
@@ -86,26 +96,28 @@ pub fn scan(
             continue;
         }
         let before = files.len();
-        collect(path, 0, &mut files, &mut seen);
+        collect(path, 0, &mut files, &mut seen, &cancelled);
         // 目录在、但一个文件都没读出来且它本身读不动（权限），也算读不到。
         if files.len() == before && fs::read_dir(path).is_err() {
             unreadable_roots.push(root.clone());
         }
     }
 
+    let mut errors: Vec<String> = unreadable_roots.iter().map(|r| format!("无法读取文件夹：{r}")).collect();
     let total = files.len() as u32;
     let mut tracks = Vec::with_capacity(files.len());
     let mut skipped = 0u32;
     let mut dir_cover_cache: HashMap<PathBuf, Option<PathBuf>> = HashMap::new();
 
     for (i, file) in files.iter().enumerate() {
+        if cancelled() { break; }
         let name = file
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
         match read_track(file, cover_dir, &mut dir_cover_cache) {
             Some(t) => tracks.push(t),
-            None => skipped += 1,
+            None => { skipped += 1; errors.push(format!("无法读取或不支持的音频：{}", file.display())); },
         }
         on_progress(i as u32 + 1, total, &name);
     }
@@ -114,6 +126,8 @@ pub fn scan(
         tracks,
         skipped,
         unreadable_roots,
+        errors,
+        cancelled: cancelled(),
     }
 }
 
@@ -122,14 +136,15 @@ pub fn scan(
 /// **不跟随符号链接**：一个指向祖先目录的软链就是无限循环，`MAX_DEPTH` 只能兜住
 /// 深度、兜不住宽度爆炸。以 `.` 开头的目录一律跳过（含下载半成品 `.haiku-incomplete`
 /// 与各类 `.git` / `.Trash`）。
-fn collect(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>) {
-    if depth >= MAX_DEPTH {
+fn collect(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>, cancelled: &impl Fn() -> bool) {
+    if depth >= MAX_DEPTH || cancelled() {
         return;
     }
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
+        if cancelled() { break; }
         let path = entry.path();
         let Ok(meta) = entry.metadata() else { continue };
         // `DirEntry::metadata` 不跟随链接，故这里能识别出软链本身。
@@ -142,7 +157,7 @@ fn collect(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, seen: &mut HashSet<
                 .and_then(|s| s.to_str())
                 .is_some_and(|s| s.starts_with('.'));
             if !hidden {
-                collect(&path, depth + 1, out, seen);
+                collect(&path, depth + 1, out, seen, cancelled);
             }
             continue;
         }
@@ -151,7 +166,7 @@ fn collect(dir: &Path, depth: usize, out: &mut Vec<PathBuf>, seen: &mut HashSet<
         }
         let key = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
         if seen.insert(key) {
-            out.push(path);
+            out.push(fs::canonicalize(&path).unwrap_or(path));
         }
     }
 }
