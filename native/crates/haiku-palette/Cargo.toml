@@ -1,5 +1,13 @@
 [package]
 name = "haiku-palette"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 publish = false
+
+[dependencies]
+serde.workspace = true
+image.workspace = true
+material-colors.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

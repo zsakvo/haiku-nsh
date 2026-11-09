@@ -7,4 +7,78 @@ resolver = "3"
 rquickjs = { package = "quickjs-jit", version = "=0.14.1", features = ["futures", "loader"] }
 quickjs-jit-stdlib = "=0.14.1"
 serde_json = "1"
-tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "fs", "io-util"] }
+
+serde = { version = "=1.0.229", features = ["derive"] }
+# KRC 内嵌翻译提取：`[language:<base64>]` 元数据解码（已在依赖树中，显式声明为直接依赖）。
+base64 = "=0.22.1"
+
+# 本地歌单权威源：CRDT（MovableList 承载可重排歌单/曲目，import 幂等可交换），
+# 见 docs/spark/2026-07-09-gist-playlist-sync-design.md。
+loro = "=1.13.6"
+# 歌单 id 生成（v4 随机）。
+uuid = { version = "=1.19.0", features = ["v4"] }
+
+# 音频播放引擎（移植自 cjrt-workspace music-cli）：边下边解码、有界内存、带 header 拉流。
+anyhow = "=1.0.100"
+futures = "=0.3.31"
+# 带 Referer/UA/Cookie 头拉取音频字节；stream 用于 bytes_stream 边下边解码。
+reqwest = { version = "=0.12.28", default-features = false, features = [
+    "rustls-tls",
+    "stream",
+] }
+# 前缀落盘：整首压缩前缀写入匿名临时文件（句柄 drop / 进程退出自动回收），内存不再
+# 常驻整段压缩数据，读取走 pread（见 player.rs SharedStream）。
+tempfile = "=3.24.0"
+# 纯 Rust 播放后端：只用 rodio 的 cpal 输出 + Source（不用其解码器，自行用 symphonia 解码）。
+rodio = { version = "=0.20.1", default-features = false }
+# 响度均衡：EBU R128 整合响度 + 采样峰值（libebur128 的纯 Rust 移植，与 C 版对拍过）。
+# 挂在解码线程上直接吃已解出的 PCM，见 src/loudness.rs。默认 feature 即够用
+# （true-peak 用不上：正增益按采样峰值留 1 dB 余量封顶，不需要过采样峰值）。
+ebur128 = "=0.1.10"
+# 自行用 symphonia 解码 m4a(AAC)/mp3/flac/ogg(Vorbis)，完整 Result 处理，绝不 panic。
+#
+# `ogg` 是容器（demuxer），`vorbis` 是其中的解码器，两个都要开才放得响 .ogg。
+# **Opus 开不了**：symphonia 0.5 没有 opus 解码器（`symphonia-codec-opus` 只是占位），
+# 所以 Ogg/Opus、WebM/Opus 仍然解不了，靠 player.rs 的 sniff_container 报「不支持」。
+# 改这里的同时必须同步改 local_scan.rs 的扫描白名单，两边一一对应。
+symphonia = { version = "=0.5.5", default-features = false, features = [
+    "aac",
+    "isomp4",
+    "mp3",
+    "flac",
+    "ogg",
+    "vorbis",
+] }
+# 下载产物打标签：title/artist/album/track/封面/歌词，覆盖 mp3(ID3v2)/flac(Vorbis)/m4a(ilst)。
+# `default-features = false` 关掉 `id3v2_compression_support`（flate2/miniz_oxide）与 `serde`。
+# 注意：`specs/features/downloads.md` §4.4 写的 `id3v2 / vorbis_comments / mp4_ilst` 三个
+# feature 在 lofty 0.19+ 已被移除（格式支持恒定编入），当前可关的只有上面两个。
+lofty = { version = "=0.24.0", default-features = false }
+# 本地 `.lrc` 侧车的编码识别（`local_scan::decode_text`）。老曲库里的歌词文件大量是
+# GBK/GB18030 或 UTF-16，硬按 UTF-8 解就是满屏乱码。
+#
+# **不增加体积**：这两个 crate 已经由 CJRT 的 `llrt_fetch` / `llrt_encoding` 拖进
+# 依赖图并链进产物（`cargo tree -i encoding_rs` 可验），这里只是把它变成直接依赖。
+chardetng = "=0.1.17"
+encoding_rs = "=0.8.35"
+# 诊断日志（扫描为什么跳过某个文件等）。logger 由 flutter_rust_bridge 装好
+# （Android → logcat，iOS/macOS → oslog），这里只管 `log::warn!`，不自己 init。
+log = "=0.4.29"
+
+# macOS：顶栏歌词组件（NSStatusItem，见 src/menubar.rs）。cocoa/objc 直调 AppKit，
+# dispatch 把安装/更新派发到主队列（AppKit 只能主线程访问）。
+cocoa = "=0.24.1"
+objc = "=0.2.7"
+dispatch = "=0.2.0"
+# CIKernel 的 roiCallback 是 Objective-C block；block crate 已在依赖树中，
+# 显式声明为直接依赖，不引入新版本。
+block = "=0.1.6"
+
+
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+material-colors = { version = "=0.5.0", features = ["quantize"] }
+haiku-model = { path = "crates/haiku-model" }
+haiku-library = { path = "crates/haiku-library" }
+haiku-lyrics = { path = "crates/haiku-lyrics" }
+haiku-store = { path = "crates/haiku-store" }

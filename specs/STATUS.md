@@ -9,7 +9,7 @@
 | S1 | nsh CLI 与 mixed 模板 | 已验证（当前完整应用重新通过） | 2026-11-09 M0-02：移除 CJRT 后，当前应用 `nsh check/build/test` 通过，build 无 warn；开发窗口与打包版均显示 `Plugin echo(21) = 42`。证据 `.artifacts/m0-02/nsh-{check,build,test,run,package}.log`、`run-window.png`、`package-window.png`；开发 host 的独立链接器提示见下文 |
 | S2 | 插件运行时与 NSH 共用一份 QuickJS | 已验证（M0 最小内核，macOS arm64） | `haiku-jsrt` 与 NSH 使用同一组 `quickjs-jit/stdlib 0.14.1`；仅一份 sys，无 CJRT/rquickjs-sys。运行时测试 11/11；16 worker 共 1000 次调用全部正确，同时有 173 次 UI JS 计算 tick，双向全局变量隔离通过；release 打包无 warn，`_JS_NewRuntime` 一个定义。证据 `.artifacts/m0-02/{jsrt-test,nsh-test,nsh-package}.log`、`cargo-tree-duplicates.log`、`nm-release.txt` 及两张窗口截图 |
 | S3 | NSH webview 读取 HttpOnly Cookie | 未开始 | |
-| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 未开始 | |
+| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 部分实现（仅迁移，未接入 NSH） | M0-03：haiku-macos 编译、6 个纯逻辑测试通过；`.artifacts/m0-03/{cargo-test,cargo-clippy}.log`。真实原生交互未覆盖 |
 | S5 | 后台播放与窗口恢复 | 未开始 | |
 | S6 | virtual_list 1 万行 | 未开始 | |
 | S7 | 原生玻璃视图嵌入 | 未开始 | |
@@ -145,3 +145,31 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 窗口截图已实际查看。终端无辅助功能权限，已有两次按钮验证通过 LLDB 向各自 AppKit 窗口队列投递 mouse moved/down/up，触发真实控件；未直接调用 JS 或写入结果。一次早期 debugger attach 导致 CLI 丢失 child 的诊断保留在 `nsh-run-lldb-parent-failed.log`，随后开发窗口验证完成。
 
 未覆盖：其他平台/架构、长期稳定性及资源上限；R2/R3/R5–R12、完整 R1/R4 和音乐 SDK 均留后续任务。同步原生 stdlib 工作不能被 JS interrupt 抢占，期限在返回后检查。本次不提交 git，不修改上游源码、Rex 会话名或其他 specs 文件；按审阅者要求停止新增验证，仅用已有证据收尾。
+
+## 2026-11-09 M0-03：Rust 核心迁移完成
+
+- 基线提交 `77bb293`：`M0: project skeleton, haiku-jsrt minimal runtime (S1, S2)`；提交前确认 main 和忽略规则，证据 `.artifacts/m0-03/git-baseline.log`。
+- 将 player/effects/loudness/media_cache/playback 迁入 haiku-audio；lyrics → haiku-lyrics；playlist_core/playlist_sync → haiku-store（collections 接口）；local_scan/local_library → haiku-library；downloader/downloads → haiku-services；cover-palette → haiku-palette；4 个 macOS 模块、2 个 API 和菜单栏图片 → haiku-macos。
+- 按后续授权调整映射：AudioTags/write_tag 下沉 haiku-library::tags；共享 FLAC/JPEG 夹具下沉 test_support（仅 test 或显式 feature），下载端到端测试仍留 services。原 library → downloader 的反向引用改为 services → library，无反向领域依赖残留。
+- 排除原 stdout bridge/RPC：共享 EventSink 下沉 haiku-model，Rust channel 保留 generation、关闭错误及原事件转发逻辑；macOS 原生回调改用可订阅 channel。仅将 data_root 纯函数提取到 haiku-store，保留 HAIKU_DATA_DIR 和原 GPUIX 默认路径，本任务未调用真实数据目录。
+- playback 删除歌词 RPC 镜像转换；歌词解析仍归 haiku-lyrics。迁入 crate 保持参考版 edition 2021，避免混入 edition 升级；haiku-macos 整体 cfg(macos)。native/app 未改动、未接入领域 crate。
+- 依赖在 workspace 集中声明，各 crate workspace=true，保留参考 feature 注释；新增直接依赖按参考锁定版本，Tokio 合并播放/下载所需 features。未引入 FRB/CJRT/Android 专用依赖。
+- 首次 workspace test 在 loro 1.13.6 + 自动解析的 loro-internal 1.17.1 处失败；一次修复思路：Cargo.lock 对齐参考版 internal 1.13.6、common/kv-store 1.13.1，重试通过；未改依赖源码。
+- 首次 Clippy 被原 macOS 三个 Objective-C ivar 访问函数的 mut_from_ref 默认 deny 阻断；一次修复思路：只在这三个函数局部 allow，保留原实现；重试通过。这不证明旧指针别名实现的安全性。
+
+| crate | 参考代码测试数 → 迁入后 | 最终结果 |
+|---|---|---|
+| haiku-audio | 63 → 63（player 38 / effects 13 / loudness 9 / media_cache 3） | 62 通过，1 ignore |
+| haiku-library | 21 → 21（local_scan 18 / local_library 3） | 全通过 |
+| haiku-lyrics / haiku-store | 15 / 15 → 15 / 15 | 全通过 |
+| haiku-services / haiku-macos | 10 / 6 → 10 / 6 | 全通过；macos 为 desktop_lyrics 4 + shortcuts 2 |
+| haiku-palette | 2 单元 + 11 既有集成 → 2 + 11 | 全通过；任务参考值 2 只计单元测试 |
+
+- 迁入的 143 个既有测试：142 通过、1 ignore；加原有 haiku-jsrt 11 个，workspace 合计 153 通过、1 ignore，0 失败。其他空壳 crate/app 仍为 0 个 Rust 测试，未新增测试。
+- 唯一 ignore 沿用原 player::tests::output_pipeline_consumes_samples，原因：需要真实音频输出设备；未新增 ignore。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：最终退出 0；首次失败、依赖锁修复及重试均保留在 `.artifacts/m0-03/cargo-test.log`。
+- `cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets`：最终退出 0；旧源码 warning 11 处（audio 5 / library 2 / lyrics 1 / store 3），不修；另有 block 0.1.6 future-incompat 提示。首次失败及重试见 `cargo-clippy.log`。
+- `nsh check`：退出 0；`nsh test`：退出 0，3/3，通过 1000 次回声、191 次重叠 UI tick 和双向 VM 隔离。证据 `.artifacts/m0-03/nsh-{check,test}.log`。
+- 全程使用同一 toolchain Cargo（1.98.1 路径），未更换工具链重跑。仅失败项目各作上述一次修复并重试；未增加其他验收、探针、GUI 自动化或汇总 JSON。
+- 第二次提交：本节随 `M0-03: migrate reference Rust core into domain crates` 纳入，哈希见最终汇报；本任务仅上述两次提交。
+- 未覆盖：真实音频设备、NSH 中的 macOS 原生交互、channel/generation 适配的专项接线测试、其他平台；未 run、截图或打包。参考项目、README、上游依赖、Rex 会话保持不变；本次停止，不开展后续任务。

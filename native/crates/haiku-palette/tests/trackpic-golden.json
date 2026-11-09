@@ -1,0 +1,96 @@
+[
+  {
+    "name": "solid",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#38536e",
+      "#547ca4",
+      "#547ca4",
+      "#88a5c2",
+      "#becede"
+    ]
+  },
+  {
+    "name": "gray",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#282828",
+      "#444444",
+      "#646464",
+      "#898989",
+      "#a4a4a4"
+    ]
+  },
+  {
+    "name": "border",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#113d6d",
+      "#1c64b4",
+      "#1c64b4",
+      "#408de1",
+      "#87b7ec"
+    ]
+  },
+  {
+    "name": "hues",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#6328c2",
+      "#c7272b",
+      "#cd316a",
+      "#b13fab",
+      "#b446e3"
+    ]
+  },
+  {
+    "name": "alpha",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#1f4064",
+      "#1f6fc2",
+      "#47a365",
+      "#24ccc6",
+      "#69cccc"
+    ]
+  },
+  {
+    "name": "empty",
+    "width": 100,
+    "height": 100,
+    "focus": null,
+    "expected": [
+      "#4a6370",
+      "#73a0b1",
+      "#98b6be",
+      "#bdcbcc",
+      "#ebf1f2"
+    ]
+  },
+  {
+    "name": "focus",
+    "width": 100,
+    "height": 100,
+    "focus": [
+      0.2,
+      0.8
+    ],
+    "expected": [
+      "#6c8c2e",
+      "#41d714",
+      "#78ca90",
+      "#b4c95c",
+      "#c7df6c"
+    ]
+  }
+]

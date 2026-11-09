@@ -1,5 +1,9 @@
 [package]
 name = "haiku-lyrics"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 publish = false
+
+[dependencies]
+base64.workspace = true
+serde_json.workspace = true
