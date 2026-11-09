@@ -29,7 +29,8 @@ export function Icon(props: {
   name: IconName;
   color?: "foreground" | "primary" | "muted-foreground" | "sidebar-foreground";
   small?: boolean;
+  sidebar?: boolean;
 }) {
-  return <Image src={icons[props.name]} class={props.small ? "size-4" : "size-5"}
+  return <Image src={icons[props.name]} class={props.sidebar ? "size-(--sidebar-icon-size)" : props.small ? "size-4" : "size-5"}
     style={{ tintColor: token(props.color ?? "foreground") }} />;
 }

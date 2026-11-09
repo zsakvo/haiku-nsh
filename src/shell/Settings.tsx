@@ -6,7 +6,7 @@ import { IconButton } from "../ui/IconButton";
 import type { IconName } from "../ui/Icon";
 import { Overlay } from "../ui/Surfaces";
 import { AppearanceOptions } from "../ui/AppearanceOptions";
-import { ChromeSpacer, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
 
 const categories = [
   { label: "账户", icon: "user" }, { label: "外观", icon: "palette" },
@@ -23,10 +23,10 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
   return <Overlay open={props.open} onClose={props.onClose}>
     <ShellFrame>
       <ShellSidebar>
-        <ChromeSpacer />
-        <View class="px-2 pb-(--sidebar-search-gap)">
-          <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="查找分类" compactPlaceholder />
-        </View>
+        <SidebarChrome />
+        <SidebarSearch>
+          <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="查找分类" sidebar />
+        </SidebarSearch>
         <Scroll class="flex-1" contentClass="flex-col gap-(--navigation-row-gap) px-2 pb-2">
           {categories.map((category) => <View class="flex-col"
             style={{ display: category.label.includes(query()) ? "flex" : "none" }}>
@@ -36,8 +36,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
         </Scroll>
       </ShellSidebar>
       <WindowPanel>
-        <ShellToolbar>
-          <Text testID="settings-heading" role="header" class="flex-1 text-base font-semibold text-foreground">{selected()}</Text>
+        <ShellToolbar testID="settings-heading">
           <IconButton icon="close" label="关闭设置" hint="关闭设置 · Esc" onPress={props.onClose} />
         </ShellToolbar>
         <Scroll class="flex-1" contentClass="flex-col px-(--content-inset) py-4">

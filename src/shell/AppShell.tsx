@@ -1,11 +1,11 @@
-import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
+import { cleanup, effect, keymap, signal, token, View } from "nsh";
 import { Menu as DesktopMenu, Window } from "nsh/desktop";
 import { Core } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
-import { ChromeSpacer, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { createNavigation, destinations } from "./navigation";
 import { Settings } from "./Settings";
@@ -20,7 +20,6 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
   const closeOverlay = () => overlay.set(null);
   const goBack = () => { if (!overlay()) nav.back(); };
   const goForward = () => { if (!overlay()) nav.forward(); };
-  const currentTitle = () => destinations.find((page) => page.id === nav.current().kind)?.label ?? "详情";
   const shortcuts = { back: "mod+[", forward: "mod+]", commands: "mod+k", settings: "mod+," };
   // Bindings and menu items dispatch the same commands. Keymap owns these keys;
   // the menu's shortcut is their matching native display/fallback.
@@ -65,7 +64,15 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
   }
   return <ShellFrame>
     <ShellSidebar>
-      <ChromeSpacer />
+      <SidebarChrome>
+        <IconButton sidebar icon="left" label="后退" hint={`后退 · ${keymap.label(shortcuts.back)}`}
+          disabled={!nav.canBack()} onPress={goBack} />
+        <IconButton sidebar icon="right" label="前进" hint={`前进 · ${keymap.label(shortcuts.forward)}`}
+          disabled={!nav.canForward()} onPress={goForward} />
+      </SidebarChrome>
+      <SidebarSearch>
+        <CommandTrigger shortcut={keymap.label(shortcuts.commands)} onPress={showCommands} />
+      </SidebarSearch>
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
         {["发现", "音乐库"].map((group) => <View class="gap-(--navigation-row-gap)">
           <SectionLabel label={group} />
@@ -74,23 +81,15 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
               selected={nav.current().kind === page.id} onPress={() => nav.navigate({ kind: page.id })} />)}
         </View>)}
         <View><SectionLabel label="歌单" /></View>
-        <View class="flex-1" />
-        <SidebarItem testID="nav-downloads" icon="download" label="下载"
-          selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
       </View>
-      <View class="h-24 shrink-0" />
+      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-4">
+        <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
+          selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
+        <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(shortcuts.settings)}`} onPress={showSettings} />
+      </View>
     </ShellSidebar>
     <WindowPanel>
-      <ShellToolbar>
-        <IconButton icon="left" label="后退" hint={`后退 · ${keymap.label(shortcuts.back)}`}
-          disabled={!nav.canBack()} onPress={goBack} />
-        <IconButton icon="right" label="前进" hint={`前进 · ${keymap.label(shortcuts.forward)}`}
-          disabled={!nav.canForward()} onPress={goForward} />
-        <Text testID="page-title" role="header" class="ml-2 text-base font-semibold text-foreground">{currentTitle()}</Text>
-        <View class="flex-1" />
-        <CommandTrigger shortcut={keymap.label(shortcuts.commands)} onPress={showCommands} />
-        <IconButton icon="settings" label="打开设置" hint={`设置 · ${keymap.label(shortcuts.settings)}`} onPress={showSettings} />
-      </ShellToolbar>
+      <ShellToolbar />
       <View class="flex-1 min-h-0">
         {destinations.map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
       </View>
