@@ -429,6 +429,14 @@ pub struct Player {
 }
 
 impl Player {
+    /// Coherent audio-thread counters for the core's Rust-only display clock.
+    /// Reading these does not allocate or publish a JS event.
+    pub fn progress(&self) -> (u64, f64, f64, bool) {
+        let _snapshot = self.handle.snapshot.lock().unwrap();
+        (self.handle.generation(), self.handle.position_secs(),
+            self.handle.buffered_fraction(), self.handle.is_buffering())
+    }
+
     /// 创建播放器：起 rodio 输出线程与流式解码运行时。
     pub fn open() -> Result<Player, String> {
         let rt = tokio::runtime::Builder::new_multi_thread()

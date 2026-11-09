@@ -1,1 +1,10 @@
 //! Haiku playback domain boundary.
+pub mod backend;
+pub mod controller;
+pub mod queue;
+pub use backend::{
+    AudioBackend, AudioEvent, AudioEventKind, Clock, LocalResolver, Progress, RealAudio,
+    SystemClock, TrackResolver,
+};
+pub use controller::{Command, Controller, PlayerState, Session, Sleep, Status};
+pub use queue::{Mode, Queue};

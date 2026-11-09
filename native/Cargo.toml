@@ -9,7 +9,7 @@ quickjs-jit-stdlib = "=0.14.1"
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros", "fs", "io-util"] }
 
-serde = { version = "=1.0.229", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive", "rc"] }
 # KRC 内嵌翻译提取：`[language:<base64>]` 元数据解码（已在依赖树中，显式声明为直接依赖）。
 base64 = "=0.22.1"
 

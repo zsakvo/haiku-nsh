@@ -6,7 +6,9 @@
 //! 根目录由 Dart 注入（`<AppSupport>/haiku_media_cache`）。
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Seek, SeekFrom, Write};
+use std::io::{self, Seek, SeekFrom};
+#[cfg(test)]
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};

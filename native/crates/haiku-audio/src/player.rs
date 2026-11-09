@@ -2070,6 +2070,7 @@ fn poppable(len: usize, max: usize, align: usize) -> usize {
     }
 }
 
+#[cfg(test)]
 fn terminal_player_event(ring: &Ring) -> PlayerEvent {
     match ring.terminal_failure() {
         Some(failure) => PlayerEvent::Error(failure),

@@ -24,7 +24,7 @@
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
-| F06 队列与播放控制 | 未实现 | | | |
+| F06 队列与播放控制 | 部分实现（本地文件） | `haiku-model`、`haiku-playback`、`haiku-store::json_file`、`native/app/src/core.rs` | M1-02：workspace 177 通过/1 忽略，Core 事件桥与原有 UI 测试通过，真实本地播放/暂停/自然结束日志通过 | 网络候选/缓存恢复、统计与 ListeningProgress、播放界面及真实多曲无缝听感未覆盖；试播入口有主题 class 运行时警告 |
 | F07 音效与响度 | 未实现 | | | |
 | F08 歌词与正在播放 | 未实现 | | | |
 | F09 桌面集成 | 未实现 | | | |
@@ -286,3 +286,25 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - `nsh check -v`、`nsh build -v`、`nsh test -v` 均退出 0，原有 Headless 4/4、测试文件未改；仅 block 0.1.6 / 开发 host __eh_frame 已知提示，日志 `.artifacts/m1-sidebar-layout/nsh-{check,build,test}.log`。
 - 两次截图前锁屏检查均为 false；主窗口与设置各运行/截图一次并实际查看，无可见重叠或裁切；`.artifacts/m1-sidebar-layout/{main-light,settings-light}.png`，运行和截图日志同目录。
 - 未覆盖：深色截图、窗口缩放/大字号、真实鼠标与菜单交互；遵守通用约定未提交 git，未修改 Rex/上游/参考项目。
+
+## 2026-11-10 M1-02：本地播放核心与 Core 事件桥
+
+- 新增 model 的 EntityRef/Track/Error；EntityRef 使用 JSON 三元组无损编码，覆盖来源含 #、URL/引号/Unicode；SDK extra 原样保留。
+- Queue 为纯 Rust 数据结构，支持四种模式、实际随机历史、跨轮避免重复、下一首插入、追加/删除/移动/跳转/替换后缀/清空，重复曲目按位置区分。
+- 参考测试对照：queue.test.ts 全部 4 项逐项迁移；playback.test.ts 中队列相关的睡眠截断/进度保持快照/无缝交接 3 项迁移，另迁移本地化恢复续播/暂停恢复 2 项，共 9 个 ref_* 测试；其余新增 13 项播放测试。
+- Controller 由 Tokio 单一 actor 持有业务状态，短命令串行；解析/打开/预加载是可 abort 任务，播放与预加载共用单调 generation，过期完成/事件丢弃，加载期间终态先缓存。
+- AudioBackend/TrackResolver 可注入；真实适配器包装现有 Player，只解析 localPath，不引入网络；失效预加载边界会修复实际流，错误跳曲最多 20 次且仅向列表尾部。
+- 注入单调 Clock；睡眠支持 15/30/45/60/90 分钟、延长 15 分钟、当前曲结束、取消/剩余时间，到期实际调用暂停。
+- session.json 经 haiku-store 临时文件 + sync_all + 原子替换；普通变更按 5 秒节流，关键操作立即写；最多 500 项，截取包含当前项的窗口，恢复为暂停且不打开音频，带 radio sessionTag 的会话不恢复。
+- PlayerState 仅低频状态和队列版本；高频位置/缓冲直接读音频线程计数器。Player 增加只读 progress；两处原有测试专用代码加 cfg(test)，消除它们接入应用后产生的警告。
+- Core 改为 class，保留原有 initialize/applyTheme 静态调用；Core.open 每引擎唯一，HAIKU_DATA_DIR 可覆盖，core.player 提供播放/队列/音量/模式/睡眠/flush/onState→Stop，错误 Promise 带 code/retriable 等字段。
+- CoreBridge 在引擎线程仅运行一个泵，写 signal 并 Callback.post；可见且播放时等待 next_frame 读取位置，暂停/隐藏不请求动画帧；位置信号最小 Rust 测试通过。
+- 开发入口 Core.devPlayFiles/devVerifyPlayback 与 PlaybackSmoke.tsx 仅用于本次试播，文档明确 M1-03 删除；正式 TSX 界面未改，新增 CorePlayback.test.tsx 仅测试服务。
+- `cargo test --manifest-path native/Cargo.toml --workspace` 最终退出 0：177 通过、1 忽略，另 WebKit Cookie harness 通过；日志 `.artifacts/m1-02/cargo-test-workspace-repair2.log`。
+- `nsh check -v`、`nsh build -v`、`nsh test -v` 均退出 0；TSX 5/5（原有 4 + Core 1），另 Rust 时钟 1/1，CLI 汇总 6/6；日志 `.artifacts/m1-02/nsh-{check,build,test}.log`。
+- nsh test 使用 `/tmp/haiku-m1-02-test.5ZYrGP` 数据根；上述构建/测试仅出现 block 0.1.6 与 __eh_frame 已知例外，无导出文档警告。
+- 一次 `nsh run PlaybackSmoke.tsx --target macos -v` 播放既有 haiku-test-voice.m4a：0.778→1.855→2.773s；暂停两次均 2.773s；恢复至 42.932s，自然结束 Idle/0 且保留当前项；日志 `.artifacts/m1-02/nsh-run.log`，通过后 Ctrl+C 收尾。
+- 该试播启动另出现 theme token 相关 unknown classes 运行时警告（含 sidebar-top-gap/sidebar-icon-size）；原因未确认，未修改已确认 UI 或扩展重跑；check/build/test 中无此警告，需后续处理。
+- 修复记录：初次 workspace 编译补显式 JsonValue/Trace/Tracer 导入；第二次发现会话窗口有符号减法错误，改 usize 饱和减法后通过，原始日志保留。
+- PLAYBACK 完整范围尚未覆盖：网络候选/1-2-4 秒恢复与提前 EOF 缓存处理留 M4；统计上报、专辑/节目 ListeningProgress 尚未接入；真实多曲无缝听感、系统媒体控制及界面留后续任务。
+- 按指定标题提交一次并纳入任务文件；开始时 MILESTONES 无待提交修改；未修改 Rex/上游/参考项目。

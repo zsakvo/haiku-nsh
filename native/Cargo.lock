@@ -1851,6 +1851,10 @@ dependencies = [
 [[package]]
 name = "haiku-model"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "haiku-palette"
@@ -1865,6 +1869,16 @@ dependencies = [
 [[package]]
 name = "haiku-playback"
 version = "0.1.0"
+dependencies = [
+ "futures",
+ "haiku-audio",
+ "haiku-model",
+ "haiku-store",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
 
 [[package]]
 name = "haiku-plugins"
@@ -1895,6 +1909,7 @@ dependencies = [
  "loro",
  "serde",
  "serde_json",
+ "tempfile",
  "uuid",
 ]
 
@@ -3062,9 +3077,16 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 name = "nsh-app-haiku"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "haiku-macos",
+ "haiku-model",
+ "haiku-playback",
+ "haiku-store",
  "nsh-base",
  "nsh-core",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
