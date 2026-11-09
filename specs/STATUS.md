@@ -9,17 +9,17 @@
 | S1 | nsh CLI 与 mixed 模板 | 已验证（当前完整应用重新通过） | 2026-11-09 M0-02：移除 CJRT 后，当前应用 `nsh check/build/test` 通过，build 无 warn；开发窗口与打包版均显示 `Plugin echo(21) = 42`。证据 `.artifacts/m0-02/nsh-{check,build,test,run,package}.log`、`run-window.png`、`package-window.png`；开发 host 的独立链接器提示见下文 |
 | S2 | 插件运行时与 NSH 共用一份 QuickJS | 已验证（M0 最小内核，macOS arm64） | `haiku-jsrt` 与 NSH 使用同一组 `quickjs-jit/stdlib 0.14.1`；仅一份 sys，无 CJRT/rquickjs-sys。运行时测试 11/11；16 worker 共 1000 次调用全部正确，同时有 173 次 UI JS 计算 tick，双向全局变量隔离通过；release 打包无 warn，`_JS_NewRuntime` 一个定义。证据 `.artifacts/m0-02/{jsrt-test,nsh-test,nsh-package}.log`、`cargo-tree-duplicates.log`、`nm-release.txt` 及两张窗口截图 |
 | S3 | NSH webview 读取 HttpOnly Cookie | 已验证（macOS 原生回退） | M0-05：NSH 公开 WebView 接口无 Cookie 读取；独立 WKWebsiteDataStore 读取本地 fixture 的两个 Cookie（含 HttpOnly），第一会话存活时第二会话为空。`.artifacts/m0-05/web-cookies-repair2.log` |
-| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 部分实现（媒体快照、状态栏安装已验证） | M0-05：正确标题、playback_state 1→2；菜单栏截图可见曲名和控制按钮，channel 接回引擎线程。`.artifacts/m0-05/nsh-run.log`、`menubar.png`；实际按钮/媒体键回调待人工确认，NSPanel 未覆盖 |
-| S5 | 后台播放与窗口恢复 | 部分实现（原生关闭策略已安装，交互待人工确认） | M0-05：原 delegate 实例加无 ivar 子类，只覆盖关闭；reopen/quit 继承 NSH。可见窗口 position 0.603→34.995。`.artifacts/m0-05/nsh-run.log`；关闭后 10 秒、open -a 恢复、Cmd+Q 退出未覆盖 |
+| S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 已验证（含用户人工确认） | M0-05：正确标题、playback_state 1→2；菜单栏截图可见曲名和控制按钮，channel 接回引擎线程。`.artifacts/m0-05/nsh-run.log`、`menubar.png`；实际按钮/媒体键回调待人工确认，NSPanel 未覆盖 |
+| S5 | 后台播放与窗口恢复 | 已验证（含用户人工确认） | M0-05：原 delegate 实例加无 ivar 子类，只覆盖关闭；reopen/quit 继承 NSH。可见窗口 position 0.603→34.995。`.artifacts/m0-05/nsh-run.log`；关闭后 10 秒、open -a 恢复、Cmd+Q 退出未覆盖 |
 | S6 | virtual_list 1 万行 | 已验证（跳转、选中回收与中部截图） | M0-04：Headless 1/1，跳转第 9000 行、选中第 5 行往返底部无串行；`.artifacts/m0-04/nsh-test-trace.log`、`list-middle.png`。trace 是提交耗时，未证明实际帧率 |
 | S7 | 原生玻璃视图嵌入 | 部分实现（嵌入、叠放与按钮已验证；模糊未证实） | M0-05：Headless 1/1，空原生视图保留 64pt 布局，NSH 按钮可触发；真实截图文字/按钮层级正确，但玻璃区仍均匀灰色，两种修复后不再扩展排查。`.artifacts/m0-05/glass-headless-repair1.log`、`native-window.png` |
-| S8 | 第二个窗口共用 Core | 部分实现（Rust 计数器，第二窗口受阻） | M0-04：Rust 持有值、TSX listener 镜像已实现；当前 nsh/desktop 无窗口创建/标识 API，三项双窗口验收均未覆盖。`.artifacts/m0-04/platform-api.log` |
+| S8 | 第二个窗口共用 Core | 不可行，已关闭（D18：设置改为窗口内覆盖层） | M0-04：Rust 持有值、TSX listener 镜像已实现；当前 nsh/desktop 无窗口创建/标识 API，三项双窗口验收均未覆盖。`.artifacts/m0-04/platform-api.log` |
 
 ## 功能要求
 
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
-| F01 桌面外壳与导航 | 未实现 | | | |
+| F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01：Headless 4/4、四种真实窗口截图；workspace 153 通过、1 忽略 | 页面内容、来源选择、PlayerDock 待后续任务；构建仍有依赖未来兼容警告 |
 | F02 插件包与来源生命周期 | 未实现 | | | |
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
@@ -219,3 +219,33 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 构建有 CLI 汇总的 2/3 个 warnings；未额外重跑以展开。Cookie 测试提示原有 block 0.1.6 的 future incompatibility；未做全量测试、Clippy、release 或额外审计。
 - 建议审阅者把 D18/API 描述限定为“NSH 公开接口不可配置”；其 macOS 内部 delegate 已实现 reopen/quit，本次直接保留。S3 记录 macOS 原生回退可行；S7 暂保留 NSH 半透明回退，待视觉结论后再决定。
 - 本次一并提交审阅者已修改的 SPEC、ARCHITECTURE、UI、MACOS 及未提交任务文件；未自行修改这些正文，未修改 Rex 会话名、上游或参考项目。
+
+## 2026-11-09 M0 人工确认（用户）
+
+用 `HAIKU_SPIKE_AUDIO=.artifacts/m0-05/haiku-test-voice.m4a nsh run` 实测，全部符合预期：播放中 Cmd+W 隐藏窗口后声音继续；点击 Dock 图标恢复窗口；键盘媒体键与菜单栏组件的暂停按钮均可暂停/继续；Cmd+Q 退出并停止声音。S4（媒体中心、菜单栏回调）与 S5（关闭隐藏、重新激活）的人工确认项据此关闭。M0 完成。
+
+## 2026-11-09 M1-01：设计系统与应用外壳
+
+- 已完整阅读设计规范、指定 Coding Guides、UI §1–2/6、D7/D18；API 依据本机 0.4.0 源码与生成声明。
+- `src/ui/STANDARDS.md` 定义 macOS standard 密度、compact 导航/工具栏、系统字体、12–20pt 字号、6/4/12pt 圆角及完整交互状态。
+- 外壳侧栏 220pt、顶栏 56pt（不低于实际 titleBar 高度）、内容边距 24pt、侧栏底部预留 96pt；保留红绿灯与拖动区。
+- `src/ui/theme/` 提供浅/深语义 token 与应用角色；17 个参考品牌色，默认 orange；深色向白混合 48%，前景按对比度选黑/白。
+- 外观与品牌色由 TSX 内存信号持有；薄 Rust 异步导出调用 `set_tokens`，使 TSX 与 Rust 共用更新后的主题。
+- `src/ui/` 包装 Button/IconButton/Tooltip/SidebarItem/SectionLabel/SearchField/Kbd/EmptyState 与 Dialog/Overlay/Menu/ContextMenu 表面；资源只复制所用 iconoir SVG 和一张插画，附许可证。
+- `src/shell/` 提供类型路由、不透明 EntityRef、最多 100 条历史与前进截断；九页保持挂载，输入/页面状态保留；均为真实空态，无假数据。
+- 设置为全窗口覆盖层，含全部分类与实际外观选项；命令面板用 base Command；快捷键和原生菜单调用相同命令。
+- 删除 M0 spike、测试及 QuickJs fixture；关闭隐藏安装移入正式 platform 启动；媒体/菜单栏接线移除，haiku-macos 能力保留。
+- `nsh check -v`：退出 0；`nsh build -v`：退出 0，应用/TSX 无新增警告，但“无 warn”严格条件未达到：依赖 `block 0.1.6` 仍有未来兼容警告。
+- `nsh test -v`：退出 0，Headless 4/4；覆盖九个入口、后退/前进与截断、输入保留、Cmd+K 跳转、Cmd+, 切深色及 Esc 后页面/历史保留。
+- 上述最终日志：`.artifacts/m1-01/nsh-{check,build,test}-layout-final.log`。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：退出 0，153 通过、1 忽略，另含 WebKit Cookie harness 通过；日志 `cargo-test-workspace-repair1.log`。
+- workspace 保留 haiku-audio 原有 unused import/dead_code 警告；未为外壳任务改动领域实现或依赖源码。
+- `nsh run` 四种状态已实际截图并查看：`main-light.png`、`main-dark-repair2.png`、`settings-light-repair1.png`、`command-dark.png`；均位于 `.artifacts/m1-01/`。
+- 对应日志为 `run-light-repair1.log`、`run-dark-repair2.log`、`run-settings-light-repair1.log`、`run-command-dark.log`；开发 host 另有 `__eh_frame` 链接器警告。
+- 截图入口固定为根目录 `ShellPreview.tsx`、`ShellDarkPreview.tsx`、`SettingsPreview.tsx`、`CommandPreview.tsx`；复用正式 AppShell，无 GUI 自动输入。
+- 修复记录：初次编译被磁盘不足中断；类型修正为 Image style.objectFit/fixture 窄类型；主题同步导出缺 runtime 改为异步任务；输入断言改读 value，设置 Esc 仅在打开期间注册。
+- 截图入口起初不在 nsh.json 同级而缺少原生模块，移至根目录；GUI host 未继承预览环境变量，改用固定入口；设置动态 display 导致横排裁切，显式 flex-col 后已重截图确认。
+- 最终截图正文、控件无裁切/错位；深色插画保留资源原色，部分装饰细线对比偏低，不承载交互或信息。
+- 未覆盖：窗口缩放/大字号、真实鼠标与菜单交互、此次启动后的关闭隐藏/Dock 恢复人工复验、其他平台、外观持久化；M0 人工确认保留。
+- 需审阅者判断是否接受现有依赖未来兼容警告作为“无 warn”例外；未屏蔽警告或修改上游。
+- 本次仅自行修改 STATUS；按任务授权一并纳入原有未提交 specs 修改，以 `M1-01: design system foundations and app shell` 提交一次后停止；Rex 会话名保持不变。

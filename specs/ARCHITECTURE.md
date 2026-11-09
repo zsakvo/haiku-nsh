@@ -143,7 +143,7 @@ M0-03 迁移时确定的归属：
 | S4 | `haiku-macos` 能否在 NSH 的 NSApplication 中安装 NSStatusItem、NSPanel，并注册 MPRemoteCommandCenter | 菜单栏组件可点击；媒体键事件回到引擎线程 | 调查 NSH 的 macOS 后端扩展点，必要时在 app 内持有主线程派发器 |
 | S5 | cpal 输出在 NSH 进程中稳定；Cmd+W 隐藏窗口后继续播放，Dock 点击后恢复窗口 | 关闭窗口后音频不中断，窗口可恢复 | NSH 没有对应 API（M0-04）：由 haiku-macos 接管主 NSWindow 的关闭与 NSApplication 的 reopen（D18），在 M0-05 验证 |
 | S6 | `virtual_list` 1 万首歌的滚动、行回收与跳转 | 滚动无掉帧；回收后行状态正确 | — |
-| S7 | `#[native_components(macos)]` 嵌入 NSVisualEffectView 作为玻璃底栏 | 与 NSH 内容正确叠放、可点击 | 底栏改用 NSH 绘制的半透明回退 |
+| S7 | `#[native_components(macos)]` 嵌入 NSVisualEffectView 作为玻璃底栏 | 与 NSH 内容正确叠放、可点击 | 嵌入与叠放已验证（M0-05）。玻璃视觉留到 M6：底栏必须**覆盖在滚动内容之上**，并使用 `WithinWindow` 混合模式（M0-05 用的是 `BehindWindow`，窗口不透明，所以只显示为灰色）。M1 先用 NSH 绘制的半透明回退 |
 | S8 | 第二个 NSH 窗口（设置窗口）与主窗口共用 Core | 两窗口状态同步，关闭设置窗口不影响主窗口 | **不可行**（M0-04：NSH 0.4.0 无法新建窗口）。设置改为窗口内覆盖层（D18），本项关闭 |
 
 验证结论写入 STATUS.md 的 M0 小节。S2 不通过会影响插件宿主的形态，必须最先完成。

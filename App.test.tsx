@@ -1,13 +1,53 @@
 import { expect, open, test } from "nsh/test";
+import { destinations } from "./src/shell/navigation";
 
-test("shows Haiku and the version returned by Rust", async () => {
-  const app = await open("./App.tsx", { platform: "macos" });
-  expect(app.texts()).toContain("Haiku");
-  expect(app.texts()).toContain("Core 0.1.0");
+const options = { platform: "macos" as const, width: 1200, height: 800 };
+test("sidebar reaches every destination", async () => {
+  const app = await open("./App.tsx", options);
+  for (const page of destinations) {
+    await app.press(`id:nav-${page.id}`);
+    await app.waitFor(`text:${page.title}`);
+    expect(app.texts()).toContain(page.description);
+  }
 });
-
-test("presses the echo button and shows the plugin result", async () => {
-  const app = await open("./App.tsx", { platform: "macos" });
-  await app.press("role:button[验证插件回声]");
-  await app.waitFor("text:Plugin echo(21) = 42", { timeout: 15_000 });
+test("back and forward retain page input; new navigation truncates forward history", async () => {
+  const app = await open("./App.tsx", options);
+  await app.press("id:nav-search");
+  await app.type("label:搜索词", "坂本龙一");
+  await app.press("id:nav-library");
+  await app.keyboard.press("mod+[");
+  expect(app.value("label:搜索词")).toBe("坂本龙一");
+  await app.keyboard.press("mod+]");
+  expect(app.texts()).toContain("你的音乐，放在这里");
+  await app.keyboard.press("mod+[");
+  await app.press("id:nav-favorites");
+  await app.keyboard.press("mod+]");
+  expect(app.texts()).toContain("收藏值得重听的音乐");
+});
+test("Cmd+K opens the real Command and navigates", async () => {
+  const app = await open("./App.tsx", options);
+  await app.keyboard.press("mod+k");
+  await app.type("label:查找命令", "下载");
+  await app.keyboard.press("enter");
+  await app.waitFor("text:让音乐随时相伴");
+});
+test("settings theme changes live; Escape preserves original page and history", async () => {
+  const app = await open("./App.tsx", options);
+  await app.press("id:nav-search");
+  await app.type("label:搜索词", "保留的搜索词");
+  await app.press("id:nav-library");
+  await app.keyboard.press("mod+,");
+  await app.waitFor("id:settings-heading");
+  await app.press("role:radio[浅色]");
+  const light = app.spanStyle("text:让 Haiku 更像你").color;
+  await app.press("role:radio[深色]");
+  await app.waitUntil(() => app.spanStyle("text:让 Haiku 更像你").color !== light);
+  await app.press("label:品牌色：蓝");
+  await app.keyboard.press("escape");
+  await app.waitUntil(() => !app.shows("id:settings-heading"));
+  expect(app.texts()).toContain("你的音乐，放在这里");
+  await app.keyboard.press("mod+[");
+  expect(app.value("label:搜索词")).toBe("保留的搜索词");
+  await app.keyboard.press("mod+]");
+  expect(app.texts()).toContain("你的音乐，放在这里");
 });
