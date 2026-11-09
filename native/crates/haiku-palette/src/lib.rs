@@ -1,0 +1,1 @@
+//! Haiku palette domain boundary.

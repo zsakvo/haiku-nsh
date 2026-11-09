@@ -1,0 +1,1 @@
+//! Haiku playback domain boundary.

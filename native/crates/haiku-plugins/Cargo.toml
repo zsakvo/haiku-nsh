@@ -1,0 +1,9 @@
+[package]
+name = "haiku-plugins"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+haiku-jsrt = { path = "../haiku-jsrt" }
+serde_json.workspace = true

@@ -1,0 +1,7 @@
+{
+  "name": "Haiku",
+  "id": "dev.haiku.nsh",
+  "version": "1.0.0",
+  "build": 1,
+  "rust": "native/app"
+}

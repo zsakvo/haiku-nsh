@@ -1,0 +1,1 @@
+//! Haiku store domain boundary.

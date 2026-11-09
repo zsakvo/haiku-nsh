@@ -1,0 +1,1 @@
+//! Haiku audio domain boundary.
