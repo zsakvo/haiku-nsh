@@ -1,4 +1,4 @@
-//! 参考版数据根策略；提取自 RPC，供原生模块直接调用。
+//! Haiku NSH 独立数据根；环境变量可覆盖，默认不读取参考版数据。
 use std::path::PathBuf;
 
 pub fn data_root() -> PathBuf {
@@ -10,13 +10,13 @@ pub fn data_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."));
     #[cfg(target_os = "macos")]
     {
-        home.join("Library/Application Support/Haiku GPUIX")
+        home.join("Library/Application Support/Haiku NSH")
     }
     #[cfg(not(target_os = "macos"))]
     {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| home.join(".local/share"))
-            .join("haiku-gpuix")
+            .join("haiku-nsh")
     }
 }

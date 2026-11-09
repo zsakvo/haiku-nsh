@@ -8,3 +8,5 @@ publish = false
 nsh-core = "0.4.0"
 nsh-base = "0.4.0"
 haiku-plugins = { path = "../crates/haiku-plugins" }
+haiku-audio.workspace = true
+haiku-model.workspace = true

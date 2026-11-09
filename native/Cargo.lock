@@ -2752,6 +2752,8 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 name = "nsh-app-haiku"
 version = "0.1.0"
 dependencies = [
+ "haiku-audio",
+ "haiku-model",
  "haiku-plugins",
  "nsh-base",
  "nsh-core",

@@ -1,6 +1,7 @@
 import { mount, signal, Text, View } from "nsh";
 import { Core, Spike } from "haiku/native";
 import { Button } from "./src/ui/Button";
+import { PlatformSpikes } from "./src/spike/PlatformSpikes";
 
 function App() {
   const pending = signal(false);
@@ -18,11 +19,14 @@ function App() {
     }
   }
   return (
-    <View class="flex-1 items-center justify-center gap-4 bg-background p-8">
-      <Text class="text-xl font-semibold text-foreground">Haiku</Text>
-      <Text class="text-sm text-muted-foreground">Core {Core.version()}</Text>
-      <Button label="验证插件回声" disabled={pending()} onPress={runEcho} />
-      <Text class="text-base text-foreground">{result()}</Text>
+    <View class="flex-1 gap-4 bg-background p-6">
+      <View class="flex-row items-center gap-4">
+        <Text class="text-xl font-semibold text-foreground">Haiku</Text>
+        <Text class="text-sm text-muted-foreground">Core {Core.version()}</Text>
+        <Button label="验证插件回声" disabled={pending()} onPress={runEcho} />
+        <Text class="text-base text-foreground">{result()}</Text>
+      </View>
+      <PlatformSpikes />
     </View>
   );
 }

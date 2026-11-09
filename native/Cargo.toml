@@ -82,3 +82,4 @@ haiku-model = { path = "crates/haiku-model" }
 haiku-library = { path = "crates/haiku-library" }
 haiku-lyrics = { path = "crates/haiku-lyrics" }
 haiku-store = { path = "crates/haiku-store" }
+haiku-audio = { path = "crates/haiku-audio" }

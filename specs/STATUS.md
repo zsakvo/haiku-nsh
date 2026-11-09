@@ -10,10 +10,10 @@
 | S2 | 插件运行时与 NSH 共用一份 QuickJS | 已验证（M0 最小内核，macOS arm64） | `haiku-jsrt` 与 NSH 使用同一组 `quickjs-jit/stdlib 0.14.1`；仅一份 sys，无 CJRT/rquickjs-sys。运行时测试 11/11；16 worker 共 1000 次调用全部正确，同时有 173 次 UI JS 计算 tick，双向全局变量隔离通过；release 打包无 warn，`_JS_NewRuntime` 一个定义。证据 `.artifacts/m0-02/{jsrt-test,nsh-test,nsh-package}.log`、`cargo-tree-duplicates.log`、`nm-release.txt` 及两张窗口截图 |
 | S3 | NSH webview 读取 HttpOnly Cookie | 未开始 | |
 | S4 | NSStatusItem / NSPanel / MPRemoteCommandCenter | 部分实现（仅迁移，未接入 NSH） | M0-03：haiku-macos 编译、6 个纯逻辑测试通过；`.artifacts/m0-03/{cargo-test,cargo-clippy}.log`。真实原生交互未覆盖 |
-| S5 | 后台播放与窗口恢复 | 未开始 | |
-| S6 | virtual_list 1 万行 | 未开始 | |
+| S5 | 后台播放与窗口恢复 | 部分实现（播放接口运行，关闭/恢复受阻） | M0-04：可见窗口 position 0.628→34.995 秒；NSH 0.4.0 无关闭拦截、窗口隐藏或 reopen 钩子。`.artifacts/m0-04/{nsh-run,platform-api}.log`；隐藏后 10 秒与恢复未覆盖 |
+| S6 | virtual_list 1 万行 | 已验证（跳转、选中回收与中部截图） | M0-04：Headless 1/1，跳转第 9000 行、选中第 5 行往返底部无串行；`.artifacts/m0-04/nsh-test-trace.log`、`list-middle.png`。trace 是提交耗时，未证明实际帧率 |
 | S7 | 原生玻璃视图嵌入 | 未开始 | |
-| S8 | 第二个窗口共用 Core | 未开始 | |
+| S8 | 第二个窗口共用 Core | 部分实现（Rust 计数器，第二窗口受阻） | M0-04：Rust 持有值、TSX listener 镜像已实现；当前 nsh/desktop 无窗口创建/标识 API，三项双窗口验收均未覆盖。`.artifacts/m0-04/platform-api.log` |
 
 ## 功能要求
 
@@ -173,3 +173,26 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 全程使用同一 toolchain Cargo（1.98.1 路径），未更换工具链重跑。仅失败项目各作上述一次修复并重试；未增加其他验收、探针、GUI 自动化或汇总 JSON。
 - 第二次提交：本节随 `M0-03: migrate reference Rust core into domain crates` 纳入，哈希见最终汇报；本任务仅上述两次提交。
 - 未覆盖：真实音频设备、NSH 中的 macOS 原生交互、channel/generation 适配的专项接线测试、其他平台；未 run、截图或打包。参考项目、README、上游依赖、Rex 会话保持不变；本次停止，不开展后续任务。
+
+## 2026-11-09 M0-04：独立数据根、平台 spikes 与窗口 API 限制
+
+- 第 0 步先修正 haiku-store::data_root：macOS 默认 `~/Library/Application Support/Haiku NSH`，其他桌面 `haiku-nsh`，保留 HAIKU_DATA_DIR；未创建/读取默认目录。原函数没有对应单元测试，本任务未增加额外测试。
+- spike 代码集中在 `native/app/src/spike/{mod,audio,tracks}.rs` 和 `src/spike/{PlatformSpikes,List,List.test}.tsx`；只在 app manifest、注册入口、App.tsx 做接线，workspace 声明 audio 依赖并更新锁文件。未建立设计系统。
+- Spike.playLocal/pause 直接调用迁入的 playback::Player；position 读取该引擎 Position 事件的原子快照，不用墙钟模拟播放。仅设置 HAIKU_SPIKE_AUDIO 时启动本地 fixture。
+- S5 结论：完整验收未通过。可见窗口播放接口运行，日志 position() 从 0.628 增至 34.995 秒；不能用它冒充 Cmd+W 隐藏后继续播放。
+- 读过当前 `.nsh/types/nsh/desktop.d.ts`、nsh-core 0.4.0 的 desktop.rs、element/desktop.rs、runtime/desktop.rs；Window 只有当前窗口操作，close 发 DesktopCommand::Close，声明明确最后窗口关闭会结束应用；无关闭拦截、隐藏窗口、reopen/激活回调。
+- S5 因此未执行真实 Cmd+W/关闭按钮、隐藏后等待 10 秒或 open -a 恢复；真实按键待人工确认，但人工操作也不能补齐缺失的生命周期钩子。M0-05 需评估原生 close→hide、保持进程存活及 Dock/reopen 恢复。
+- S6：Rust SpikeTrackList 使用 virtual_list、10000 条标题/艺术家/时长数据、44pt 固定行高、token 颜色；HashSet 按曲目 id 持有选择，事件和绑定在回收时读取当前 Position，行内无独立选择 signal。
+- `nsh test src/spike/List.test.tsx --trace`：最终退出 0、1/1；第 9000 行可见，第 5 行选择经底部往返仍保留，底部无选中泄漏，返回后仅第 5 行选中。
+- 上述验收首次因 Track 缺 PartialEq 在编译阶段失败；修复后因嵌套测试 open 路径解析失败；第二处修复为同目录 `./List.tsx`，最后重试通过。两种修复后停止扩展；全过程原日志保存在 `.artifacts/m0-04/nsh-test-trace.log`。
+- 同条 trace 的滚动提交耗时为 2798/3549/3279/3259µs，选择更新 902µs；369 个节点未随 10000 条数据全量创建。该数据是 Headless 提交成本，不是 GPU 完整帧耗时；真实滚动帧率未覆盖，未自建测量工具。
+- `nsh run --target macos`：构建并连接真实窗口；起始索引 4999，截图实际显示曲目 05000 起的中部内容，已查看。证据 `.artifacts/m0-04/nsh-run.log`、`list-middle.png`；截图后 Ctrl+C 停止，终端会话返回 1，不计作构建失败。
+- 音频为本地生成的 35 秒、44.1kHz、mono、16-bit 常量采样 FLAC，文件及生成记录仅在 `.artifacts/m0-04/{silence-35s.flac,audio-fixture.log}`，不提交音频。
+- 截图用只读 CGWindowListCopyWindowInfo 查询目标 id，再 screencapture -l；记录 `window-capture.log`。未使用 lldb、AppleScript、辅助功能、CGEvent 或自动 GUI 输入。
+- S8 结论：第二窗口验收未通过。实现一个 Rust SpikeCounter，TSX 只经 onChange 镜像、经 increment 请求写入；设置窗口按钮禁用并说明缺少 API，没有用同窗面板或第二进程冒充第二窗口。
+- 当前 nsh/desktop 和 Rust DesktopCommand 都无 create/open、窗口 id 或多窗口引用；Headless 也无窗口创建/切换驱动。skill tooling 提到的 Window.open/currentWindow 不存在于当前 0.4.0 源码/声明，未据新文档虚构调用。
+- S8 的双窗同步、重复打开激活同窗、关闭设置不影响主窗均未覆盖。M0-05 需增加宿主多窗口/多 surface 接线及共享 Rust Core 的生命周期验证；本任务未修改 NSH 或引入原生补丁。
+- 建议审阅者修订 UI.md §1 的 Cmd+W 与 §6 设置窗口、MACOS.md §1 及 ARCHITECTURE S5/S8：明确当前版本缺口，将原生宿主生命周期/多窗口列为前置项；不宣称 NSH 现成支持。
+- 本任务只跑上述 Headless/trace 和一次真实窗口运行，未跑全 workspace、check、Clippy、打包或额外探针。沿用同一 toolchain Cargo 路径；`cargo update --workspace --offline` 仅维护 app 的依赖锁，0 个包升级，证据 cargo-lock.log。
+- 未覆盖：真实音频听感、暂停按钮人工交互、S5 关闭/恢复、S8 所有真实双窗交互、真实滚动 FPS、其他平台。应用仍为 spike；不开展 S3/S4/S7 或 M1。
+- 随一次提交 `M0-04: data root fix, NSH platform spikes (S5, S6, S8)` 收尾；用户已有 ARCHITECTURE 修改和未跟踪 M0-04 任务文件保持原样，不纳入本次提交。其余 specs、README、参考项目、NSH/依赖源码、Rex 均未修改。
