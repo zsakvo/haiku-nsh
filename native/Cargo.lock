@@ -1746,7 +1746,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 2.0.18",
- "windows 0.54.0",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -3080,14 +3080,20 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 name = "nsh-app-haiku"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "futures",
  "haiku-library",
+ "haiku-lyrics",
  "haiku-macos",
  "haiku-model",
+ "haiku-palette",
  "haiku-playback",
  "haiku-store",
+ "log",
  "nsh-base",
  "nsh-core",
+ "nsh-engine",
+ "nsh-testing",
  "serde",
  "serde_json",
  "tokio",
@@ -3256,6 +3262,19 @@ dependencies = [
  "objc2-quartz-core",
  "rustc-hash 2.1.1",
  "serde_json",
+]
+
+[[package]]
+name = "nsh-testing"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa9f8c137cbd4bb5ef50d25c9ce38c88e470713c0b1f2fce6a0283b44a6a457e"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "nsh-core",
+ "nsh-engine",
+ "regex",
 ]
 
 [[package]]

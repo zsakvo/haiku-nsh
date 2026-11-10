@@ -24,9 +24,9 @@
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
-| F06 队列与播放控制 | 部分实现（本地文件） | `haiku-model`、`haiku-playback`、`haiku-store::json_file`、`native/app/src/core.rs` | M1-02：workspace 177 通过/1 忽略，Core 事件桥与原有 UI 测试通过，真实本地播放/暂停/自然结束日志通过 | 网络候选/缓存恢复、统计与 ListeningProgress、播放界面及真实多曲无缝听感未覆盖；试播入口有主题 class 运行时警告 |
+| F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
 | F07 音效与响度 | 未实现 | | | |
-| F08 歌词与正在播放 | 未实现 | | | |
+| F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
 | F09 桌面集成 | 未实现 | | | |
 | F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/service.rs`、`native/app/src/{library,track_source,track_list}.rs`、`src/pages/{LibraryPage,TrackEditor}.tsx` | M1-03 本机实现与自动化验收通过，真实扫描/播放日志、浅深截图已保存，待审阅 | 刮削留 M4；原生双击/选择器交互与听感待人工确认；额外 cargo target-dir 警告见下节 |
 | F11 喜欢、歌单与远端收藏 | 未实现 | | | |
@@ -329,3 +329,43 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 全部证据位于 `.artifacts/m1-03/`，音频和预览数据不提交。已知例外仍有 block 0.1.6、开发 host __eh_frame；额外 huacnlee/cargo 的“忽略 target-dir，使用 ./target”警告已汇报，严格“仅已知例外”条件未达成，未换工具链或改依赖。
 - LIBRARY 全范围未覆盖：刮削/加入歌单按任务留后续；原生目录/封面选择器、Finder、真实鼠标双击和听感待人工确认；未扩展格式矩阵、手工重置/写回/取消视觉验收或 M1-04。
 - 保留全部工作区供审阅，不提交/推送；specs 仅修改本 STATUS，审阅者 HANDOFF/任务改动保留；未修改 Rex 会话/布局、参考版、NSH 或依赖源码。
+
+## 2026-11-10 M1-04：播放界面与本地歌词（按静态覆盖层方案收尾，待审阅）
+
+- 基线为审阅通过的 `62e85c2`；本轮未提交/推送，未修改 Rex、参考版、NSH 或依赖源码；specs 仅改本文件，README 未改。
+- 第 0 步：TrackList 普通序号改为 muted-foreground，当前播放指示保留 primary。
+- NSH 0.4.0 的 capabilities 为应用级配置，未找到按入口区分的配置；保留既有 `/tmp/haiku-m1-03-fixtures` 与 `.artifacts/m1-03` 授权，未扩大，**M6 打包前移除**。
+- 新增 Rust player_dock/seek_bar/now_playing/lyrics_view/player_controls/presentation/player_theme；Core 初始化唯一展示状态，position/buffered 留在 Rust，buffering 时停止帧时钟推进。
+- PlayerDock 根部唯一实例，左右/底部 24pt，80pt 高；普通进度使用中性 token，只有中心播放按钮用 primary；侧栏底部留 112pt（96pt 预留加原 16pt 内距）。
+- Dock 接口 onOpenChange/onLyricChange（仅当前行变化）；SeekBar 接口 position/duration/buffered/nowPlaying/onSeek({seconds})；NowPlaying 接口 open/onOpenChange。
+- Dock 提供封面、上一首/播放暂停/下一首、模式、音量 Popover+Slider、虚拟队列跳转/删除、歌词入口；空队列保留布局并禁用播放操作。
+- SeekBar 主指针按下捕获 left/width/duration，横移 ≥1pt 激活，预览独立于时钟，松开仅提交一次；缓冲/已播放独立图层。
+- 本地歌词按有效曲目元数据加载（含暂停恢复）；sidecar→内嵌，UTF-8/GBK/UTF-16，译文规则复用；补 1MiB 边界与内嵌文本上限。
+- Cursor 二分查找且仅行变化发布；LyricsView 虚拟行、点行 seek、当前居中、邻行渐隐、用户浏览 4 秒后回跟；KaraokeLine 逐字裁切直接绑定 Rust 时钟。
+- 当前及 Controller 实际 next_index（含随机/单曲循环）的封面在后台预热，按路径/mtime/长度缓存 12 项；请求版本丢弃旧完成；运行时覆盖深色 now-playing/lyric token，新增准确 HCT tone 15/38。
+- 所有 Cargo/NSH 命令设置 CARGO_PROFILE_DEV_BUILD_OVERRIDE_STRIP=false 与 CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false，未改 profile/工具链。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：183 通过、0 失败、1 忽略；`cargo-test-workspace.log`，新增 Cursor、UTF-16 双端序/1MiB 边界、配色过期版本测试。
+- `nsh check`：首轮 API 用法错误；修复一统一 0.4.0 类型/样式 API；修复二补 Tooltip 元素、Clone 与 f32 类型后通过；`nsh-check{,-repair1,-repair2}.log`。
+- `nsh build`：通过，无 unknown classes/导出文档警告；`nsh-build.log`。
+- `nsh test`：9/9（8 个 TSX +1 个 Rust）通过；`nsh-test.log`。新增 Player.test、PlayerFixture、SeekBarFixture，覆盖阈值/预览/单次提交/非主键、空队列/命令、设置内控制、导航状态/Dock 实例保留、暂停歌词/点行/切歌清理。
+- 上述初次自动化之后，真实预览暴露封面权限与覆盖层几何问题；审阅者授权本次续修，最后代码变更后的 check/build/test 结果见下，workspace 沿用既有结果。
+- `scripts/generate-player-fixture.py` 生成两首 120 秒低音量 FLAC，含内嵌 PNG、40 行增强 LRC/译文；媒体/各预览数据根均隔离在 `.artifacts/m1-04/`，禁用 keychain；`generate-media.log`。
+- 真实首次失败：file:// 封面被 NSH 拒绝。修复一在 Rust 有界读取封面，转内存 data URI，并与配色共同缓存；未增加权限；`nsh-run-light.log`、`nsh-run-light-repair1.log`。
+- 浅/深本地曲库+Dock 截图已查看且通过：`library-dock-light.png`、`library-dock-dark.png`；对应 `nsh-run-light-repair1.log`、`nsh-run-dark.log`、`capture-{light,dark}.log`。
+- 真实扫描两首、errors=[]，播放 loading→playing/error:null；Rust 与 JS 低频日志记录 Cursor 0→1→2…（约每 3 秒）；三份最终预览日志均有证据。
+- 历史失败证据保留：`now-playing.png`、`now-playing-repair2.png` 及对应 run 日志；此前显式高度方案仍裁切。
+- 审阅续修：确认 nsh-core 0.4.0 ambient.rs 的 window() / TS windowSize() 均为逻辑 pt；NowPlaying 与 Settings 删除显式 height，统一 top=0、bottom=112、left/right=0，布局留出 Dock。
+- Settings 保持已确认内容/主题，新增 PlayerSettingsPreview 复用真实扫描播放入口；浅色 `settings-light-review.png` 已查看，通过，Dock 完整可见；`nsh-run-settings-review.log`、`capture-settings-review.log`。
+- 新增 Rust Headless 几何回归：实际 NowPlaying 内容根 ref.measure() 的 top≈0、bottom≈688（1200×800 窗口）；只在 cfg(test) 测量，不增加产品调试接口。**API 不含动画 transform，不能证明原生屏幕位置正确。**
+- 上轮失败历史：约束修正后 `now-playing-review.png` 仍下移；追加数据根移至仓库外、Rust popup 显式 flex-col 两种修复，`now-playing-review-repair{1,2}.png` 均仍越出底部；审阅者随后判定 SheetMotion fade 未完成，并授权替换 Sheet，不再排查其内部。
+- 上述截图均有 `nsh-run-now-playing-review{,-repair1,-repair2}.log` 与 capture 日志；仓库外数据隔离在 `/tmp/haiku-m1-03-fixtures/m1-04-review-{settings,now-playing}-data`，禁用 keychain；未扩大授权。
+- 上轮 `nsh check -v`、`nsh build -v`、`nsh test -v` 均退出 0，测试 10/10（8 TSX+2 Rust）；`nsh-{check,build,test}-review-final.log`，首轮续修日志也保留。
+- 动画尝试历史：替换 Sheet 为自绘覆盖层、独立 animated_value 250ms timing 后 Headless 10/10，但 `now-playing-owned-overlay.png` 在约 27 秒仍仅背景/Dock，真实日志无入场完成事件；`nsh-{check,build,test}-owned-overlay.log` 与 `nsh-run-now-playing-owned-overlay.log` 保留。
+- 最终按用户批准的静态方案：NowPlaying 无 translate/animated_value/timing，打开直接 y=0、收起立即卸载背景与内容；绝对定位 top/left/right=0、bottom=112、z=20（Dock z=30），保留原双栏内容与几何测试。
+- Esc 仅打开期间注册 Rust keymap（Always）；内容挂载 effect 请求焦点，不等待 next_frame。Dock 不卸载，接口 open/onOpenChange 保留；Settings 未改动，沿用已审阅通过截图。
+- 最终代码后 `nsh check -v`、`nsh build -v`、`nsh test -v` 各一次，均退出 0，Headless 10/10（8 TSX+2 Rust），含几何与打开/收起/导航/Dock 保留；`nsh-{check,build,test}-static-overlay.log`，两个 STRIP=false 环境变量均设置。
+- **最终静态覆盖层真实截图通过**：`now-playing-static-overlay.png` 已查看，封面/唱片、标题、歌词/译文位于窗口内，Dock 完整可见；`nsh-run-now-playing-static-overlay.log` 证明扫描 2 首 errors=[]、40 行歌词、playing/error:null 与行推进；截图日志 `capture-now-playing-static-overlay.log`。数据根隔离于 `/tmp/haiku-m1-03-fixtures/m1-04-static-overlay-preview-data`，禁用 keychain。
+- **已知缺口：入场动画未实现**。真实 host 中 Rust 组件的 animated_value timing 不推进，Headless 正常，原因待查；可能与 CoreBridge 每帧 next_frame 有关（未验证因果），留后续复核。当前打开/收起均直接切换，偏离原动画要求，按用户明确批准收尾。
+- unknown classes 结论：最终 check/build/Headless/真实运行均未出现；编译警告仅有允许的 block 0.1.6、__eh_frame、huacnlee/cargo target-dir；停止 host 后有 dev WebSocket 断连 debug 日志。
+- 待人工确认/后续：动画问题复核与恢复后的观感、真实拖动手感、听感、队列/音量弹层逐项人工检查；其他平台/窗口尺寸/大字号未覆盖。未做 GUI 自动操作，所有预览 host 已 Ctrl+C 收尾。
+- 全部证据位于 `.artifacts/m1-04/`；保留历史失败证据与工作区供审阅，M1-04 按入场动画缺口收尾，不提交/推送，不进入后续任务。

@@ -34,6 +34,9 @@ pub struct Sleep {
 #[serde(rename_all = "camelCase")]
 pub struct PlayerState {
     pub current: Option<Track>,
+    /// The queue's actual planned successor, including shuffle/repeat-one.
+    #[serde(skip)]
+    pub next_index: Option<i32>,
     pub tracks: Arc<Vec<Track>>,
     pub index: i32,
     pub queue_version: u64,
@@ -135,6 +138,7 @@ impl Controller {
         }
         let initial = PlayerState {
             current: queue.current().cloned(),
+            next_index: queue.peek_next(true),
             tracks: Arc::new(queue.tracks.clone()),
             index: queue.index,
             queue_version: 0,
@@ -298,6 +302,7 @@ impl Actor {
             self.state.tracks = Arc::new(self.queue.tracks.clone());
         }
         self.state.current = self.queue.current().cloned();
+        self.state.next_index = self.queue.peek_next(true);
         self.state.index = self.queue.index;
         self.state.mode = self.queue.mode;
         if *self.states.borrow() != self.state {

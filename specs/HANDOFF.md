@@ -23,7 +23,13 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
-## 2026-11-10 更新：M1-03 已验收（待提交），下一步 M1-04
+## 2026-11-10 更新：M1-04 已验收并提交，下一步 M1-05
+
+- M1-04：Dock、SeekBar、正在播放覆盖层、本地歌词、封面配色完成；nsh test 10/10、workspace 测试通过、浅深 Dock + 设置 + 正在播放截图已审阅。
+- 已知缺口：真实 host 中 Rust 组件的 `animated_value` timing 不推进（Headless 正常；nsh-base Sheet 与自绘动画都卡在起点），正在播放覆盖层因此直接显示、无入场动画。Settings 覆盖层（TSX Sheet）正常。原因待查，疑与 CoreBridge 每帧 `next_frame` 有关；后续单独复核。
+- 待人工确认：拖动手感、听感、队列/音量弹层。
+
+## 2026-11-10 更新：M1-03 已验收并提交（62e85c2）
 
 - M1-03 由 Codex 完成，审阅者已核对：workspace 180 通过/1 忽略，nsh test 7/7，真实扫描与播放日志、浅深截图（`.artifacts/m1-03/`）。unknown classes 在正式入口不复现。
 - 遗留小项并入 M1-04 第 0 步：序号列颜色、`nsh.json` 测试 fs 授权。

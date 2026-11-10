@@ -22,7 +22,8 @@
       "track-row-height": "3rem",
       "brand-option-min-width": "7rem",
       "font-sans": "system-ui",
-      "font-mono": "monospace"
+      "font-mono": "monospace",
+      "dock-clearance": "7rem"
     },
     "light": {
       "background": "#fcfbfa",
@@ -61,7 +62,7 @@
       "selection-foreground": "#71300f",
       "primary": "#ba5a24",
       "primary-foreground": "#ffffff",
-      "progress-played": "#ba5a24",
+      "progress-played": "#272522",
       "lyric-active": "#ffffff",
       "sidebar-primary": "#ba5a24",
       "sidebar-primary-foreground": "#ffffff",
@@ -85,7 +86,12 @@
       "brand-purple": "#9453b0",
       "brand-fuchsia": "#a9459e",
       "brand-pink": "#af467e",
-      "brand-rose": "#ba4762"
+      "brand-rose": "#ba4762",
+      "transparent": "#00000000",
+      "now-playing-shade-top": "#00000080",
+      "now-playing-shade-bottom": "#000000b3",
+      "progress-now-playing-played": "#30251f",
+      "progress-now-playing-buffered": "#76604f"
     },
     "dark": {
       "background": "#1c1b1a",
@@ -124,7 +130,7 @@
       "selection-foreground": "#f4c8ac",
       "primary": "#dba98d",
       "primary-foreground": "#000000",
-      "progress-played": "#dba98d",
+      "progress-played": "#f2efeb",
       "lyric-active": "#ffffff",
       "sidebar-primary": "#dba98d",
       "sidebar-primary-foreground": "#000000",
@@ -148,7 +154,12 @@
       "brand-purple": "#9453b0",
       "brand-fuchsia": "#a9459e",
       "brand-pink": "#af467e",
-      "brand-rose": "#ba4762"
+      "brand-rose": "#ba4762",
+      "transparent": "#00000000",
+      "now-playing-shade-top": "#00000080",
+      "now-playing-shade-bottom": "#000000b3",
+      "progress-now-playing-played": "#30251f",
+      "progress-now-playing-buffered": "#76604f"
     }
   }
 }

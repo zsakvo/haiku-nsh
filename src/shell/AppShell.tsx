@@ -1,6 +1,6 @@
 import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
 import { Menu as DesktopMenu, Window } from "nsh/desktop";
-import { Core } from "haiku/native";
+import { Core, PlayerDock, NowPlaying } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
@@ -15,17 +15,19 @@ import { CommandPalette } from "./CommandPalette";
 
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
-  initialRoute?: Route; injectedLibraryFolders?: string[];
+  initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
+  onLyricChange?: (index: number | null) => void;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
   const nav = createNavigation(props.initialRoute);
   const core = createCoreState();
+  const nowPlaying = signal(props.initialNowPlaying ?? false);
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
-  const showSettings = () => overlay.set("settings");
-  const showCommands = () => overlay.set("command");
+  const showSettings = () => { nowPlaying.set(false); overlay.set("settings"); };
+  const showCommands = () => { nowPlaying.set(false); overlay.set("command"); };
   const closeOverlay = () => overlay.set(null);
-  const goBack = () => { if (!overlay()) nav.back(); };
-  const goForward = () => { if (!overlay()) nav.forward(); };
+  const goBack = () => { if (!overlay() && !nowPlaying()) nav.back(); };
+  const goForward = () => { if (!overlay() && !nowPlaying()) nav.forward(); };
   const shortcuts = { back: "mod+[", forward: "mod+]", commands: "mod+k", settings: "mod+," };
   // Bindings and menu items dispatch the same commands. Keymap owns these keys;
   // the menu's shortcut is their matching native display/fallback.
@@ -89,7 +91,7 @@ export function AppShell(props: {
         </View>)}
         <View><SectionLabel label="歌单" /></View>
       </View>
-      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-4">
+      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-(--dock-clearance)">
         <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
           selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
         <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(shortcuts.settings)}`} onPress={showSettings} />
@@ -118,6 +120,13 @@ export function AppShell(props: {
       </View>
     </WindowPanel>
     <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} />
+    <If when={!!core()}>
+      <NowPlaying open={nowPlaying()} onOpenChange={(event) => nowPlaying.set(event.open)} />
+      <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {
+        nowPlaying.set(event.open);
+        if (event.open) closeOverlay();
+      }} />
+    </If>
     <CommandPalette open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
       items={[
         ...destinations.map((page) => ({ id: page.id, label: `前往${page.label}`, group: "导航" })),

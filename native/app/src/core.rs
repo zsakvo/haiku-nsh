@@ -72,6 +72,7 @@ impl CoreBridge {
                     // Paused/loading/hidden surfaces don't request animation frames.
                     loop {
                         let visible_playback = snapshot.status == Status::Playing
+                            && !snapshot.buffering
                             && lifecycle() != nsh_core::platform::Lifecycle::Background;
                         let changed = states.changed().boxed_local();
                         let frame = async {
@@ -156,6 +157,7 @@ impl Core {
         }
         let listeners = Listeners::default();
         let bridge = CoreBridge::new(controller, listeners.clone());
+        crate::presentation::initialize(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
             library,
@@ -187,6 +189,7 @@ impl Core {
     /// Replace semantic tokens shared by TSX and Rust.
     pub async fn apply_theme(json: String) -> Result<(), String> {
         set_tokens(nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?);
+        crate::presentation::reapply_theme();
         Ok(())
     }
 }

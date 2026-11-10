@@ -10,6 +10,10 @@ nsh-base = "0.4.0"
 haiku-model.workspace = true
 haiku-store.workspace = true
 haiku-library.workspace = true
+haiku-lyrics.workspace = true
+haiku-palette = { path = "../crates/haiku-palette" }
+log.workspace = true
+base64.workspace = true
 haiku-playback = { path = "../crates/haiku-playback" }
 serde.workspace = true
 serde_json.workspace = true
@@ -18,3 +22,7 @@ futures.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 haiku-macos = { path = "../crates/haiku-macos" }
+
+[dev-dependencies]
+nsh-engine = { version = "0.4.0", default-features = false }
+nsh-testing = { version = "0.4.0", default-features = false }

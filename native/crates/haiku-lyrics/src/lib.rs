@@ -6,8 +6,11 @@
 //!
 //! 移植自 cjrt-workspace `examples/music-cli/src/lyrics.rs`。
 
+mod cursor;
+pub use cursor::Cursor;
+
 /// 逐字歌词中的一个音节/字（来自 KRC）。时间为**绝对秒**。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Word {
     pub start: f64,
     pub end: f64,
@@ -15,7 +18,7 @@ pub struct Word {
 }
 
 /// 一行带时间戳的歌词。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LyricLine {
     /// 该行起始时间（秒）。
     pub at: f64,
@@ -42,7 +45,7 @@ impl LyricLine {
 }
 
 /// 解析后的歌词。`lines` 按 `at` 升序；`synced` 表示是否含有效时间标签（决定能否随播放滚动）。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Lyrics {
     pub lines: Vec<LyricLine>,
     pub synced: bool,

@@ -394,6 +394,7 @@ fn read_text_file(path: &Path) -> Option<String> {
         return None;
     }
     let bytes = fs::read(path).ok()?;
+    if bytes.len() > MAX_LYRICS_BYTES as usize { return None; }
     Some(decode_text(&bytes))
 }
 
@@ -433,7 +434,7 @@ fn embedded_lyrics(path: &Path) -> Option<String> {
     for tag in tagged.tags() {
         for key in [ItemKey::Lyrics, ItemKey::UnsyncLyrics] {
             if let Some(v) = tag.get_string(key) {
-                if !v.trim().is_empty() {
+                if !v.trim().is_empty() && v.len() <= MAX_LYRICS_BYTES as usize {
                     return Some(v.to_string());
                 }
             }
@@ -769,6 +770,41 @@ mod tests {
         assert_eq!(got.origin, "sidecar");
         assert!(got.text.contains("窗外的麻雀"));
         assert!(got.translation.is_none());
+    }
+
+    #[test]
+    fn utf16_both_endians_and_exact_one_mib_sidecar_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let song = flac_at(dir.path(), "bounded.flac");
+        let path = dir.path().join("bounded.lrc");
+        let text = "[00:01.00]窗外的麻雀\n";
+        for little in [true, false] {
+            let mut bytes = if little { vec![0xff, 0xfe] } else { vec![0xfe, 0xff] };
+            for unit in text.encode_utf16() {
+                bytes.extend(if little { unit.to_le_bytes() } else { unit.to_be_bytes() });
+            }
+            fs::write(&path, bytes).unwrap();
+            assert_eq!(read_lyrics(&song).unwrap().text.trim(), text.trim());
+        }
+        let mut exact = b"[00:01.00]".to_vec();
+        exact.resize(MAX_LYRICS_BYTES as usize, b'a');
+        fs::write(&path, &exact).unwrap();
+        assert!(read_lyrics(&song).is_some());
+        exact.push(b'a');
+        fs::write(&path, exact).unwrap();
+        assert!(read_lyrics(&song).is_none());
+        fs::remove_file(&path).unwrap();
+        let mut tags = crate::tags::AudioTags {
+            title: "bounded".into(), artists: vec![], album: None, album_artist: None,
+            track_no: None, disc_no: None, year: None, cover_path: None,
+            lyrics: Some("x".repeat(MAX_LYRICS_BYTES as usize + 1)),
+        };
+        crate::tags::write_tag(&song, &tags).unwrap();
+        assert!(read_lyrics(&song).is_none());
+        tags.lyrics = Some("[00:01]embedded fallback".into());
+        crate::tags::write_tag(&song, &tags).unwrap();
+        fs::write(&path, vec![b'x'; MAX_LYRICS_BYTES as usize+1]).unwrap();
+        assert_eq!(read_lyrics(&song).unwrap().origin, "embedded");
     }
 
     /// `song.mp3.lrc` 这种「整个文件名再加后缀」的写法也要认。

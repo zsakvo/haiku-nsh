@@ -43,6 +43,30 @@ pub fn fallback_palette() -> Vec<Color> {
     tonal_palette(FALLBACK_SOURCE)
 }
 
+/// Generate an exact HCT tone from a palette color, including player tones 15 and 38.
+pub fn tone(source: &Color, tone: i32) -> Color {
+    let hct = Hct::new(Rgb::new(source.r, source.g, source.b));
+    Color::rgb(TonalPalette::of(hct.get_hue(), hct.get_chroma()).tone(tone.clamp(0, 100)))
+}
+
+/// Generate the five cover roles from an application accent when artwork is absent.
+pub fn from_rgb(r: u8, g: u8, b: u8) -> Vec<Color> {
+    tonal_palette(Rgb::new(r, g, b))
+}
+
+/// A request generation. Advancing invalidates every older asynchronous completion.
+#[derive(Default)]
+pub struct RequestVersion(u64);
+impl RequestVersion {
+    pub fn advance(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(1);
+        self.0
+    }
+    pub fn accepts(&self, version: u64) -> bool {
+        self.0 == version
+    }
+}
+
 // A fixed hash makes sampling repeatable while avoiding a regular sampling lattice
 // that could repeatedly select the same column of striped artwork.
 fn sample_hash(mut value: u32) -> u32 {
@@ -140,6 +164,20 @@ pub fn extract_file(path: impl AsRef<Path>) -> Result<Vec<Color>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stale_palette_results_never_replace_the_selected_cover() {
+        let mut version = RequestVersion::default();
+        let first = version.advance();
+        let second = version.advance();
+        assert!(!version.accepts(first));
+        assert!(version.accepts(second));
+        let cleared = version.advance();
+        assert!(!version.accepts(second));
+        assert!(version.accepts(cleared));
+        let palette = fallback_palette();
+        assert_ne!(tone(&palette[1], 15).hex, tone(&palette[1], 38).hex);
+    }
 
     #[test]
     fn samples_are_bounded_and_cover_both_dimensions_without_stride_bias() {

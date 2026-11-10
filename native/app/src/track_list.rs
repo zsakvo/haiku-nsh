@@ -271,7 +271,15 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                             })
                             .w_8()
                             .text_xs()
-                            .text_color(move || theme().primary),
+                            .text_color(move || {
+                                if id_at(props, at).is_some_and(|id| {
+                                    props.current_id.get().is_some_and(|v| v.as_str() == id)
+                                }) {
+                                    theme().primary
+                                } else {
+                                    theme().muted_foreground
+                                }
+                            }),
                         )
                         .child(
                             view()

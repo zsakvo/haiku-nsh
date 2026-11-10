@@ -40,7 +40,7 @@ export function brandTheme(brand: Brand) {
       "sidebar-primary": primary, "sidebar-primary-foreground": onPrimary,
       selection, "selection-foreground": source.foreground,
       "sidebar-accent": selection, "sidebar-accent-foreground": source.foreground,
-      "sidebar-ring": primary, "progress-played": primary,
+      "sidebar-ring": primary, "progress-played": source.foreground,
     };
   }
   return { cssVars: { theme: base.cssVars.theme, light: palette(false), dark: palette(true) } };
