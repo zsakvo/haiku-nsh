@@ -1,13 +1,15 @@
-//! Minimal JS-only plugin runtime using the same engine as NSH.
+//! Isolated plugin runtime using the same engine as NSH.
 //!
 //! Each instance owns one OS thread and one QuickJS Runtime/Context. Commands
 //! execute serially; only strings, JSON and errors cross the channel. A local
 //! Tokio executor and wake-driven job polling run JS promises and stdlib futures.
-//! This is not yet a plugin SDK, filesystem loader or security sandbox.
+//! Generic host facilities; no music SDK semantics. This is not an OS sandbox.
 
 use std::{
+    collections::BTreeMap,
     fmt,
     future::{Future, poll_fn},
+    path::{Path, PathBuf},
     pin::pin,
     sync::{
         Arc, Mutex,
@@ -26,6 +28,12 @@ use rquickjs::{
 use serde_json::Value;
 use tokio::sync::{Notify, mpsc as channel, oneshot};
 
+mod crypto;
+mod host;
+mod loader;
+pub use host::{HttpEvent, LogRecord};
+pub use loader::NativeModule;
+
 const LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const JOB_BATCH: usize = 32;
 
@@ -39,6 +47,10 @@ pub struct JsError {
     pub message: String,
     /// JavaScript stack when supplied by the thrown value; otherwise empty.
     pub stack: String,
+    /// Original source location, when available (one-based).
+    pub file: Option<String>,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
 }
 
 impl JsError {
@@ -47,6 +59,9 @@ impl JsError {
             name: name.into(),
             message: message.into(),
             stack: String::new(),
+            file: None,
+            line: None,
+            column: None,
         }
     }
 
@@ -62,6 +77,9 @@ impl JsError {
                     .get("message")
                     .unwrap_or_else(|_| format!("{thrown:?}")),
                 stack: object.get("stack").unwrap_or_default(),
+                file: object.get("fileName").ok(),
+                line: object.get("lineNumber").ok(),
+                column: object.get("columnNumber").ok(),
             }
         } else {
             let message = rquickjs::Coerced::<String>::from_js(ctx, thrown)
@@ -82,14 +100,91 @@ impl fmt::Display for JsError {
 
 impl std::error::Error for JsError {}
 
+/// Configuration retained across unload and hot reload. Callbacks run on the VM thread.
+#[derive(Clone)]
+pub struct RuntimeOptions {
+    pub instance_id: String,
+    pub memory_limit: usize,
+    pub describe_only: bool,
+    pub storage_path: Option<PathBuf>,
+    pub modules: BTreeMap<String, String>,
+    pub native_modules: BTreeMap<String, NativeModule>,
+    pub log: Option<Arc<dyn Fn(LogRecord) + Send + Sync>>,
+    pub http_hook: Option<Arc<dyn Fn(HttpEvent) + Send + Sync>>,
+}
+impl Default for RuntimeOptions {
+    fn default() -> Self {
+        Self {
+            instance_id: "plugin".into(),
+            memory_limit: 64 * 1024 * 1024,
+            describe_only: false,
+            storage_path: None,
+            modules: BTreeMap::new(),
+            native_modules: BTreeMap::new(),
+            log: None,
+            http_hook: None,
+        }
+    }
+}
+
+/// Cloneable cancellation token. Aborting does not destroy the instance.
+#[derive(Clone, Default)]
+pub struct AbortHandle(Arc<Stop>);
+impl AbortHandle {
+    pub fn abort(&self) {
+        self.0.requested.store(true, Ordering::Release);
+        self.0.wake.notify_waiters();
+    }
+    pub fn is_aborted(&self) -> bool {
+        self.0.requested.load(Ordering::Acquire)
+    }
+    async fn cancelled(&self) {
+        loop {
+            let notified = self.0.wake.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.is_aborted() {
+                return;
+            }
+            notified.await;
+        }
+    }
+}
+/// An enqueued call and its independently cloneable abort handle.
+pub struct CallHandle {
+    pub abort: AbortHandle,
+    response: oneshot::Receiver<Result<Value, JsError>>,
+}
+impl CallHandle {
+    pub async fn result(self) -> Result<Value, JsError> {
+        self.response
+            .await
+            .map_err(|_| JsError::new("ShutdownError", "VM thread is stopped"))?
+    }
+}
+
 enum Operation {
-    Load { name: String, source: String },
-    Call { export: String, args: String },
+    Load {
+        name: String,
+        source: String,
+    },
+    Call {
+        export: String,
+        args: String,
+        context: String,
+    },
+    Package {
+        root: PathBuf,
+        entry: String,
+    },
+    Unload,
+    Describe,
 }
 
 struct Command {
     operation: Operation,
     deadline: Instant,
+    abort: AbortHandle,
     reply: oneshot::Sender<Result<Value, JsError>>,
 }
 
@@ -114,8 +209,12 @@ impl Runtime {
     /// Starts a VM and installs the stdlib globals and builtin module loader.
     ///
     /// Returns only after initialization succeeds. Does not require an ambient
-    /// Tokio runtime. No host fetch, console, storage or timers are installed.
+    /// Tokio runtime. Uses the default memory limit and in-memory storage.
     pub fn spawn() -> Result<Self, JsError> {
+        Self::with_options(RuntimeOptions::default())
+    }
+
+    pub fn with_options(options: RuntimeOptions) -> Result<Self, JsError> {
         let (commands, receiver) = channel::unbounded_channel();
         let (startup, ready) = mpsc::sync_channel(1);
         let stop = Arc::new(Stop::default());
@@ -135,10 +234,10 @@ impl Runtime {
                     }
                 };
                 executor.block_on(async move {
-                    match Engine::new(worker_stop.clone()).await {
+                    match Engine::configured(worker_stop.clone(), options.clone()).await {
                         Ok(engine) => {
                             if startup.send(Ok(())).is_ok() {
-                                worker(engine, receiver, worker_stop).await;
+                                worker(engine, receiver, worker_stop, options).await;
                             }
                         }
                         Err(error) => {
@@ -170,8 +269,8 @@ impl Runtime {
 
     /// Evaluates an ES module from JS source and selects its exports for `call`.
     ///
-    /// Each name must be unique within the instance. Only the stdlib builtin
-    /// imports are resolved; there is no filesystem loader or TS transpilation.
+    /// Each name must be unique within the instance. Registered host modules and
+    /// stdlib modules are available; use load_package for filesystem TypeScript.
     /// Top-level await is supported, with a fixed five-second load deadline.
     /// A timeout retires the VM; construct a new instance before using it again.
     pub async fn load_module(&self, name: &str, source: &str) -> Result<(), JsError> {
@@ -206,27 +305,78 @@ impl Runtime {
             Operation::Call {
                 export: export.into(),
                 args: args_json.into(),
+                context: "{}".into(),
             },
             timeout,
         )
         .await
     }
 
-    async fn request(&self, operation: Operation, timeout: Duration) -> Result<Value, JsError> {
+    /// Enqueue a call; args is the first argument and a fresh ctx is the second.
+    /// Host JSON fields are augmented with signal/http/storage/log facilities.
+    pub fn start_call(
+        &self,
+        export: &str,
+        args: Value,
+        context: Value,
+        timeout: Duration,
+    ) -> Result<CallHandle, JsError> {
+        if !context.is_object() {
+            return Err(JsError::new("InvalidArgument", "ctx must be an object"));
+        }
+        self.enqueue(
+            Operation::Call {
+                export: export.into(),
+                args: args.to_string(),
+                context: context.to_string(),
+            },
+            timeout,
+        )
+    }
+    /// Loads a package into a fresh VM. Entry is relative to the canonical package root.
+    pub async fn load_package(&self, root: &Path, entry: &str) -> Result<(), JsError> {
+        self.request(
+            Operation::Package {
+                root: root.into(),
+                entry: entry.into(),
+            },
+            LOAD_TIMEOUT,
+        )
+        .await
+        .map(|_| ())
+    }
+    /// Queue a fresh package evaluation after earlier calls complete; storage survives.
+    pub async fn reload(&self, root: &Path, entry: &str) -> Result<(), JsError> {
+        self.load_package(root, entry).await
+    }
+    pub async fn unload(&self) -> Result<(), JsError> {
+        self.request(Operation::Unload, LOAD_TIMEOUT)
+            .await
+            .map(|_| ())
+    }
+    /// Read an export shape without invoking getters or handler functions.
+    pub async fn describe(&self) -> Result<Value, JsError> {
+        self.request(Operation::Describe, LOAD_TIMEOUT).await
+    }
+
+    fn enqueue(&self, operation: Operation, timeout: Duration) -> Result<CallHandle, JsError> {
         let deadline = Instant::now()
             .checked_add(timeout)
             .ok_or_else(|| JsError::new("InvalidArgument", "Timeout is too large"))?;
         let (reply, response) = oneshot::channel();
+        let abort = AbortHandle::default();
         self.commands
             .send(Command {
                 operation,
                 deadline,
                 reply,
+                abort: abort.clone(),
             })
             .map_err(|_| JsError::new("ShutdownError", "VM thread is stopped"))?;
-        response
-            .await
-            .map_err(|_| JsError::new("ShutdownError", "VM thread is stopped"))?
+        Ok(CallHandle { abort, response })
+    }
+    async fn request(&self, operation: Operation, timeout: Duration) -> Result<Value, JsError> {
+        self.enqueue(operation, timeout)?.result().await
     }
 
     /// Interrupts execution, drops all VM state on its thread, and joins it.
@@ -259,36 +409,98 @@ impl Drop for Runtime {
 // Field order ensures JS persistent values are released before context/runtime.
 struct Engine {
     module: Option<Persistent<Object<'static>>>,
+    controller: Option<Persistent<Object<'static>>>,
+    options: RuntimeOptions,
+    sources: loader::SharedSources,
+    active: Arc<Mutex<AbortHandle>>,
     context: AsyncContext,
     runtime: AsyncRuntime,
     deadline: Arc<Mutex<Instant>>,
 }
 
 impl Engine {
+    #[cfg(test)]
     async fn new(stop: Arc<Stop>) -> Result<Self, JsError> {
+        Self::configured(stop, RuntimeOptions::default()).await
+    }
+
+    async fn configured(stop: Arc<Stop>, options: RuntimeOptions) -> Result<Self, JsError> {
         let runtime =
             AsyncRuntime::new().map_err(|error| JsError::new("RuntimeError", error.to_string()))?;
         let deadline = Arc::new(Mutex::new(Instant::now() + LOAD_TIMEOUT));
         let limit = deadline.clone();
+        let active = Arc::new(Mutex::new(AbortHandle::default()));
+        let interrupt = active.clone();
         runtime
             .set_interrupt_handler(Some(Box::new(move || {
-                stop.requested.load(Ordering::Acquire) || Instant::now() >= *limit.lock().unwrap()
+                stop.requested.load(Ordering::Acquire)
+                    || interrupt.lock().unwrap().is_aborted()
+                    || Instant::now() >= *limit.lock().unwrap()
             })))
             .await;
+        let sources = loader::SharedSources::default();
+        let names = options
+            .modules
+            .keys()
+            .chain(options.native_modules.keys())
+            .cloned()
+            .collect();
+        let mut stdlib = quickjs_jit_stdlib::loader();
+        stdlib.add_module("__stdlib_crypto", quickjs_jit_stdlib::crypto::CryptoModule);
+        let mut modules = options.modules.clone();
+        modules.insert("crypto".into(), crypto::MODULE.into());
         runtime
-            .set_loader(quickjs_jit_stdlib::resolver(), quickjs_jit_stdlib::loader())
+            .set_loader(
+                (
+                    quickjs_jit_stdlib::resolver().with_module("__stdlib_crypto"),
+                    loader::PackageResolver {
+                        sources: sources.clone(),
+                        names,
+                    },
+                ),
+                (
+                    loader::PackageLoader {
+                        sources: sources.clone(),
+                        modules,
+                        native: options.native_modules.clone(),
+                    },
+                    stdlib,
+                ),
+            )
             .await;
+        runtime.set_memory_limit(options.memory_limit).await;
         runtime.set_max_stack_size(1024 * 1024).await;
         let context = AsyncContext::full(&runtime)
             .await
             .map_err(|error| JsError::new("RuntimeError", error.to_string()))?;
         context
             .with(|ctx| {
-                quickjs_jit_stdlib::init(&ctx).map_err(|error| JsError::from_engine(&ctx, error))
+                (|| {
+                    quickjs_jit_stdlib::init(&ctx)?;
+                    quickjs_jit_stdlib::events::init(&ctx)?;
+                    // The stdlib installs a DOMException stack accessor. Restore
+                    // QuickJS's lazy Error stack accessor after that initialization.
+                    let restore_stack: Function = ctx.eval(r#"(() => {
+                        const descriptor=Object.getOwnPropertyDescriptor(Error.prototype,'stack');
+                        return () => { if(descriptor) Object.defineProperty(Error.prototype,'stack',descriptor);
+                            else delete Error.prototype.stack; };
+                    })()"#)?;
+                    quickjs_jit_stdlib::exceptions::init(&ctx)?;
+                    restore_stack.call::<_, ()>(())?;
+                    quickjs_jit_stdlib::abort::init(&ctx)?;
+                    host::install(&ctx, &options)?;
+                    crypto::install(&ctx)?;
+                    Ok(())
+                })()
+                .map_err(|error| JsError::from_engine(&ctx, error))
             })
             .await?;
         Ok(Self {
             module: None,
+            controller: None,
+            options,
+            sources,
+            active,
             context,
             runtime,
             deadline,
@@ -316,7 +528,53 @@ impl Engine {
                 self.module = Some(namespace);
                 Ok(Value::Null)
             }
-            Operation::Call { export, args } => {
+            Operation::Package { root, entry } => {
+                let root = root
+                    .canonicalize()
+                    .map_err(|e| JsError::new("ModuleError", e.to_string()))?;
+                let path = loader::checked_path(&root, &root, &entry)?;
+                let source = {
+                    let mut sources = self.sources.lock().unwrap();
+                    sources.root = Some(root);
+                    loader::read_source(&path, &mut sources)?
+                };
+                Box::pin(self.execute(Operation::Load {
+                    name: path.to_string_lossy().into_owned(),
+                    source,
+                }))
+                .await
+            }
+            Operation::Unload => Ok(Value::Null),
+            Operation::Describe => {
+                let module = self
+                    .module
+                    .as_ref()
+                    .ok_or_else(|| JsError::new("RuntimeError", "No module loaded"))?;
+                self.context
+                    .with(|ctx| {
+                        let describe: Function = ctx
+                            .globals()
+                            .get("__describe")
+                            .map_err(|e| JsError::from_engine(&ctx, e))?;
+                        let text: String = describe
+                            .call((module
+                                .clone()
+                                .restore(&ctx)
+                                .map_err(|e| JsError::from_engine(&ctx, e))?,))
+                            .map_err(|e| JsError::from_engine(&ctx, e))?;
+                        serde_json::from_str(&text)
+                            .map_err(|e| JsError::new("RuntimeError", e.to_string()))
+                    })
+                    .await
+            }
+            Operation::Call {
+                export,
+                args,
+                context,
+            } => {
+                if self.options.describe_only {
+                    return Err(JsError::new("DescribeOnly", "Handler calls are disabled"));
+                }
                 let module = self.module.as_ref().ok_or_else(|| {
                     JsError::new("RuntimeError", "Load a module before calling an export")
                 })?;
@@ -325,9 +583,25 @@ impl Engine {
                     .with(|ctx| {
                         let result = (|| {
                             let namespace = module.clone().restore(&ctx)?;
-                            let function: Function = namespace.get(export)?;
+                            let mut object = namespace;
+                            let mut parts = export.split('.').peekable();
+                            let mut key = parts.next().unwrap_or("");
+                            while parts.peek().is_some() {
+                                object = object.get(key)?;
+                                key = parts.next().unwrap();
+                            }
+                            let function: Function = object.get(key)?;
+                            let make: Function = ctx.globals().get("__makeContext")?;
+                            let pair: Object = make.call((ctx.json_parse(context)?,))?;
+                            self.controller =
+                                Some(Persistent::save(&ctx, pair.get::<_, Object>("controller")?));
+                            let call_ctx: Object = pair.get("ctx")?;
                             let args = ctx.json_parse(args)?;
-                            let value: JsValue = function.call((args,))?;
+                            let value: JsValue = function.call((
+                                rquickjs::function::This(object),
+                                args,
+                                call_ctx,
+                            ))?;
                             Ok(Persistent::save(&ctx, value))
                         })();
                         result.map_err(|error| JsError::from_engine(&ctx, error))
@@ -437,6 +711,7 @@ async fn worker(
     engine: Engine,
     mut commands: channel::UnboundedReceiver<Command>,
     stop: Arc<Stop>,
+    options: RuntimeOptions,
 ) {
     let mut engine = Some(engine);
     loop {
@@ -463,20 +738,52 @@ async fn worker(
         let Some(command) = command else {
             break;
         };
+        if matches!(
+            command.operation,
+            Operation::Package { .. } | Operation::Unload
+        ) {
+            engine.take();
+            match Engine::configured(stop.clone(), options.clone()).await {
+                Ok(vm) => engine = Some(vm),
+                Err(error) => {
+                    let _ = command.reply.send(Err(error));
+                    continue;
+                }
+            }
+        }
         let result = if let Some(vm) = engine.as_mut() {
+            *vm.active.lock().unwrap() = command.abort.clone();
             *vm.deadline.lock().unwrap() = command.deadline;
-            let result = if Instant::now() >= command.deadline {
+            let result = if command.abort.is_aborted() {
+                Err(JsError::new("AbortError", "Call aborted"))
+            } else if Instant::now() >= command.deadline {
                 Err(timeout_error())
             } else {
                 tokio::select! {
                     biased;
                     _ = stop.wake.notified() => Err(JsError::new("ShutdownError", "VM is shutting down")),
+                    _ = command.abort.cancelled() => Err(JsError::new("AbortError", "Call aborted")),
                     result = tokio::time::timeout_at(
                         command.deadline.into(), vm.execute(command.operation)
                     ) => result.unwrap_or_else(|_| Err(timeout_error())),
                 }
             };
-            if stop.requested.load(Ordering::Acquire) {
+            *vm.active.lock().unwrap() = AbortHandle::default();
+            if command.abort.is_aborted() {
+                if let Some(controller) = vm.controller.take() {
+                    vm.context
+                        .with(|ctx| {
+                            if let Ok(controller) = controller.restore(&ctx)
+                                && let Ok(abort) = controller.get::<_, Function>("abort")
+                            {
+                                let _: rquickjs::Result<()> =
+                                    abort.call((rquickjs::function::This(controller),));
+                            }
+                        })
+                        .await;
+                }
+                Err(JsError::new("AbortError", "Call aborted"))
+            } else if stop.requested.load(Ordering::Acquire) {
                 Err(JsError::new("ShutdownError", "VM is shutting down"))
             } else if Instant::now() >= command.deadline {
                 Err(timeout_error())
@@ -489,11 +796,22 @@ async fn worker(
                 "VM was retired; spawn a new Runtime",
             ))
         };
-        if result
-            .as_ref()
-            .is_err_and(|error| error.name == "TimeoutError")
-        {
+        if result.as_ref().is_err_and(|error| {
+            error.name == "TimeoutError" && error.message.starts_with("JS deadline exceeded")
+        }) {
             engine.take(); // Cancel all remaining futures/jobs and release the VM.
+        }
+        let result = result.map_err(|mut e| {
+            if let Some(vm) = engine.as_ref() {
+                loader::locate(&mut e, &vm.sources);
+            }
+            if e.message.contains("out of memory") {
+                e.name = "MemoryLimitError".into();
+            }
+            e
+        });
+        if result.as_ref().is_err_and(|e| e.name == "MemoryLimitError") {
+            engine.take();
         }
         let _ = command.reply.send(result);
     }

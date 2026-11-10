@@ -1,0 +1,7 @@
+# macOS 27's dyld rejects stripped proc-macro dylibs. Keep build-time
+# dependencies unstripped in both the native and NSH-generated workspaces.
+[profile.dev.build-override]
+strip = false
+
+[profile.release.build-override]
+strip = false

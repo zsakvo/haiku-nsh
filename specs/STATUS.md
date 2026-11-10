@@ -20,7 +20,7 @@
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
-| F02 插件包与来源生命周期 | 未实现 | | | |
+| F02 插件包与来源生命周期 | 运行时 R1–R12 已实现，待审阅；插件宿主未实现 | jsrt 24/24、workspace 203 通过/1 忽略、NSH 同进程并发及 check/build/test 通过；crypto 限制见 M2-01 小节 | `.artifacts/m2-01/` | |
 | F03 来源认证与用户内容 | 未实现 | | | |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
@@ -394,3 +394,43 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 警告：block 0.1.6 与 __eh_frame 为允许例外；仍有 huacnlee/cargo 的 ignoring configured target directory 提示，故严格“仅已知例外”未满足；未换工具链或修改依赖。
 - 未覆盖/待人工：媒体键与控制中心按钮、关闭隐藏后续播、Dock 恢复、Cmd+Q、真实防息屏/听感；其他平台与深色新分组视觉未验收；网络缓存真实写入/恢复留 M4，下载及其他设置/通知/日志留后续。
 - 未引入新的架构决策；目录差异按本任务具体要求执行，后续由审阅者统一 DATA 路径说明。未修改 README、Rex、参考版、NSH 或依赖源码；specs 仅改本 STATUS，保留审阅者未跟踪任务文件；不提交/不推送。
+
+## 2026-11-10 构建修复：普通 nsh run
+
+- 用户直接执行 nsh run 时缺少两个 STRIP=false 环境变量，复现交接中记录的 proc-macro dylib 被 dyld 拒绝问题，表现为 E0463 rquickjs_macro。
+- 新增仓库根 .cargo/config.toml，配置 dev/release 的 build-override.strip=false，同时覆盖 native 与 .nsh/rust 生成 workspace；不再依赖手动 export。
+- 显式移除 CARGO_PROFILE_DEV_BUILD_OVERRIDE_STRIP 与 CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP 后运行 nsh run：Rust crate、App.tsx、macOS 开发 host 均构建成功，真实应用 connected。
+- 验证使用 /tmp/haiku-m1-03-fixtures/build-strip.* 隔离 HAIKU_DATA_DIR，HAIKU_NO_KEYCHAIN=1；启动后 Ctrl+C 收尾，无 GUI 自动操作。
+- 日志：.artifacts/m1-05/nsh-run-repo-strip-config.log；host 汇报 1 条未展开警告，未额外重跑；release 配置未另做打包验证。
+- 未修改 README、生成 host、依赖、工具链、参考版或 Rex；保留工作区，不提交/推送。
+
+
+## 2026-11-10 M2-01：运行时 R1–R12（待审阅）
+
+- 所有操作均在主仓库 `/Users/zsakvo/Project/GPUI/haiku-nsh`；只改 Rust/依赖及本 STATUS；未提交/推送，未改 UI、Rex、参考版或上游。
+- 保留审阅者既有改动/未跟踪任务说明；根 `.cargo/config.toml` 的 dev/release build-override.strip=false 按审阅者明确授权保留，本轮未另改。
+- RuntimeOptions 配置实例 id/内存/描述模式/宿主模块/日志/HTTP 钩子/KV 路径；独立 Runtime/Context 与专用线程，串行队列、超时退役、shutdown/Drop join。
+- 新增 load_package/unload/reload/describe、CallHandle/AbortHandle、导出路径/this、JSON args+逐次 ctx（signal/http/storage/log）；取消同步 JS 与异步调用后可继续使用实例。
+- 包 loader canonicalize 根/目标，拒绝绝对路径/父路径/符号链接逃逸；oxc 剥离 TS 与内存 source map；注册源码模块及 Rust ModuleDef 工厂。
+- fetch/Headers/Request/Response 使用 reqwest+rustls；文本/JSON/原始字节、重定向/超时/AbortSignal、脱敏的请求响应元数据钩子；响应体限 16MiB。
+- console 分级、实例 id、对象及文本敏感字段脱敏；KV 临时文件+sync+rename+父目录 sync，卸载/重建/热重载后保留。
+- crypto 包装并保留 stdlib 导出/default/WebCrypto；补 createCipheriv/createDecipheriv/publicEncrypt，AES 三种 key size × ECB/CBC/CTR/GCM，padding/tag/AAD、PEM RSA PKCS#1 v1.5/OAEP。
+- 续修一：恢复 stdlib DOMException 初始化前 QuickJS Error.prototype.stack descriptor，保持 M0 catch/read stack 路径，TS source map 还原后 R2/R4 通过；R10 原失败为 Buffer.equals 不存在，扩展导出已断言验证。
+- R7 二进制原失败在 HTTP fixture 的 from_utf8_lossy；改为完整读取 Content-Length 后原字节回显，bytes/arrayBuffer 都验证 0x00/0x01/0xff 保真。
+- 续修二：保留 reqwest is_timeout 语义；HTTP TimeoutError 不再误退役 VM；补 RSA 两种 PEM/三种 padding-hash 组合、GCM 认证失败和分段 update/final。
+- 续修三只清理 clippy 的 collapsible_if 与测试 MutexGuard 词法作用域；不重复 workspace 构建，最终 nsh test 同进程用例再次通过。
+- 新增直接依赖（沿用已锁定版本）：reqwest 0.12.28、serde 1.0.229、tempfile 3.24.0、regex 1.12.2；aes 0.9.4、aes-gcm 0.11.1、ctr 0.10.1、rsa 0.10.0-rc.19、rand 0.10.3、sha1 0.11.0、sha2 0.11.1。
+- TS 新增 oxc_allocator/parser/span/semantic/transformer/codegen 0.155.0；oxc_sourcemap 9.0.0 沿用锁定版本；仍使用同一套 quickjs-jit 0.14.1。
+- 所有构建设置两个 CARGO_PROFILE_{DEV,RELEASE}_BUILD_OVERRIDE_STRIP=false；NSH/workspace 使用隔离 HAIKU_DATA_DIR=/tmp/haiku-m1-03-fixtures/m2-01-data、HAIKU_NO_KEYCHAIN=1；未换工具链。
+- `cargo test --manifest-path native/Cargo.toml -p haiku-jsrt`：最终 24 通过、0 失败；`cargo-test-jsrt-review2.log`。早期依赖/API 编译失败、18/23 和 22/23 失败日志全部保留。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：203 通过、0 失败、1 忽略；`cargo-test-workspace.log`；含 jsrt_r1_r4_r5_r7_concurrent_with_nsh_ui_vm，通过真实 NSH JS engine 与两实例多调用/HTTP/取消，并验证 UI 期间和销毁后的事件响应。
+- `cargo clippy --manifest-path native/Cargo.toml -p haiku-jsrt --all-targets`：修复两条局部告警后无警告；`cargo-clippy-jsrt-review3.log`，初轮日志也保留。
+- `nsh check` / `nsh build`：退出 0；`nsh-check.log` / `nsh-build.log`，未输出警告。
+- `nsh test`：退出 0，12/12（9 TSX+3 Rust）；`nsh-test.log`；runner 构建摘要提示 1 条未展开警告，未为展开警告重跑构建，不能认定其已属已知例外。
+- workspace 仅 block 0.1.6 future-incompat 已知例外；最终 clippy/check/build 无新增告警；严格“仅已知例外”仍待审阅确认 runner 的未展开告警。
+- R1–R12 每项的 r1_…r12_ 测试均通过；R1/R4 同实例排队/多实例，R5 同步/异步取消后复用，R7 多实例 HTTP/宿主取消/JS abort/请求超时；R2 包边界拒绝断言均已执行。
+- R10 AES 对照 NIST SP800-38A/38D 向量；RSA 为固定公开测试 key 的 PEM 导入/加密/解密回归，未另跑 OpenSSL 交叉验证。
+- §8 限制：GCM 仅 12 字节 IV/16 字节 tag；OAEP 仅 SHA-1/SHA-256；cipher update 已返回分段输出，但每段重算累计输入（大块/多段优化留后续）；fetch 为有界缓冲 body，未实现 Web ReadableStream/FormData。
+- interrupt 无法抢占同步原生 stdlib/crypto/KV/模块读取与编译/宿主回调；返回后检查 deadline。内存限额覆盖 QuickJS heap；Rust HTTP（另限16MiB）/crypto/编译分配不计入。
+- 待审阅决定：是否接受上述 crypto/fetch 子集与 update 重算实现进入 M2-02；确认未展开 runner 告警。未进入插件宿主/SDK/CLI/UI，无额外 GUI 验收。
+- 全部证据 `.artifacts/m2-01/`，无一次性诊断脚本、汇总 JSON/hash；保留工作区等待审阅。

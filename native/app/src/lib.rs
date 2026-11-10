@@ -28,3 +28,6 @@ fn native(registry: &mut Registry) {
     registry.register::<PlayerDock>();
     registry.register::<NowPlaying>();
 }
+
+#[cfg(test)]
+mod jsrt_tests;

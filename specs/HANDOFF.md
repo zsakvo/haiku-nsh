@@ -23,6 +23,14 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M2-01 已验收并提交
+
+- M2 拆为 M2-01 运行时 → M2-02 宿主 + `sdk/haiku.d.ts` + subsonic → M2-03 其余插件、CLI、契约套件、设置面板、GUIDE。
+- M2-01：haiku-jsrt R1–R12 完成；jsrt 24/24、workspace 203 通过/1 忽略、NSH 同进程并发测试、nsh check/build/test 12/12。
+- 审阅决定：接受 crypto/fetch 子集（GCM 12 字节 IV、OAEP SHA-1/256、响应体 16 MiB、无 ReadableStream/FormData）；cipher 分段 update 每次重算累计输入的性能问题列入 M2-02 第 0 步。rsa 为 0.10.0-rc，M6 前复核。
+- 仓库根 `.cargo/config.toml` 关闭 build-override strip，普通 `nsh run` 不再需要手动 export。
+- Codex `/new` 会切到 `~/.codex/worktrees/` 下的独立工作树；派发时需明确要求在主仓库路径工作。
+
 ## 2026-11-10 更新：M1-05 已验收并提交，M1 完成
 
 - M1-05：设置服务（`core.settings`，schemaVersion 1，保留参考版字段名与未知字段）、外观持久化、十段 EQ/效果/响度均衡、媒体缓存接线（`<data>/media-cache/`，DATA.md 已对齐）、设置“播放”“存储”分组、媒体中心/远程命令、防息屏。workspace 189 通过/1 忽略，nsh test 11/11，浅色截图已审阅。
