@@ -5,7 +5,9 @@
 ## 工作方式
 
 - 用户要求：**代码全部由 Codex 编写**，Claude 只负责写任务说明（`specs/tasks/<任务号>.md`）、派发、审阅证据、更新 specs。
-- 每个任务都遵守 `specs/tasks/README.md` 的通用约定：只做列出的验收、每项跑一次、不做 GUI 自动化、失败最多两次修复、STATUS 小节有篇幅上限；当前 M1-03 续做不提交 git，完成后交审阅者。
+- 每个任务都遵守 `specs/tasks/README.md` 的通用约定：只做列出的验收、每项跑一次、不做 GUI 自动化、失败最多两次修复（审阅者可追加授权）、STATUS 小节有篇幅上限。Codex 不提交 git；**审阅通过后由 Claude 在 main 本地提交（不推送）**，提交信息末尾加 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`（用户已授权）。
+- 用户要求 Claude 派发后**自动监听 Codex 并自动推进**：后台每 30s `rex capture` 窗格末尾 25 行，连续 3 次无 “esc to interrupt” 视为空闲（只看末尾十几行会误报）。仅架构决策或人工验证才停下问用户。
+- 派发时不要让 Codex 用 `/new`（会切到 `~/.codex/worktrees/` 工作树），消息里写明“在主仓库 /Users/zsakvo/Project/GPUI/haiku-nsh 工作”；Codex 状态栏显示 worktree 路径但实际改动落在主仓库。Codex 发送后有时需再补一次 `rex send-key enter`。
 - 本机已确认 Codex 在当前 Rex 会话 `session:01a18a85-6562-735f-9af5-41e1a0ea8fc2` 的右侧窗格 `block:01a1c2f7-c4a0-7591-bd83-d40c4e0a846e`；派发方式是 `rex send` + `rex send-key enter`，随后 capture 确认已进入执行。换会话或机器时重新检查，不复用旧窗格 ID。
 - 执行者不得修改 Rex 会话名称或布局。
 
@@ -13,7 +15,16 @@
 
 - macOS arm64，Xcode；`nsh 0.4.0`（`curl -fsSL https://nsh.dev/install.sh | sh`）；cargo 用 huacnlee/cargo（`curl -fsSL https://huacnlee.github.io/cargo/install.sh | sh`，会替换 `~/.cargo/bin/cargo`，原版留为 `cargo.rustup`）。
 - 参考项目（只读）：本机为 `~/Project/GPUI/haiku`（业务与行为依据，旧机器路径 `~/Project/haiku-gpuix` 已失效）；原 Flutter 版 `~/Project/Flutter/haiku`。
-- 本机仓库有 `origin` remote，当前分支 main；本轮不提交或推送。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；本机尚无 `.artifacts/m1-03/`，验收需保存新证据，不假定旧机器音频和日志存在。
+- 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交，**截至 `9a52e44` 均未推送**。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
+
+## 当前进度（2026-11-10 交接时）
+
+- M0、M1、M2 完成；M3-01 已提交（`9a52e44`）。**M3-02 进行中，未验收、未提交**（任务 `specs/tasks/M3-02-history-stats-logs.md`）。
+- 交接时 Codex 仍在执行 M3-02（约 34 分钟，处于自查阶段），周额度剩约 11%。已有改动：`haiku-store::{history,stats,logs,document}`、`tests/activity.rs` 与参考版 `history.json`/`stats.json` fixture、`native/app/src/activity.rs`、Core/plugins/controller/track_list 等接线、`src/pages/{HistoryPage,StatsPage}.tsx`、`src/shell/Diagnostics.tsx`、`assets/icons/heart-filled.svg`、根目录 `{History,Stats,Logs,Notifications}Preview.tsx`、`Activity*.tsx`。旧机器 `.artifacts/m3-02/` 已有 workspace/nsh 日志（含 repair1/2）及 history、statistics、liked-dock 截图；日志查看器、通知中心截图尚未见到。
+- **新机器接手 M3-02**：未提交改动不会随 git 走。二选一：(a) 在旧机器等 Codex 完成、审阅、提交并推送后再拉取；(b) 直接在新机器让 Codex 按任务文件从头/续做（先 `git status` 看有无残留）。审阅要点：workspace 与 `nsh test` 全绿、5 张浅色截图（历史、统计含热图与小时分布、日志查看器、通知中心、Dock 实心爱心）、与参考版 JSON 兼容、通知入口位置、图表实现方式、STATUS F12/F16 与 ≤40 行小节；根目录 Preview 文件是否应归位到 `src/` 下需审阅。
+- M3-02 通过后：提交 “M3-02: history, local stats, logs and notifications”，HANDOFF 记 M3 完成，再按 `specs/MILESTONES.md` 拆 M4（推荐/分类/搜索/详情页、网络播放、在线歌词、在线歌单历史写入、远端收藏刷新）。
+- 累积待人工确认（给用户汇总）：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛（中继与安全码）、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3-01 控制中心 favorite、真实 Cmd+Q 冲刷。
+- 小项待后续 UI 任务：二维码过期置灰；开发者结果树空 `warnings` 不显示展开箭头；Rust `animated_value` 真实 host 不推进（未查明）。
 
 ## 已完成
 
