@@ -1,0 +1,36 @@
+import { expect, open, test } from "nsh/test";
+
+test("library source → paged album → playback, artist albums, favorite sidebar and retry", async () => {
+  const app = await open("../../../NetworkFixture.tsx", {platform:"macos",width:1200,height:800,network:"live"});
+  await app.waitFor("id:page-source-library");
+  await app.waitFor("role:button[潮汐与回声]");
+  await app.press("注入一次来源错误");
+  await app.waitFor("text:来源错误已注入");
+  await app.press("role:button[潮汐与回声]");
+  await app.waitFor("text:Error: UPSTREAM_ERROR: 夹具连接暂时失败，请重试");
+  await app.press("重试详情");
+  await app.waitFor("text:已加载 1 首");
+  await app.press("加载更多曲目");
+  await app.waitFor("text:已加载 2 首");
+  await app.press("播放全部");
+  await app.waitFor("text:0:01");
+  expect(app.enabled("label:播放 / 暂停")).toBe(true);
+  await app.press("label:播放 / 暂停");
+  await app.press("后退");
+  await app.waitFor("role:button[林间回声]");
+  await app.press("role:button[林间回声]");
+  await app.waitFor("text:热门曲目");
+  expect(app.shows("role:button[潮汐与回声]")).toBe(true);
+  await app.press("后退");
+  await app.scroll("id:source-library-scroll", 420);
+  await app.waitFor("role:button[夜航精选]");
+  await app.press("role:button[夜航精选]");
+  await app.waitFor("text:已加载 1 首");
+  await app.press("收藏歌单");
+  await app.waitFor("role:button[取消收藏歌单]");
+  expect(app.texts().filter((t) => t === "夜航精选").length >= 2).toBe(true);
+  await app.press("id:nav-history");
+  await app.press("歌单历史");
+  await app.press("id:history-playlist-list >> role:button[夜航精选]");
+  await app.waitFor("role:button[取消收藏歌单]");
+});

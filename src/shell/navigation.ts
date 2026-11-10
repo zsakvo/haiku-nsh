@@ -17,9 +17,10 @@ export const destinations = [
 ] as const satisfies readonly { id: string; label: string; icon: IconName; group: string; title: string; description: string }[];
 export type PageKind = typeof destinations[number]["id"];
 export type Route = { [K in PageKind]: { kind: K } }[PageKind]
+  | { kind: "source"; source: string }
   | { kind: "playlist" | "album" | "artist" | "chart" | "program"; ref: EntityRef };
 export function routeKey(route: Route): string {
-  return "ref" in route ? `${route.kind}:${route.ref}` : route.kind;
+  return "ref" in route ? `${route.kind}:${route.ref}` : route.kind === "source" ? `source:${route.source}` : route.kind;
 }
 export function createNavigation(initial: Route = { kind: "home" }) {
   const history = signal<Route[]>([initial]);

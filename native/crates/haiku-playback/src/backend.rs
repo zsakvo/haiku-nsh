@@ -12,6 +12,12 @@ use tokio::sync::mpsc;
 
 pub trait Clock: Send + Sync + 'static {
     fn now_ms(&self) -> u64;
+    fn unix_seconds(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
 }
 pub struct SystemClock(Instant);
 impl Default for SystemClock {
@@ -64,6 +70,25 @@ pub trait AudioBackend: Send + Sync + 'static {
         }
     }
     fn configure(&self, _: Settings) {}
+    fn open_candidate(
+        &self,
+        track: Track,
+        candidate: crate::Candidate,
+        generation: u64,
+        prepare: bool,
+        _position: f64,
+        _cache_key: Option<String>,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        match candidate {
+            crate::Candidate::Local(path) => self.open_track(track, path, generation, prepare),
+            _ => Box::pin(async {
+                Err(Error::new(
+                    ErrorCode::CapabilityUnsupported,
+                    "Network audio is unavailable",
+                ))
+            }),
+        }
+    }
     fn configuration(&self) -> Settings {
         Settings::default()
     }
@@ -78,7 +103,20 @@ pub trait AudioBackend: Send + Sync + 'static {
 }
 /// M4 can replace this local-only implementation with download/cache/stream resolution.
 pub trait TrackResolver: Send + Sync + 'static {
-    fn resolve(&self, track: Track) -> BoxFuture<'_, Result<PathBuf, Error>>;
+    fn resolve(&self, track: Track) -> BoxFuture<'_, Result<PathBuf, Error>> {
+        Box::pin(async move { LocalResolver.resolve(track).await })
+    }
+    fn candidates(
+        &self,
+        track: Track,
+        _quality: String,
+    ) -> BoxFuture<'_, Result<Vec<crate::Candidate>, Error>> {
+        Box::pin(async move {
+            self.resolve(track)
+                .await
+                .map(|p| vec![crate::Candidate::Local(p)])
+        })
+    }
 }
 pub struct LocalResolver;
 impl TrackResolver for LocalResolver {
@@ -179,7 +217,12 @@ impl RealAudio {
                         PlaybackEventKind::Finished => AudioEventKind::Finished,
                         PlaybackEventKind::TrackChanged => AudioEventKind::TrackChanged,
                         PlaybackEventKind::Error => {
-                            AudioEventKind::Error(audio_error(event.data.message))
+                            let mut error = audio_error(event.data.message);
+                            error.retriable = matches!(
+                                event.data.failure_kind,
+                                haiku_audio::playback::PlaybackFailureKind::Network
+                            );
+                            AudioEventKind::Error(error)
                         }
                         PlaybackEventKind::BufferingStarted | PlaybackEventKind::OutputLost => {
                             AudioEventKind::Buffering(true)
@@ -216,7 +259,9 @@ fn audio_error(message: String) -> Error {
     } else {
         ErrorCode::PlaybackError
     };
-    Error::new(code, message)
+    let mut error = Error::new(code, message);
+    error.retriable = code != ErrorCode::UnsupportedFormat;
+    error
 }
 pub fn effects(settings: &Settings) -> AudioEffectsOptions {
     let e = &settings.audio_effects;
@@ -231,6 +276,54 @@ pub fn effects(settings: &Settings) -> AudioEffectsOptions {
     }
 }
 impl AudioBackend for RealAudio {
+    fn open_candidate(
+        &self,
+        track: Track,
+        candidate: crate::Candidate,
+        generation: u64,
+        prepare: bool,
+        position: f64,
+        key: Option<String>,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        Box::pin(async move {
+            let options = self.options(&track);
+            let player = self.player()?;
+            if !prepare {
+                *self.current.lock().unwrap() = Some(track);
+            }
+            match candidate {
+                crate::Candidate::Local(path) => {
+                    if prepare {
+                        player
+                            .prepare_next_local(
+                                path.to_string_lossy().into(),
+                                key,
+                                options,
+                                generation,
+                            )
+                            .await
+                    } else {
+                        player
+                            .play_local(path.to_string_lossy().into(), key, options, generation)
+                            .await
+                    }
+                }
+                crate::Candidate::Network { url, headers, .. } => {
+                    let headers = serde_json::to_string(&headers).unwrap();
+                    if prepare {
+                        player
+                            .prepare_next(url, headers, key, options, generation)
+                            .await
+                    } else {
+                        player
+                            .play(url, headers, key, position, options, generation)
+                            .await
+                    }
+                }
+            }
+            .map_err(audio_error)
+        })
+    }
     fn open(&self, path: PathBuf, generation: u64) -> BoxFuture<'_, Result<(), Error>> {
         Box::pin(async move {
             self.player()?

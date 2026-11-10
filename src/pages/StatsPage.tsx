@@ -67,17 +67,17 @@ export function StatsPage(props: { core: Core; active: boolean }) {
         </View>
         <View class="gap-3">
           <Text class="text-sm font-semibold text-foreground">聆听日历 · 最近 12 周</Text>
-          <View testID="stats-calendar" class="flex-row gap-2">
+          <View testID="stats-calendar" class="w-full flex-row gap-2">
             <View class="gap-1">
               {["一", "二", "三", "四", "五", "六", "日"].map((day) =>
-                <Text class="h-4 w-4 text-xs text-muted-foreground">{day}</Text>)}
+                <Text class="h-6 w-4 text-xs text-muted-foreground">{day}</Text>)}
             </View>
             <Each of={days()} key={(week) => week[0].date}>{(week) =>
-              <View class="gap-1">
+              <View class="flex-1 min-w-0 gap-1">
                 <Each of={week()} key={(d) => d.date}>{(d) =>
                   <View role="image" accessibilityLabel={`${d().date}：${Math.round(d().value)} 秒`}
                     tooltip={<Tooltip label={`${d().date} · ${Math.round(d().value)} 秒`} />}
-                    class={`size-4 rounded-sm ${d().value > 0 ? "bg-primary" : "bg-muted"}`}
+                    class={`w-full h-6 rounded-sm ${d().value > 0 ? "bg-primary" : "bg-muted"}`}
                     style={{ opacity: d().future ? 0 : d().value > 0 ? 0.25 + 0.75 * d().value / maxDay() : 1 }} />}
                 </Each>
               </View>}

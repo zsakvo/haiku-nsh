@@ -10,3 +10,5 @@ pub use controller::{Command, Controller, PlayerState, Session, Sleep, Status};
 pub use queue::{Mode, Queue};
 
 mod loudness_cache;
+mod network;
+pub use network::Candidate;

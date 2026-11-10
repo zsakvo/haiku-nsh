@@ -12,6 +12,8 @@ mod player_controls;
 mod player_dock;
 mod player_theme;
 mod plugins;
+mod sources;
+mod network_fixture;
 mod plugin_tools;
 mod presentation;
 mod seek_bar;

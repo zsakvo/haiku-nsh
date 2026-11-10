@@ -24,14 +24,14 @@
 | F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
-| F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
+| F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
-| F11 喜欢、歌单与远端收藏 | 部分实现（本地） | `haiku-store::collections`、`native/app/src/collections.rs`、collections 页面与菜单 | M3-01：workspace 232 通过/1 忽略；新增 collections Headless 流程通过；参考版 Loro fixture 可读 | 全套 nsh test 未通过；最终截图、首次媒体会话前退出冲刷与媒体命令实机验证未完成 |
+| F11 喜欢、歌单与远端收藏 | 部分实现（本地与远端收藏，M4-01 待审阅） | `haiku-store::collections`、`native/app/src/{collections,plugins}.rs`、`src/pages/{SourceDetailPage,CollectionsBrowser}.tsx` | M4-01：来源歌单收藏写入既有远端镜像；nsh test 22/22，含收藏后侧栏/按钮状态与歌单历史回访；真实来源曲目 Dock 实心喜欢截图通过 | 真实来源收藏刷新、取消收藏操作及媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
-| F13 下载与媒体缓存 | 部分实现（媒体缓存） | `haiku-audio::media_cache`、`haiku-playback::backend`、`src/shell/StorageSettings.tsx` | M1-05：容量/LRU/pin/完整性/失败删除/原文件保护测试通过；清理确认 Headless 与浅色截图通过 | 网络缓存真实写入/恢复留 M4，下载留 M5；缓存路径按任务使用 media-cache/ |
+| F13 下载与媒体缓存 | 部分实现（媒体缓存与网络接线，M4-01 待审阅） | `haiku-audio::media_cache`、`haiku-playback::{backend,network}`、`src/shell/StorageSettings.tsx` | M1-05 缓存测试沿用；M4-01 workspace 通过，覆盖同音质完整缓存优先且不取地址、提前 EOF 恢复；网络后端传入缓存键，真实 loopback 解码播放日志已保存 | 真实网络落盘后第二次播放命中、实机恢复未覆盖；下载留 M5；缓存目录沿用 media-cache/ |
 | F14 Haiku 账号 | 未实现 | | | |
 | F15 同步与备份 | 未实现 | | | |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
@@ -615,3 +615,30 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 最后小时标签高度、弹窗定位是纯样式调整，经真实 host 热更新/截图检查；未重复 check/build/test。未新增探针、GUI 自动化、release/clippy、汇总 JSON 或 hash 清单。
 - 偏离/未覆盖：参考目录 ~/Project/GPUI/haiku 在本机不存在，改只读 ~/Project/haiku-gpuix 核对对应行为；热图当前显示最近 12 周，不提供全年选择；远程/M4/M5 内容未做。
 - 待人工确认：真实鼠标/键盘交互、原生保存选择器与实际剪贴板、长期真实播放统计；关于页如实标明应用许可证未声明，需审阅者确定许可证。
+
+## 2026-11-10 M4-01：网络播放与来源详情（fixture 验收完成，待审阅）
+
+- 主仓库保留改动，未提交 git；未改 Rex、参考项目、NSH 或依赖源码；既有 MILESTONES/任务文件改动保留。
+- 第 0 步：通知/日志采用本地可读时间、整秒；通知按钮可见“清除”，序号保留于无障碍标签；设置只留按钮打开日志 Dialog；12 周热图铺满内容宽度。
+- 播放采用已批准 Candidate：Local(PathBuf) / Network{url,headers,format,quality,expires_at}；Controller 注入 TrackResolver/Clock，app 经 SourceApi 获取地址。
+- 本地曲库只走 Local，失败不回退；同音质完整缓存先于 streams；候选过期前复用，Expired/到期有界刷新，不支持格式打开前跳过。
+- 网络失败 1/2/4 秒最多三次；暂停/停止/seek/新队列取消；连续正常进度 30 秒清零；提前 EOF ≥5 秒失效缓存并从位置恢复，预加载共用解析路径。
+- 媒体缓存键为 (完整 EntityRef, quality)，沿用设置 audioQuality（默认 high）；M5 下载文件提供者未实现。
+- 来源封面经带请求头的有界下载进入媒体中心；来源曲目沿用历史/统计接线。
+- 来源详情覆盖 playlist/album/artist/toplist，含分页、热门曲目/专辑、播放/随机、原生 TrackList 菜单、收藏镜像和歌单历史；异步结果校验页面身份。
+- 侧栏显示已启用 library 来源；按 cards 分组为虚拟封面网格/TrackList，错误提供重试与去设置；实机发现单项标题横向拉伸，补 items-start 与封面左对齐。
+- core.sources 新增 detail/artistAlbums/browse/favoritePlaylist/trackSource/releaseTracks，静态 reference/isRemote；core.player.play 接受 SDK 来源曲目；监听返回 Stop。
+- 回归夹具位于 src/pages/fixtures 与 native/app/tests/fixtures/network-plugin；根 Network*Preview 为薄入口，以加载根 nsh.json/native/theme；全部独立临时根、loopback，无真实上游。
+- 验收 1：workspace 初轮编译失败（测试 LocalResolver 路径），修正后 243 通过、1 忽略；日志 .artifacts/m4-01/cargo-test[-repair1].log。
+- 五个新增 Rust 用例覆盖候选回退/容器跳过/地址复用、Expired/到期、同音质缓存/本地失败、重试计时/取消、30 秒清零/提前 EOF。
+- 验收 2：nsh test -v 最终 22/22（8 Rust、14 Headless），nsh-test-review-repair.log；已覆盖来源浏览→错误重试→详情分页/播放→歌手专辑→收藏侧栏→歌单历史回访及第 0 步。
+- 前三轮 21/22：错误注入/析构、错误暂停标签、侧栏与历史同名选择器歧义；原始 nsh-test[-repair1/-repair2].log 全部保留。
+- 审阅者明确授权超出修复上限继续；历史 List 新增 history-playlist-list，最后点击限定其后代按钮，未用 nth；没有改业务导航。
+- 授权续跑后 nsh check/build 各一次通过（nsh-{check,build}-final.log）；随后仅改卡片对齐 class，并再各跑一次通过（nsh-{check,build}-visual-final.log）；样式调整后未重复整套测试。
+- 验收 3：五个根预览分别真实 nsh run --target macos -v，独立临时根、浅色；nsh-run-{library,album,artist,dock,stats}.log，截图均已查看。
+- 五张截图均在 .artifacts/m4-01/：library-light.png、album-light.png、artist-light.png、dock-light.png、stats-light.png（小时分布与全宽 12 周热图）。
+- nsh-run-dock.log：loopback 220Hz 非静音 FLAC、音量 0.15，真实 macOS 播放进度由 0 推进至 23 秒、buffered=1.000；媒体快照 has_artwork=true，截图可见播放中暂停按钮与实心喜欢。
+- 截图仅使用 CGSession/CGWindow 只读查询与 screencapture，capture-*.log 记录屏幕未锁定；临时捕获脚本已删除，无 GUI 自动化。
+- 各预览截图后 Ctrl+C 停止；退出 1/随后开发连接关闭不作构建失败；仅出现约定允许的 block 0.1.6 / __eh_frame 提示。
+- 未覆盖/待人工：真实缓存落盘后二次命中与实机故障恢复、Subsonic/飞牛/QQ 播放、实际扬声器听感、真实远端收藏刷新及原生媒体操作；未访问真实上游。
+- 偏离：Rust Controller 直接注入 SourceApi 适配器，未复用参考版 TS/RPC 播放控制层；没有新增待定架构决策；F04/F05 保持原状。

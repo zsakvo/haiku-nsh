@@ -72,6 +72,7 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
     let controller = bridge.controller.clone();
     let last = stored(None);
     let info_updates = updates.clone();
+    let artwork_path = crate::presentation::get().unwrap().artwork_path;
     effect(move || {
         if !ready.get() {
             return;
@@ -82,6 +83,7 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             .current
             .as_ref()
             .is_some_and(|t| collections.is_liked(&t.entity_ref()));
+        let artwork = artwork_path.get();
         let key = (
             s.current.clone(),
             s.status,
@@ -90,6 +92,7 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             s.next_index,
             s.mode,
             favorite,
+            artwork.clone(),
         );
         if last.with(|old| old.as_ref() == Some(&key)) {
             return;
@@ -111,10 +114,12 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             duration: track.duration.unwrap_or(0.),
             position: controller.position_snapshot(),
             playing: s.status == Status::Playing && !s.buffering,
-            artwork_path: track
-                .cover
-                .filter(|p| !p.starts_with("http"))
-                .map(|p| p.strip_prefix("file://").unwrap_or(&p).to_owned()),
+            artwork_path: artwork.or_else(|| {
+                track
+                    .cover
+                    .filter(|p| !p.starts_with("http"))
+                    .map(|p| p.strip_prefix("file://").unwrap_or(&p).to_owned())
+            }),
             can_next: s.next_index.is_some(),
             can_previous: s.index >= 0,
             favorite,

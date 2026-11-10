@@ -1,6 +1,6 @@
 import { cleanup, effect, List, resource, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
-import { CollectionsService, TrackList } from "haiku/native";
+import { CollectionsService, PluginService, TrackList } from "haiku/native";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 import { Button } from "../ui/Button";
@@ -77,13 +77,13 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       <EmptyState title="留下听过的旋律" description="播放音乐后，你可以在这里找到它。" />
     </If>
     <If when={tab() === "playlists"}>
-      <List each={playlists()} keyExtractor={(p: any) => JSON.stringify([p.kind, p.sourceId, p.id])}
+      <List testID="history-playlist-list" each={playlists()} keyExtractor={(p: any) => JSON.stringify([p.kind, p.sourceId, p.id])}
         class="flex-1 min-h-0" estimatedItemSize={64}>
         {(p: () => any) => <View class="flex-row items-center gap-3 px-(--content-inset) py-3">
           <View class="flex-1 gap-1">
             <Button label={p().title} variant="ghost" onPress={() => {
               if (p().kind === "local") props.navigate({ kind: "playlist", ref: props.core.collections.key(p().id) as any });
-              else error.set("在线歌单详情将在来源内容接入后提供。");
+              else props.navigate({ kind: "playlist", ref: PluginService.reference(p().sourceId, "playlist", p().id) as any });
             }} />
             <Text class="text-xs text-muted-foreground">{`${p().sourceId} · ${p().trackCount == null ? "曲目数未知" : `${p().trackCount} 首`}`}</Text>
           </View>

@@ -3,9 +3,7 @@ use futures::{
     future::{Either, select},
 };
 use haiku_model::{Error, ErrorCode};
-use haiku_playback::{
-    Command, Controller, LocalResolver, PlayerState, RealAudio, Status, SystemClock,
-};
+use haiku_playback::{Command, Controller, PlayerState, RealAudio, Status, SystemClock};
 use nsh_core::prelude::*;
 use nsh_core::{
     JsonValue,
@@ -65,6 +63,8 @@ impl Core {
 
 /// Engine-thread adapter; its position/buffer signals are for Rust components only.
 pub struct CoreBridge {
+    pub(crate) source_host: Arc<haiku_plugins::Host>,
+    pub(crate) artwork_root: std::path::PathBuf,
     pub(crate) controller: Controller,
     pub(crate) collections: haiku_store::collections::Collections,
     pub(crate) history: haiku_store::history::History,
@@ -89,6 +89,7 @@ impl CoreBridge {
         stats: haiku_store::stats::Stats,
         logs: haiku_store::logs::Logs,
         root: DataRoot,
+        source_host: Arc<haiku_plugins::Host>,
     ) -> Rc<Self> {
         let owner = Owner::detached();
         let (position, buffered, state) = owner.run(|| {
@@ -152,6 +153,8 @@ impl CoreBridge {
         });
         crate::platform::install_exit_hook();
         Rc::new(Self {
+            source_host,
+            artwork_root: root.path.join("artwork"),
             _root: root,
             _exit: exit,
             collections,
@@ -221,16 +224,16 @@ impl Core {
                 let (audio, events) = RealAudio::configured(&root, settings.get());
                 let library = haiku_library::service::Library::open(&root)
                     .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                let plugins = haiku_plugins::Host::open(&root)
+                    .await
+                    .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
                 let controller = Controller::start(
                     audio,
-                    Arc::new(LocalResolver),
+                    Arc::new(crate::sources::SourceResolver(plugins.clone())),
                     Arc::new(SystemClock::default()),
                     events,
                     Some(root.join("session.json")),
                 )?;
-                let plugins = haiku_plugins::Host::open(&root)
-                    .await
-                    .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
                 let collections = haiku_store::collections::Collections::open(&root)
                     .map_err(|e| Error::new(ErrorCode::Io, e))?;
                 let history = haiku_store::history::History::open(&root)
@@ -259,6 +262,7 @@ impl Core {
                 }
                 let (h, s, l) = (history.clone(), stats.clone(), logs.clone());
                 let seen = std::sync::Mutex::new((None::<(String, u64)>, None::<String>));
+                let fixture_second = std::sync::atomic::AtomicU64::new(u64::MAX);
                 controller.observe(move |state, progress, mono| {
                     let (epoch, offset) = haiku_store::stats::wall_time();
                     let playing =
@@ -266,6 +270,13 @@ impl Core {
                     let mut seen = seen.lock().unwrap();
                     if playing {
                         if let Some(track) = &state.current {
+                            if track.source.starts_with("network.fixture") {
+                                let second = progress.position as u64;
+                                if fixture_second.swap(second, std::sync::atomic::Ordering::Relaxed) != second {
+                                    println!("M4-01 loopback audio: track={} generation={} position={:.2}s buffered={:.3} playing=true",
+                                        track.id,state.generation,progress.position,progress.buffered);
+                                }
+                            }
                             let key = (track.entity_ref().encode(), state.generation);
                             if seen.0.as_ref() != Some(&key) {
                                 h.record_track(track, epoch);
@@ -322,6 +333,7 @@ impl Core {
             stats,
             logs,
             selected,
+            plugins.clone(),
         );
         crate::presentation::initialize(bridge.clone(), library.clone());
         bridge
@@ -336,7 +348,11 @@ impl Core {
         let core = Instance::new(Self {
             activity,
             collections,
-            plugins: crate::plugins::PluginService::new(plugins, plugin_logs),
+            plugins: crate::plugins::PluginService::new(
+                plugins,
+                plugin_logs,
+                bridge.collections.clone(),
+            ),
             settings,
             library,
             player: Instance::new(PlayerService {
@@ -714,7 +730,7 @@ mod tests {
         let (_events, rx) = tokio::sync::mpsc::unbounded_channel();
         let controller = Controller::start(
             audio.clone(),
-            Arc::new(LocalResolver),
+            Arc::new(haiku_playback::LocalResolver),
             Arc::new(SystemClock::default()),
             rx,
             None,

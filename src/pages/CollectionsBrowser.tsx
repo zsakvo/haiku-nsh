@@ -29,7 +29,7 @@ export function PlaylistSidebar(props: { core: Core; current: Route; navigate: (
         <Text style={{ fontSize: token("sidebar-hint-size") }} class="text-muted-foreground">新建…</Text>
       </BaseButton>
     </View>
-    <List each={mirror.collections().filter((p) => p.kind === "user")} keyExtractor={(p) => p.id}
+    <List each={mirror.collections().filter((p) => p.kind === "user" || p.kind === "plugin")} keyExtractor={(p) => p.id}
       estimatedItemSize={32} class="flex-1 min-h-0">
       {(p) => <SidebarItem icon="music" label={p().title}
         selected={props.current.kind === "playlist" && props.current.ref === props.core.collections.key(p().id)}

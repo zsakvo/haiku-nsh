@@ -3,6 +3,7 @@ import type { Core } from "haiku/native";
 import { Button } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
+import { localDateTime } from "../ui/dateTime";
 
 /** Filtered pages and redaction come from Rust; copying and saving are explicit actions. */
 export function LogsView(props: { core: Core }) {
@@ -42,7 +43,7 @@ export function LogsView(props: { core: Core }) {
     <List each={data()?.items ?? []} keyExtractor={(e: any, index) => `${e.time}:${e.session}:${index}`}
       class="h-72 min-h-0 rounded-(--radius) border border-border" estimatedItemSize={80}>
       {(e: () => any) => <View class="gap-1 px-3 py-3 border-b border-border">
-        <Text class="text-xs text-muted-foreground">{`${e().time} · ${e().channel}/${e().level} · ${e().source} · 会话 ${e().session}`}</Text>
+        <Text class="text-xs text-muted-foreground">{`${localDateTime(e().time)} · ${e().channel}/${e().level} · ${e().source} · 会话 ${e().session}`}</Text>
         <Text class="text-sm text-foreground">{e().message}</Text>
         <If when={!!e().detail}><Text class="text-xs text-muted-foreground">{e().detail}</Text></If>
       </View>}
@@ -69,8 +70,14 @@ export function OtherSettings(props: { core: Core; initialLogs?: boolean }) {
   const logs = signal(props.initialLogs ?? false);
   return <View class="gap-5">
     <Text role="header" class="text-xl font-semibold text-foreground">其他</Text>
-    <Button label="日志查看器…" onPress={() => logs.set(!logs())} />
-    <If when={logs()}><LogsView core={props.core} /></If>
+    <Button label="日志查看器…" onPress={() => logs.set(true)} />
+    <Dialog open={logs()} onOpenChange={(e) => logs.set(e.open)}
+      class="w-240 max-w-full self-center mt-24 p-5 gap-4">
+      <LogsView core={props.core} />
+      <View class="flex-row justify-end">
+        <Button label="关闭日志查看器" onPress={() => logs.set(false)} />
+      </View>
+    </Dialog>
     <View class="gap-2">
       <Text class="text-lg font-semibold text-foreground">关于 Haiku</Text>
       <Text class="text-sm text-muted-foreground">Haiku 1.0.0 · Native Shell 0.4.0</Text>
@@ -97,9 +104,10 @@ export function NotificationCenter(props: { core: Core; open: boolean; onClose: 
             const next = new Set(previous); if (next.has(n().id)) next.delete(n().id); else next.add(n().id); return next;
           })} />
           <View class="flex-1" />
-          <Button label={`清除通知 ${n().id}`} size="sm" onPress={() => props.core.notifications.clearNotice(n().id)} />
+          <Button label="清除" accessibilityLabel={`清除通知 ${n().id}`} size="sm"
+            onPress={() => props.core.notifications.clearNotice(n().id)} />
         </View>
-        <Text class="text-xs text-muted-foreground">{`${n().time} · ${n().kind}`}</Text>
+        <Text class="text-xs text-muted-foreground">{`${localDateTime(n().time)} · ${n().kind}`}</Text>
         <If when={expanded().has(n().id) && !!n().detail}><Text class="text-sm text-muted-foreground">{n().detail}</Text></If>
       </View>}
     </List>

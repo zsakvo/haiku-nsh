@@ -30,6 +30,8 @@ test("real playback history, clear confirmation, stats ranges, diagnostic filter
   await app.waitFor("text:通知中心");
   await app.press("text:来源暂时离线");
   await app.waitFor("text:离线曲目仍可播放，稍后可以重试连接。");
+  expect(app.texts()).toContain("清除");
+  expect(app.texts().some((text) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} · warning$/.test(text))).toBe(true);
   await app.press("清除全部通知");
   await app.waitFor("text:暂无通知");
   await app.press("关闭通知");
@@ -38,6 +40,7 @@ test("real playback history, clear confirmation, stats ranges, diagnostic filter
   await app.press("role:button[其他]");
   await app.press("日志查看器…");
   await app.waitFor("id:logs-viewer");
+  await app.waitFor("role:button[关闭日志查看器]");
   await app.type("label:日志关键词", "来源暂时离线");
   await app.waitFor("text:共 1 条日志");
   await app.waitFor("text:来源暂时离线");

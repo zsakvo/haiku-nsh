@@ -418,6 +418,22 @@ impl SourceApi {
             .await?;
         self.page(kind, value)
     }
+    pub async fn browse_tracks(
+        &self,
+        card: &str,
+        page: PageArgs,
+        cancel: Option<&Cancellation>,
+    ) -> Result<Page<Track>> {
+        let value = self
+            .invoke(
+                "library.browse",
+                vec![json!(card)],
+                json!({"cursor":page.cursor,"limit":page.limit}),
+                cancel,
+            )
+            .await?;
+        self.tracks(value)
+    }
     pub async fn toplists(&self, cancel: Option<&Cancellation>) -> Result<Vec<Entity>> {
         let value = self
             .invoke("toplist.list", vec![], json!({}), cancel)

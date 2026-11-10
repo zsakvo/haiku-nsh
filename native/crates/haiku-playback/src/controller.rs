@@ -165,6 +165,20 @@ impl Controller {
             .and_then(|path| std::fs::metadata(path).ok())
             .filter(|file| file.is_file() && file.len() > 0)
             .map(|_| 1.0)
+            .or_else(|| {
+                queue
+                    .current()
+                    .and_then(|t| {
+                        crate::backend::cache_key(t, &backend.configuration().audio_quality)
+                    })
+                    .filter(|key| {
+                        matches!(
+                            haiku_audio::media_cache::status(key),
+                            haiku_audio::media_cache::CacheStatus::Complete { .. }
+                        )
+                    })
+                    .map(|_| 1.0)
+            })
             .unwrap_or(0.0);
         let frozen = Arc::new(Mutex::new(Progress {
             position,
@@ -196,6 +210,11 @@ impl Controller {
             finished: None,
             sleep_deadline: None,
             failed: 0,
+            addresses: Default::default(),
+            retry_count: 0,
+            retry_due: None,
+            retry_key: String::new(),
+            healthy: None,
         };
         tokio::spawn(actor.run(requests, events, completions));
         Ok(Self {
@@ -281,6 +300,11 @@ struct Actor {
     finished: Option<u64>,
     sleep_deadline: Option<u64>,
     failed: usize,
+    addresses: crate::network::Addresses,
+    retry_count: u8,
+    retry_due: Option<u64>,
+    retry_key: String,
+    healthy: Option<(u64, u64, f64)>,
 }
 impl Actor {
     async fn run(
@@ -403,6 +427,8 @@ impl Actor {
         Ok(())
     }
     fn cancel_open(&mut self) {
+        self.retry_due = None;
+        self.healthy = None;
         if let Some(task) = self.open_task.take() {
             task.abort();
         }
@@ -435,17 +461,27 @@ impl Actor {
             self.publish(false);
         }
         let track = self.queue.current().unwrap().clone();
+        let key = track.entity_ref().encode();
+        if key != self.retry_key {
+            self.retry_count = 0;
+            self.retry_key = key;
+        }
         let generation = self.state.generation;
         let backend = self.backend.clone();
         let resolver = self.resolver.clone();
         let completed = self.completed.clone();
+        let open = self.addresses.open(
+            backend,
+            resolver,
+            self.clock.clone(),
+            track,
+            self.backend.configuration().audio_quality,
+            generation,
+            false,
+            position,
+        );
         self.open_task = Some(tokio::spawn(async move {
-            let result = async {
-                let path = resolver.resolve(track.clone()).await?;
-                backend.open_track(track, path, generation, false).await?;
-                Ok(())
-            }
-            .await;
+            let result = open.await;
             let _ = completed.send(Completion::Open(generation, result));
         }));
     }
@@ -468,18 +504,18 @@ impl Actor {
         let backend = self.backend.clone();
         let resolver = self.resolver.clone();
         let completed = self.completed.clone();
+        let open = self.addresses.open(
+            backend,
+            resolver,
+            self.clock.clone(),
+            track,
+            self.backend.configuration().audio_quality,
+            generation,
+            true,
+            0.,
+        );
         self.prepare_task = Some(tokio::spawn(async move {
-            let result = async {
-                backend
-                    .open_track(
-                        track.clone(),
-                        resolver.resolve(track).await?,
-                        generation,
-                        true,
-                    )
-                    .await
-            }
-            .await;
+            let result = open.await;
             let _ = completed.send(Completion::Prepare(generation, result));
         }));
     }
@@ -500,6 +536,8 @@ impl Actor {
         self.backend.stop();
     }
     fn pause(&mut self) {
+        self.retry_due = None;
+        self.healthy = None;
         if self.queue.current().is_none() {
             return;
         }
@@ -528,6 +566,7 @@ impl Actor {
             self.state.error = None;
             self.publish(false);
             self.backend.resume();
+            self.healthy = Some((self.clock.now_ms(), self.clock.now_ms(), self.position()));
             self.prepare_next();
         } else {
             self.start_current(self.position());
@@ -548,6 +587,35 @@ impl Actor {
         } else {
             self.stop(false);
         }
+    }
+    fn recover(&mut self, error: Error) {
+        let remote = self.queue.current().is_some_and(|t| t.local_path.is_none());
+        let retriable =
+            error.retriable || matches!(error.code, ErrorCode::PlaybackExpired | ErrorCode::Io);
+        if !remote || !retriable || self.retry_count >= 3 {
+            self.fail(error);
+            return;
+        }
+        if error.code == ErrorCode::PlaybackExpired {
+            if let Some(track) = self.queue.current() {
+                self.addresses
+                    .expire(track, &self.backend.configuration().audio_quality);
+            }
+        }
+        self.sample();
+        let position = self.position();
+        self.cancel_open();
+        self.invalidate_prepared();
+        self.backend.stop();
+        self.opened = false;
+        self.state.generation = self.generation();
+        self.set_position(position);
+        self.state.status = Status::Loading;
+        self.state.buffering = true;
+        self.state.error = None;
+        self.retry_due = Some(self.clock.now_ms().saturating_add(1000 << self.retry_count));
+        self.retry_count += 1;
+        self.publish(false);
     }
     fn fail(&mut self, error: Error) {
         self.cancel_open();
@@ -586,6 +654,9 @@ impl Actor {
                         }
                         self.opened = true;
                         self.state.status = Status::Playing;
+                        self.state.buffering = false;
+                        self.healthy =
+                            Some((self.clock.now_ms(), self.clock.now_ms(), self.position()));
                         self.publish(false);
                         let pending = std::mem::take(&mut self.pending);
                         if pending.is_empty() {
@@ -596,7 +667,7 @@ impl Actor {
                             }
                         }
                     }
-                    Err(e) => self.fail(e),
+                    Err(e) => self.recover(e),
                 }
             }
             Completion::Prepare(generation, Err(_))
@@ -637,6 +708,9 @@ impl Actor {
                 self.state.error = None;
                 self.state.buffering = false;
                 self.failed = 0;
+                self.retry_count = 0;
+                self.retry_key = self.queue.current().unwrap().entity_ref().encode();
+                self.healthy = Some((self.clock.now_ms(), self.clock.now_ms(), 0.));
                 self.set_position(0.0);
                 self.publish(false);
                 if let Err(e) = self.persist(true) {
@@ -673,6 +747,22 @@ impl Actor {
                 if self.state.status == Status::Playing
                     && self.finished != Some(event.generation) =>
             {
+                self.sample();
+                if self.queue.current().is_some_and(|t| {
+                    t.local_path.is_none()
+                        && t.duration
+                            .is_some_and(|d| d > 0. && d - self.position() >= 5.)
+                }) {
+                    if let Some(key) = self.queue.current().and_then(|t| {
+                        crate::backend::cache_key(t, &self.backend.configuration().audio_quality)
+                    }) {
+                        haiku_audio::media_cache::remove(&key);
+                    }
+                    let mut error = Error::new(ErrorCode::PlaybackError, "音频提前结束，正在恢复");
+                    error.retriable = true;
+                    self.recover(error);
+                    return;
+                }
                 self.finished = Some(event.generation);
                 self.next(true);
                 if let Err(e) = self.persist(true) {
@@ -681,7 +771,7 @@ impl Actor {
                 }
             }
             AudioEventKind::Error(error) if self.state.status == Status::Playing => {
-                self.fail(error)
+                self.recover(error)
             }
             AudioEventKind::Buffering(value) if self.state.status == Status::Playing => {
                 self.state.buffering = value;
@@ -692,6 +782,31 @@ impl Actor {
     }
     fn tick(&mut self) -> Result<(), Error> {
         self.sample();
+        let now = self.clock.now_ms();
+        if self.retry_due.is_some_and(|due| now >= due) {
+            self.start_current(self.position());
+        }
+        if self.state.status == Status::Playing && !self.state.buffering {
+            let progress = self.backend.progress();
+            if !progress.buffering && progress.generation == self.state.generation {
+                if let Some((start, last, position)) = self.healthy {
+                    if now.saturating_sub(last) > 1500 || progress.position < position {
+                        self.healthy = Some((now, now, progress.position));
+                    } else if progress.position > position {
+                        if now.saturating_sub(start) >= 30_000 {
+                            self.retry_count = 0;
+                        }
+                        self.healthy = Some((start, now, progress.position));
+                    }
+                } else {
+                    self.healthy = Some((now, now, progress.position));
+                }
+            } else {
+                self.healthy = None;
+            }
+        } else {
+            self.healthy = None;
+        }
         if let Some(deadline) = self.sleep_deadline {
             let remaining = deadline.saturating_sub(self.clock.now_ms());
             if remaining == 0 {
@@ -715,6 +830,7 @@ impl Actor {
         match command {
             Command::Play(tracks, index) => {
                 self.failed = 0;
+                self.retry_count = 0;
                 self.queue.replace(tracks, index);
                 self.publish(true);
                 self.start_current(0.0);
@@ -754,11 +870,17 @@ impl Actor {
                     .filter(|d| *d > 0.0)
                     .unwrap_or(f64::INFINITY);
                 let position = seconds.clamp(0.0, duration);
+                let waiting_retry = self.retry_due.take().is_some();
+                self.healthy = None;
                 self.invalidate_prepared();
                 self.state.timeline_revision += 1;
                 self.set_position(position);
                 self.publish(false);
-                if self.state.status == Status::Loading {
+                if waiting_retry {
+                    self.state.status = Status::Paused;
+                    self.state.buffering = false;
+                    self.publish(false);
+                } else if self.state.status == Status::Loading {
                     self.start_current(position);
                 } else if self.opened {
                     self.backend.seek(position);

@@ -13,6 +13,7 @@ use std::{cell::RefCell, collections::VecDeque, io::Read, path::PathBuf, rc::Rc,
 struct Cover {
     palette: Vec<Color>,
     uri: String,
+    path: String,
 }
 
 pub(crate) struct Presentation {
@@ -20,6 +21,7 @@ pub(crate) struct Presentation {
     pub bridge: Rc<CoreBridge>,
     pub track: Signal<Option<Track>>,
     pub artwork: Signal<String>,
+    pub artwork_path: Signal<Option<String>>,
     pub lyrics: Signal<Arc<Lyrics>>,
     pub line: Signal<Option<usize>>,
     pub open: Signal<bool>,
@@ -44,7 +46,6 @@ fn cover_path(track: &Track) -> Option<String> {
     track
         .cover
         .as_ref()
-        .filter(|p| !p.starts_with("http"))
         .map(|p| p.strip_prefix("file://").unwrap_or(p).to_owned())
 }
 fn cover_key(path: &str) -> String {
@@ -58,16 +59,33 @@ fn cover_key(path: &str) -> String {
 fn load_cover(path: String) -> Option<Cover> {
     let palette = haiku_palette::extract_file(&path).ok()?;
     let mut bytes = Vec::new();
-    std::fs::File::open(&path).ok()?.take(16 * 1024 * 1024 + 1)
-        .read_to_end(&mut bytes).ok()?;
-    if bytes.len() > 16 * 1024 * 1024 { return None; }
-    let mime = if bytes.starts_with(b"\x89PNG") { "image/png" }
-        else if bytes.starts_with(b"GIF8") { "image/gif" }
-        else if bytes.starts_with(b"RIFF") { "image/webp" }
-        else { "image/jpeg" };
+    std::fs::File::open(&path)
+        .ok()?
+        .take(16 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() > 16 * 1024 * 1024 {
+        return None;
+    }
+    let mime = if bytes.starts_with(b"\x89PNG") {
+        "image/png"
+    } else if bytes.starts_with(b"GIF8") {
+        "image/gif"
+    } else if bytes.starts_with(b"RIFF") {
+        "image/webp"
+    } else {
+        "image/jpeg"
+    };
     // Native local media is app-owned. The image service receives bytes, never an
     // ungranted file URL; the same bounded cache prewarms artwork and palette.
-    Some(Cover { palette, uri: format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)) })
+    Some(Cover {
+        palette,
+        path,
+        uri: format!(
+            "data:{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ),
+    })
 }
 fn parse_local(path: Option<String>) -> Lyrics {
     let Some(local) = path.and_then(|p| haiku_library::local_scan::read_lyrics(&PathBuf::from(p)))
@@ -88,6 +106,7 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             bridge,
             track: signal(None),
             artwork: signal(String::new()),
+            artwork_path: signal(None),
             lyrics: signal(Arc::new(Lyrics::default())),
             line: signal(None),
             open: signal(false),
@@ -133,16 +152,34 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                     .map(|(_, v)| v.clone())
             });
             let cold = cached.is_none();
-            p.artwork.set(cached.as_ref().map(|c|c.uri.clone()).unwrap_or_default());
-            let palette = cached.map(|c|c.palette);
+            p.artwork
+                .set(cached.as_ref().map(|c| c.uri.clone()).unwrap_or_default());
+            p.artwork_path.set(cached.as_ref().map(|c| c.path.clone()));
+            let palette = cached.map(|c| c.palette);
             *p.palette.borrow_mut() = palette.clone();
-            crate::player_theme::apply(&palette.unwrap_or_else(crate::player_theme::accent_palette));
-            let path = selected.and_then(|t| t.local_path);
+            crate::player_theme::apply(
+                &palette.unwrap_or_else(crate::player_theme::accent_palette),
+            );
+            let path = selected.as_ref().and_then(|t| t.local_path.clone());
+            let host = p.bridge.source_host.clone();
+            let root = p.bridge.artwork_root.clone();
             let weak = Rc::downgrade(&p);
             spawn(async move {
+                let disk_art = if cold {
+                    if let Some(track) = selected {
+                        background(crate::sources::artwork(host, root, track))
+                            .await
+                            .ok()
+                            .flatten()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
                 let result = blocking(move || {
                     let lyrics = parse_local(path);
-                    let cover = art.filter(|_|cold).and_then(load_cover);
+                    let cover = disk_art.and_then(load_cover);
                     (lyrics, cover)
                 })
                 .await;
@@ -158,6 +195,7 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                             p.remember(key, cover.clone());
                         }
                         p.artwork.set(cover.uri);
+                        p.artwork_path.set(Some(cover.path));
                         *p.palette.borrow_mut() = Some(cover.palette.clone());
                         crate::player_theme::apply(&cover.palette);
                     }
@@ -203,7 +241,18 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 return;
             }
             let weak = Rc::downgrade(&p);
+            let host = p.bridge.source_host.clone();
+            let root = p.bridge.artwork_root.clone();
             spawn(async move {
+                let path = if let Some(track) = next {
+                    background(crate::sources::artwork(host, root, track))
+                        .await
+                        .ok()
+                        .flatten()
+                } else {
+                    None
+                };
+                let Some(path) = path else { return };
                 if let Ok(Some(cover)) = blocking(move || load_cover(path)).await {
                     if let Some(p) = weak.upgrade() {
                         p.remember(key, cover);

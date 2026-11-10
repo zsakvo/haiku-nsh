@@ -36,9 +36,16 @@ pub struct PluginService {
     fixtures: Arc<Mutex<Vec<haiku_plugins::contract::ReplayServer>>>,
     logins: Arc<tokio::sync::Mutex<BTreeMap<String, Login>>>,
     cancellations: Arc<Mutex<BTreeMap<String, Cancellation>>>,
+    collections: haiku_store::collections::Collections,
+    remote: Rc<crate::sources::RemoteSources>,
+    network_fixtures: Arc<Mutex<Vec<crate::network_fixture::Server>>>,
 }
 impl PluginService {
-    pub(crate) fn new(host: Arc<Host>, logs: haiku_store::logs::Logs) -> Instance<Self> {
+    pub(crate) fn new(
+        host: Arc<Host>,
+        logs: haiku_store::logs::Logs,
+        collections: haiku_store::collections::Collections,
+    ) -> Instance<Self> {
         let event_listeners = Listeners::default();
         let listeners = event_listeners.clone();
         let alive = Rc::new(std::cell::Cell::new(true));
@@ -106,6 +113,9 @@ impl PluginService {
             fixtures: Arc::default(),
             logins: Arc::default(),
             cancellations: Arc::default(),
+            collections,
+            remote: Rc::new(Default::default()),
+            network_fixtures: Arc::default(),
         })
     }
     pub(crate) fn host(this: &Instance<Self>) -> Arc<Host> {
@@ -170,6 +180,237 @@ impl Drop for PluginService {
 }
 #[class]
 impl PluginService {
+    /// Start the isolated loopback library/audio fixture for offline acceptance previews.
+    pub async fn start_network_fixture(this: Instance<Self>) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let fixtures = this.with(|s| s.network_fixtures.clone());
+        let result = background(async move {
+            let server = crate::network_fixture::Server::start()?;
+            let url = server.url.clone();
+            host.install_files(
+                BTreeMap::from([(
+                    "plugin.ts".into(),
+                    include_bytes!("../tests/fixtures/network-plugin/plugin.ts").to_vec(),
+                )]),
+                false,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            let source = host
+                .connect(
+                    "network.fixture",
+                    BTreeMap::from([("url".into(), url.clone())]),
+                    Some("回声音乐库".into()),
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            fixtures.lock().unwrap().push(server);
+            Ok::<_, String>(json!({"sourceId":source.record.source_id,"url":url}))
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await?;
+        Ok(result)
+    }
+    /// Encode a lossless host identity for navigation; callers never split source/native IDs.
+    pub fn reference(source: String, kind: String, id: String) -> String {
+        haiku_model::EntityRef { source, kind, id }.encode()
+    }
+    /// Distinguinguish source detail routes from local library/collection routes.
+    pub fn is_remote(reference: String) -> bool {
+        haiku_model::EntityRef::decode(&reference)
+            .is_ok_and(|r| r.source != "local" && r.source != "collections")
+    }
+    /// Fetch one SDK detail page by opaque EntityRef; artist pages also include paged albums.
+    pub async fn detail(
+        this: Instance<Self>,
+        reference: String,
+        cursor: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
+        background(async move {
+            let source = host.source(&r.source)?;
+            let capabilities = source.descriptor().capabilities;
+            let api = haiku_plugins::SourceApi::new(source);
+            let page = haiku_plugins::PageArgs { cursor: cursor.clone(), limit: 40 };
+            let mut detail = api.detail(&r.kind, &r.id, page.clone(), None).await?;
+            if let Some(info) = &mut detail.info {
+                info.reference = Some(r.clone());
+            }
+            let mut albums = None;
+            if r.kind == "artist" {
+                if capabilities.iter().any(|p| p == "artist.tracks") {
+                    detail.tracks = api.artist_tracks(&r.id, page.clone(), None).await?;
+                }
+                if cursor.is_none() && capabilities.iter().any(|p| p == "artist.albums") {
+                    albums = Some(api.artist_albums(&r.id, haiku_plugins::PageArgs {cursor:None, limit:40}, None).await?);
+                }
+            }
+            Ok::<_, haiku_plugins::PluginError>(json!({"info":detail.info,"tracks":detail.tracks,
+                "albums":albums,"canFavorite":r.kind=="playlist" && capabilities.iter().any(|p| p=="playlist.get")}))
+        }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+    }
+    /// Fetch another artist album page; cursors remain opaque plugin values.
+    pub async fn artist_albums(
+        this: Instance<Self>,
+        reference: String,
+        cursor: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
+        background(async move {
+            let api = haiku_plugins::SourceApi::new(host.source(&r.source)?);
+            Ok::<_, haiku_plugins::PluginError>(json!(
+                api.artist_albums(&r.id, haiku_plugins::PageArgs { cursor, limit: 40 }, None)
+                    .await?
+            ))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+    }
+    /// Browse one declared library card (or all cards' first pages when card is null).
+    pub async fn browse(
+        this: Instance<Self>,
+        source: String,
+        card: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            let source = host.source(&source)?;
+            if source.needs_login() {
+                return Err(haiku_plugins::PluginError::new(
+                    "AUTH_REQUIRED",
+                    "来源尚未登录，请前往设置连接",
+                ));
+            }
+            let api = haiku_plugins::SourceApi::new(source);
+            let mut groups = vec![];
+            for c in api
+                .library_cards()?
+                .into_iter()
+                .filter(|c| card.as_ref().is_none_or(|id| id == &c.id))
+            {
+                let page = haiku_plugins::PageArgs {
+                    cursor: cursor.clone(),
+                    limit: 40,
+                };
+                let result = if c.entity == "track" {
+                    json!(api.browse_tracks(&c.id, page, None).await?)
+                } else {
+                    json!(api.browse(&c.id, &c.entity, page, None, None).await?)
+                };
+                groups.push(json!({"card":c,"page":result}));
+            }
+            Ok::<_, haiku_plugins::PluginError>(json!({"groups":groups}))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+    }
+    /// Snapshot every playlist page (maximum 100) into the existing offline favorite contract.
+    /// False removes only the local favorite mirror.
+    pub async fn favorite_playlist(
+        this: Instance<Self>,
+        reference: String,
+        favorite: bool,
+    ) -> Result<String, String> {
+        let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
+        if r.kind != "playlist" {
+            return Err("只能收藏远端歌单".into());
+        }
+        let store = this.with(|s| s.collections.clone());
+        let host = Self::host(&this);
+        background(async move {
+            let id = format!("favorite:{}:{}", r.source, r.id);
+            if !favorite {
+                store.delete(&id)?;
+                return Ok(id);
+            }
+            let source = host.source(&r.source).map_err(|e| e.to_string())?;
+            let label = source
+                .record
+                .display_name
+                .clone()
+                .unwrap_or_else(|| source.descriptor().name);
+            let api = haiku_plugins::SourceApi::new(source);
+            let first = api
+                .detail(
+                    "playlist",
+                    &r.id,
+                    haiku_plugins::PageArgs {
+                        cursor: None,
+                        limit: 40,
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            let info = first.info.ok_or("歌单信息缺失")?;
+            let tracks = haiku_plugins::SourceApi::collect_all(|cursor| {
+                let api = api.clone();
+                let id = r.id.clone();
+                async move {
+                    Ok(api
+                        .detail(
+                            "playlist",
+                            &id,
+                            haiku_plugins::PageArgs { cursor, limit: 40 },
+                            None,
+                        )
+                        .await?
+                        .tracks)
+                }
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+            store.favorite(
+                &r.source,
+                &r.id,
+                &label,
+                &info.title,
+                info.description.as_deref().unwrap_or(""),
+                info.cover.as_deref().unwrap_or(""),
+                &tracks,
+            )
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    /// Retain or update a native virtual TrackList source; release it when its page is disposed.
+    pub async fn track_source(
+        this: Instance<Self>,
+        tracks: Vec<JsonValue>,
+        handle: Option<u32>,
+    ) -> Result<u32, String> {
+        let tracks = serde_json::from_value(json!(tracks)).map_err(|e| e.to_string())?;
+        let remote = this.with(|s| s.remote.clone());
+        if let Some(handle) = handle {
+            let sources = remote.tracks.borrow();
+            let source = sources.get(&handle).ok_or("曲目列表已释放")?;
+            *source.0.borrow_mut() = tracks;
+            if let Some(s) = crate::track_source::get(handle) {
+                s.refresh();
+            }
+            Ok(handle)
+        } else {
+            let source = Rc::new(crate::sources::RemoteTracks(RefCell::new(tracks)));
+            let id = remote
+                .owner
+                .run(|| crate::track_source::register(source.clone()));
+            remote.tracks.borrow_mut().insert(id, source);
+            Ok(id)
+        }
+    }
+    /// Release an engine-local remote TrackList source, independently of other pages.
+    pub async fn release_tracks(this: Instance<Self>, handle: u32) {
+        this.with(|s| {
+            s.remote.tracks.borrow_mut().remove(&handle);
+        });
+        crate::track_source::remove(handle);
+    }
     /// Read installed descriptors and committed sources (secret connection fields are redacted).
     pub async fn list(this: Instance<Self>) -> Result<JsonValue, String> {
         Self::snapshot(Self::host(&this)).await

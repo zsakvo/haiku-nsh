@@ -3260,6 +3260,7 @@ dependencies = [
  "nsh-engine",
  "nsh-testing",
  "qrcode",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",

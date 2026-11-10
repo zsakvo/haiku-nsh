@@ -93,6 +93,7 @@ pub enum ErrorCode {
     InvalidArgument,
     Cancelled,
     PlaybackError,
+    PlaybackExpired,
     CapabilityUnsupported,
 }
 
