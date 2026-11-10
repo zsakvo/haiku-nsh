@@ -7,3 +7,16 @@ publish = false
 [dependencies]
 haiku-jsrt = { path = "../haiku-jsrt" }
 serde_json.workspace = true
+serde.workspace = true
+tokio.workspace = true
+haiku-model.workspace = true
+haiku-store.workspace = true
+tempfile.workspace = true
+sha1 = "=0.11.0"
+url = "=2.5.8"
+semver = "=1.0.27"
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+log.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true

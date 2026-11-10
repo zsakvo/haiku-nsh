@@ -1,59 +1,97 @@
-//! Isolated haiku-jsrt echo probe for M0; no plugin package SDK yet.
+//! Generic plugin package/source host and the music SDK boundary.
+mod api;
+mod descriptor;
+mod host;
+mod sdk;
+mod source;
+pub use api::*;
+pub use descriptor::{Descriptor, describe_package, normalize_source_url, source_id};
+pub use host::{Host, Package, SourceRecord};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+pub use source::{Cancellation, LoginDraft, LoginResult, QrSession, Source};
 
-use haiku_jsrt::Runtime;
-use serde_json::{Value, json};
-use std::time::Duration;
-
-const ECHO: &str = r#"
-    import { createHash } from 'crypto';
-    import { Buffer } from 'buffer';
-    globalThis.__haikuPluginLeak = 1;
-    export async function echo(args) {
-        return {
-            ok: true,
-            n: args.n * 2,
-            md5: createHash('md5').update(Buffer.from('abc')).digest('hex'),
-            uiGlobalVisible: typeof globalThis.__haikuUiLeak !== 'undefined'
-        };
+pub type Result<T> = std::result::Result<T, PluginError>;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PluginError {
+    pub code: String,
+    pub message: String,
+    pub stack: String,
+    pub file: Option<String>,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
+    pub details: Option<Value>,
+}
+impl PluginError {
+    pub fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            stack: String::new(),
+            file: None,
+            line: None,
+            column: None,
+            details: None,
+        }
     }
-"#;
-
-/// Doubles a finite number in a fresh VM, checking MD5, Buffer and VM isolation.
-///
-/// Run on a background executor: VM startup and shutdown join an OS thread.
-/// Each invocation loads the inline JS independently and always shuts it down.
-pub async fn plugin_echo(n: f64) -> Result<f64, String> {
-    if !n.is_finite() || !(n * 2.0).is_finite() {
-        return Err("The echo input and doubled result must be finite".into());
+}
+impl std::fmt::Display for PluginError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
     }
-    let runtime = Runtime::spawn().map_err(|error| error.to_string())?;
-    let result = call_echo(&runtime, n).await;
-    let shutdown = runtime.shutdown().map_err(|error| error.to_string());
-    let value = result?;
-    shutdown?;
-    Ok(value)
+}
+impl std::error::Error for PluginError {}
+impl From<std::io::Error> for PluginError {
+    fn from(e: std::io::Error) -> Self {
+        Self::new("IO", e.to_string())
+    }
+}
+impl From<serde_json::Error> for PluginError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::new("PARSE_ERROR", e.to_string())
+    }
+}
+impl From<haiku_jsrt::JsError> for PluginError {
+    fn from(e: haiku_jsrt::JsError) -> Self {
+        let code = e
+            .details
+            .as_ref()
+            .and_then(|d| d["code"].as_str())
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                match e.name.as_str() {
+                    "AbortError" => "CANCELLED",
+                    "TimeoutError" => "TIMEOUT",
+                    _ => "PLUGIN_ERROR",
+                }
+                .into()
+            });
+        Self {
+            code,
+            message: e.message,
+            stack: e.stack,
+            file: e.file,
+            line: e.line,
+            column: e.column,
+            details: e.details,
+        }
+    }
 }
 
-async fn call_echo(runtime: &Runtime, n: f64) -> Result<f64, String> {
-    runtime
-        .load_module("haiku-m0-echo.js", ECHO)
-        .await
-        .map_err(|error| error.to_string())?;
-    let response: Value = runtime
-        .call(
-            "echo",
-            &json!({ "n": n }).to_string(),
-            Duration::from_secs(10),
-        )
-        .await
-        .map_err(|error| error.to_string())?;
-    if response["ok"] != true
-        || response["md5"] != "900150983cd24fb0d6963f7d28e17f72"
-        || response["uiGlobalVisible"] != false
-    {
-        return Err(format!("Echo stdlib/isolation check failed: {response}"));
+/// Retained M0 compatibility entry point.
+pub async fn plugin_echo(n: f64) -> std::result::Result<f64, String> {
+    if !n.is_finite() || !(n * 2.).is_finite() {
+        return Err("Invalid input".into());
     }
-    response["n"]
+    let vm = haiku_jsrt::Runtime::spawn().map_err(|e| e.to_string())?;
+    vm.load_module("echo.js", "export const echo=n=>n*2;")
+        .await
+        .map_err(|e| e.to_string())?;
+    vm.call("echo", &n.to_string(), std::time::Duration::from_secs(5))
+        .await
+        .map_err(|e| e.to_string())?
         .as_f64()
-        .ok_or_else(|| format!("Echo result has no numeric n: {response}"))
+        .ok_or("Invalid result".into())
 }
+#[cfg(test)]
+mod tests;

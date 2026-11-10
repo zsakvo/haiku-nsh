@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+haiku-plugins = { path = "../crates/haiku-plugins" }
 nsh-core = "0.4.0"
 nsh-base = "0.4.0"
 haiku-model.workspace = true

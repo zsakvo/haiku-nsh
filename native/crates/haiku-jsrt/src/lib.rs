@@ -51,6 +51,8 @@ pub struct JsError {
     pub file: Option<String>,
     pub line: Option<u32>,
     pub column: Option<u32>,
+    /// Enumerable exception fields (host-specific codes, retry metadata).
+    pub details: Option<Value>,
 }
 
 impl JsError {
@@ -62,6 +64,7 @@ impl JsError {
             file: None,
             line: None,
             column: None,
+            details: None,
         }
     }
 
@@ -80,6 +83,12 @@ impl JsError {
                 file: object.get("fileName").ok(),
                 line: object.get("lineNumber").ok(),
                 column: object.get("columnNumber").ok(),
+                details: ctx
+                    .json_stringify(thrown.clone())
+                    .ok()
+                    .flatten()
+                    .and_then(|s| s.to_string().ok())
+                    .and_then(|s| serde_json::from_str(&s).ok()),
             }
         } else {
             let message = rquickjs::Coerced::<String>::from_js(ctx, thrown)

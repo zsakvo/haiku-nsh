@@ -129,6 +129,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    plugins: Arc<haiku_plugins::Host>,
     player: Instance<PlayerService>,
     settings: Instance<crate::settings::SettingsService>,
     library: Instance<crate::library::LibraryService>,
@@ -141,7 +142,7 @@ impl Core {
         if let Some(core) = slot.get() {
             return Ok(core);
         }
-        let (controller, library, settings) = background(async {
+        let (controller, library, settings, plugins) = background(async {
             let root = haiku_store::data_root();
             std::fs::create_dir_all(&root).map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
             let settings = Arc::new(
@@ -161,7 +162,10 @@ impl Core {
                 events,
                 Some(root.join("session.json")),
             )?;
-            Ok::<_, Error>((controller, library, settings))
+            let plugins = haiku_plugins::Host::open(&root)
+                .await
+                .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
+            Ok::<_, Error>((controller, library, settings, plugins))
         })
         .await
         .map_err(|e| JsError::Error(e.to_string()))?
@@ -180,6 +184,7 @@ impl Core {
         let settings = crate::settings::SettingsService::new(settings, bridge.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
+            plugins,
             settings,
             library,
             player: Instance::new(PlayerService {
@@ -426,5 +431,38 @@ mod tests {
             assert_eq!(position.get(), 12.0);
         });
         controller.shutdown();
+    }
+}
+
+#[cfg(test)]
+mod plugin_host_tests {
+    use super::*;
+    use nsh_engine::{EngineConfig, Root};
+    use nsh_testing::Headless;
+    #[component]
+    fn Fixture() -> impl IntoElement {
+        let installed = signal(false);
+        spawn(async move {
+            let core = Core::open().await.unwrap();
+            core.with(|value| {
+                let packages = value.plugins.packages().unwrap();
+                assert!(packages.iter().any(|p| p.descriptor.id == "subsonic.music"
+                    && p.descriptor.builtin
+                    && p.descriptor.kind == "library"));
+            });
+            installed.set(true);
+        });
+        text(move || {
+            if installed.get() {
+                "Builtin subsonic installed"
+            } else {
+                "Opening"
+            }
+        })
+    }
+    #[test]
+    fn core_open_installs_readable_builtin_descriptor() {
+        let mut app = Headless::start(EngineConfig::new(Root::of::<Fixture>())).unwrap();
+        app.wait_for("Builtin subsonic installed").unwrap();
     }
 }

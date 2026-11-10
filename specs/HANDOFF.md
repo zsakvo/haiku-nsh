@@ -23,6 +23,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M2-02 已验收并提交
+
+- haiku-plugins 宿主（描述符、安装事务、sources.json 兼容参考版、认证状态机、AuthExpired 单飞刷新、SourceApi）、`haiku` SDK、`sdk/haiku.d.ts`、`plugins/subsonic/plugin.ts`（297 行，id `subsonic.music`）。workspace 210 通过，tsc 通过，nsh test 13/13。
+- 插件 id 必须沿用参考版（`subsonic.music`、`feiniu.music`、`qq.scraper`、`kugou.scraper`、`qq.music`），sourceId 与参考 `deriveSourceId` 一致（审阅者用 Node 复算过）。
+- 遗留并入 M2-03 第 0 步：Shelf/Link 等结构校验、100 页聚合、SMS cooldown、QR 到期抢占、描述符认证展示元数据、cookie 罐/SMS/web/logout 回归、坏包隔离与安装崩溃恢复。
+
 ## 2026-11-10 更新：M2-01 已验收并提交
 
 - M2 拆为 M2-01 运行时 → M2-02 宿主 + `sdk/haiku.d.ts` + subsonic → M2-03 其余插件、CLI、契约套件、设置面板、GUIDE。

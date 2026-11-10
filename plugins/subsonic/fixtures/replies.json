@@ -1,0 +1,12 @@
+{
+ "ping":{"subsonic-response":{"status":"ok","version":"1.16.1","openSubsonic":true}},
+ "search3":{"subsonic-response":{"status":"ok","searchResult3":{"song":[{"id":"song:1/字","title":"Fixture Song","artist":"Artist","artistId":"artist1","album":"Album","albumId":"album1","coverArt":"cover1","duration":123,"suffix":"flac","bitRate":800}],"album":[{"id":"album1","name":"Album","artist":"Artist"}],"artist":[{"id":"artist1","name":"Artist"}]}}},
+ "getSong":{"subsonic-response":{"status":"ok","song":{"id":"song:1/字","title":"Fixture Song","artist":"Artist","suffix":"flac","bitRate":800}}},
+ "getAlbum":{"subsonic-response":{"status":"ok","album":{"id":"album1","name":"Album","song":[{"id":"song1","title":"One","artist":"Artist"},{"id":"song2","title":"Two","artist":"Artist"}]}}},
+ "getArtist":{"subsonic-response":{"status":"ok","artist":{"id":"artist1","name":"Artist","album":[{"id":"album1","name":"Album"}]}}},
+ "getPlaylist":{"subsonic-response":{"status":"ok","playlist":{"id":"playlist1","name":"Playlist","owner":"User","entry":[{"id":"song1","title":"One"}]}}},
+ "getAlbumList2":{"subsonic-response":{"status":"ok","albumList2":{"album":[{"id":"album1","name":"Album"}]}}},
+ "getArtists":{"subsonic-response":{"status":"ok","artists":{"index":[{"artist":[{"id":"artist1","name":"Artist"}]}]}}},
+ "getPlaylists":{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"playlist1","name":"Playlist","owner":"User"}]}}},
+ "getLyricsBySongId":{"subsonic-response":{"status":"ok","lyricsList":{"structuredLyrics":[{"synced":true,"line":[{"start":1230,"value":"Fixture lyrics"}]}]}}}
+}

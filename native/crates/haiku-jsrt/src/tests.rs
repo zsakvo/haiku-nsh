@@ -882,3 +882,14 @@ Uz4xpoYU8cPObY7JmDznKvc=
         json!([16, 16, 16])
     );
 }
+
+#[tokio::test]
+async fn cipher_many_chunks_equal_single_chunk() {
+    let vm=loaded(r#"import {createCipheriv,createDecipheriv} from 'crypto';export function run(){const data=Buffer.from(Array.from({length:4099},(_,i)=>i%256));for(const bits of [128,192,256])for(const mode of ['ecb','cbc','ctr','gcm']){const key=Buffer.alloc(bits/8),iv=mode==='ecb'?null:Buffer.alloc(mode==='gcm'?12:16);function encrypt(step){const c=createCipheriv(`aes-${bits}-${mode}`,key,iv);const out=[];for(let i=0;i<data.length;i+=step)out.push(c.update(data.subarray(i,i+step)));out.push(c.final());return {data:Buffer.concat(out),tag:mode==='gcm'?c.getAuthTag():null};}const full=encrypt(data.length),parts=encrypt(7);if(full.data.toString('hex')!==parts.data.toString('hex'))throw new Error('chunk mismatch');const d=createDecipheriv(`aes-${bits}-${mode}`,key,iv);if(parts.tag)d.setAuthTag(parts.tag);const plain=[];for(let i=0;i<parts.data.length;i+=11)plain.push(d.update(parts.data.subarray(i,i+11)));plain.push(d.final());if(Buffer.concat(plain).toString('hex')!==data.toString('hex'))throw new Error('decrypt mismatch');}return true;}"#).await;
+    assert_eq!(
+        vm.call("run", "null", Duration::from_secs(5))
+            .await
+            .unwrap(),
+        json!(true)
+    );
+}

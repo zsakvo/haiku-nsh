@@ -352,6 +352,6 @@ const BOOTSTRAP: &str = r#"
  globalThis.localStorage=storage;
  globalThis.__makeContext=(data)=>{ const controller=new AbortController(); const signal=controller.signal;currentSignal=signal;
    return {controller,ctx:Object.freeze({...data,signal,http:(input,init={})=>fetch(input,{...init,signal:init.signal?AbortSignal.any([signal,init.signal]):signal}),storage,log:console})}; };
- globalThis.__describe=(object)=>{ const seen=new Set(); function shape(value,depth=0){if(typeof value==='function')return 'function'; if(value===null||typeof value!=='object')return value; if(depth>16||seen.has(value))return '[object]'; seen.add(value); const out={}; for(const key of Object.keys(value)){const d=Object.getOwnPropertyDescriptor(value,key);out[key]=d.get?'getter':shape(d.value,depth+1);} return out;} return JSON.stringify(shape(object)); };
+ globalThis.__describe=(object)=>{ const seen=new Set(); function shape(value,depth=0){if(typeof value==='function')return 'function'; if(value===null||typeof value!=='object')return value; if(depth>16||seen.has(value))return '[object]'; seen.add(value); const out=Array.isArray(value)?[]:{}; for(const key of Object.keys(value)){const d=Object.getOwnPropertyDescriptor(value,key);out[key]=d.get?'getter':shape(d.value,depth+1);} return out;} return JSON.stringify(shape(object)); };
 })();
 "#;

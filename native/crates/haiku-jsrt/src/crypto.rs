@@ -7,6 +7,7 @@ use aes_gcm::{
 use rquickjs::{Ctx, Exception, function::Func};
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPublicKey, pkcs1::DecodeRsaPublicKey, pkcs8::DecodePublicKey};
 use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 #[derive(Deserialize)]
 struct Input {
@@ -200,16 +201,127 @@ fn public_encrypt(input: RsaInput) -> Result<Vec<u8>, String> {
     }
     .map_err(|e| e.to_string())
 }
+#[derive(Deserialize)]
+struct Chunk {
+    data: Vec<u8>,
+    finalizing: bool,
+    padding: bool,
+    tag: Vec<u8>,
+    aad: Vec<u8>,
+}
+struct CipherState {
+    input: Input,
+    pending: Vec<u8>,
+    offset: usize,
+}
+impl CipherState {
+    fn push(&mut self, chunk: Chunk) -> Result<Output, String> {
+        self.input.padding = chunk.padding;
+        self.input.tag = chunk.tag;
+        self.input.aad = chunk.aad;
+        self.pending.extend_from_slice(&chunk.data);
+        let mode = self.input.algorithm.rsplit('-').next().unwrap();
+        // GCM is computed once at final, including authentication. Never replay prefixes.
+        if mode == "gcm" && !chunk.finalizing {
+            return Ok(Output {
+                data: vec![],
+                tag: vec![],
+            });
+        }
+        let length = if chunk.finalizing || mode == "ctr" || mode == "gcm" {
+            self.pending.len()
+        } else {
+            self.pending
+                .len()
+                .saturating_sub(usize::from(self.input.decrypt && chunk.padding))
+                / 16
+                * 16
+        };
+        let mut data: Vec<u8> = self.pending.drain(..length).collect();
+        let original = data.clone();
+        if mode == "ctr" && self.offset > 0 {
+            let mut prefix = vec![0; self.offset];
+            prefix.extend(data);
+            data = prefix;
+        }
+        let input = Input {
+            algorithm: self.input.algorithm.clone(),
+            key: self.input.key.clone(),
+            iv: self.input.iv.clone(),
+            data,
+            decrypt: self.input.decrypt,
+            padding: chunk.finalizing && chunk.padding,
+            tag: self.input.tag.clone(),
+            aad: self.input.aad.clone(),
+        };
+        let mut output = transform(input)?;
+        if mode == "cbc" && length > 0 {
+            self.input.iv = if self.input.decrypt {
+                original[length - 16..].to_vec()
+            } else {
+                output.data[output.data.len() - 16..].to_vec()
+            };
+        }
+        if mode == "ctr" {
+            output.data.drain(..self.offset);
+            let blocks = (self.offset + length) / 16;
+            self.offset = (self.offset + length) % 16;
+            let counter = u128::from_be_bytes(
+                self.input
+                    .iv
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| "Invalid IV")?,
+            )
+            .wrapping_add(blocks as u128);
+            self.input.iv = counter.to_be_bytes().to_vec();
+        }
+        Ok(output)
+    }
+}
 pub(crate) fn install(ctx: &Ctx<'_>) -> rquickjs::Result<()> {
+    let states = Rc::new(RefCell::new((0u64, BTreeMap::<u64, CipherState>::new())));
+    let create = states.clone();
     ctx.globals().set(
-        "__cipher",
-        Func::from(|ctx: Ctx<'_>, text: String| -> rquickjs::Result<String> {
-            let input = serde_json::from_str(&text)
+        "__cipherCreate",
+        Func::from(move |ctx: Ctx<'_>, text: String| -> rquickjs::Result<u64> {
+            let input: Input = serde_json::from_str(&text)
                 .map_err(|e| Exception::throw_type(&ctx, &e.to_string()))?;
-            let output = transform(input).map_err(|e| Exception::throw_message(&ctx, &e))?;
-            serde_json::to_string(&output)
-                .map_err(|e| Exception::throw_message(&ctx, &e.to_string()))
+            let mut states = create.borrow_mut();
+            states.0 += 1;
+            let id = states.0;
+            states.1.insert(
+                id,
+                CipherState {
+                    input,
+                    pending: vec![],
+                    offset: 0,
+                },
+            );
+            Ok(id)
         }),
+    )?;
+    ctx.globals().set(
+        "__cipherChunk",
+        Func::from(
+            move |ctx: Ctx<'_>, id: u64, text: String| -> rquickjs::Result<String> {
+                let chunk: Chunk = serde_json::from_str(&text)
+                    .map_err(|e| Exception::throw_type(&ctx, &e.to_string()))?;
+                let finalizing = chunk.finalizing;
+                let mut states = states.borrow_mut();
+                let result = states
+                    .1
+                    .get_mut(&id)
+                    .ok_or_else(|| "Cipher finalized".to_string())
+                    .and_then(|state| state.push(chunk));
+                if finalizing || result.is_err() {
+                    states.1.remove(&id);
+                }
+                let output = result.map_err(|e| Exception::throw_message(&ctx, &e))?;
+                serde_json::to_string(&output)
+                    .map_err(|e| Exception::throw_message(&ctx, &e.to_string()))
+            },
+        ),
     )?;
     ctx.globals().set(
         "__rsa",
@@ -227,7 +339,7 @@ import {Buffer} from 'buffer';
 export * from '__stdlib_crypto';
 const toBytes=(value,encoding)=>value==null?[]:Array.from(typeof value==='string'?Buffer.from(value,encoding):Buffer.from(value));
 class Cipher {
- constructor(algorithm,key,iv,decrypt) {this.algorithm=algorithm;this.key=toBytes(key);this.iv=toBytes(iv);this.decrypt=decrypt;this.padding=true;this.parts=[];this.tag=[];this.aad=[];this.done=false;this.emitted=0;
+ constructor(algorithm,key,iv,decrypt) {this.algorithm=algorithm;this.key=toBytes(key);this.iv=toBytes(iv);this.decrypt=decrypt;this.padding=true;this.handle=null;this.tag=[];this.aad=[];this.done=false;this.emitted=0;
    const match=/^aes-(128|192|256)-(ecb|cbc|ctr|gcm)$/.exec(algorithm);if(!match||this.key.length!==Number(match[1])/8)throw new TypeError('Invalid cipher/key');
    if(this.iv.length!==(match[2]==='ecb'?0:match[2]==='gcm'?12:16))throw new TypeError('Invalid IV');
  }
@@ -235,18 +347,11 @@ class Cipher {
  setAAD(value){this.aad=toBytes(value);return this;}
  setAuthTag(value){if(!this.decrypt||!this.algorithm.endsWith('-gcm'))throw new Error('Invalid state');this.tag=toBytes(value);return this;}
  getAuthTag(){if(!this.done||this.decrypt||!this.algorithm.endsWith('-gcm'))throw new Error('Invalid state');return Buffer.from(this.tag);}
- _transform(data,final){let algorithm=this.algorithm,iv=this.iv,padding=final&&this.padding;
-   if(!final&&this.decrypt&&algorithm.endsWith('-gcm')){algorithm=algorithm.replace('-gcm','-ctr');iv=[...iv,0,0,0,2];}
-   return JSON.parse(__cipher(JSON.stringify({algorithm,key:this.key,iv,data:Array.from(data),decrypt:this.decrypt,padding,tag:this.tag,aad:this.aad})));
- }
- update(data,inputEncoding,outputEncoding){if(this.done)throw new Error('Cipher finalized');this.parts.push(Buffer.from(toBytes(data,inputEncoding)));const all=Buffer.concat(this.parts);
-   const blocks=/-(ecb|cbc)$/.test(this.algorithm);const length=blocks?Math.floor(Math.max(0,all.length-(this.decrypt&&this.padding?1:0))/16)*16:all.length;
-   const out=this._transform(all.subarray(0,length),false);const result=Buffer.from(out.data).subarray(this.emitted);this.emitted=length;return outputEncoding?result.toString(outputEncoding):result;
- }
- final(encoding){if(this.done)throw new Error('Cipher finalized');this.done=true;
-   const out=this._transform(Buffer.concat(this.parts),true);
-   this.tag=out.tag;const data=Buffer.from(out.data).subarray(this.emitted);return encoding?data.toString(encoding):data;
- }
+ _transform(data,finalizing){if(this.handle===null)this.handle=__cipherCreate(JSON.stringify({algorithm:this.algorithm,key:this.key,iv:this.iv,data:[],decrypt:this.decrypt,padding:this.padding,tag:[],aad:[]}));
+   return JSON.parse(__cipherChunk(this.handle,JSON.stringify({data:toBytes(data),finalizing,padding:this.padding,tag:this.tag,aad:this.aad})));}
+ update(data,inputEncoding,outputEncoding){if(this.done)throw new Error('Cipher finalized');const out=this._transform(Buffer.from(toBytes(data,inputEncoding)),false);const result=Buffer.from(out.data);return outputEncoding?result.toString(outputEncoding):result;}
+ final(encoding){if(this.done)throw new Error('Cipher finalized');this.done=true;const out=this._transform(Buffer.alloc(0),true);this.tag=out.tag;const data=Buffer.from(out.data);return encoding?data.toString(encoding):data;}
+
 }
 export const createCipheriv=(algorithm,key,iv)=>new Cipher(algorithm,key,iv,false);
 export const createDecipheriv=(algorithm,key,iv)=>new Cipher(algorithm,key,iv,true);

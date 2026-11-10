@@ -1,0 +1,642 @@
+use super::*;
+use haiku_store::json_file;
+use serde_json::{Value, json};
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU16, Ordering},
+    },
+    time::{Duration, Instant},
+};
+
+async fn install(host: &Host, id: &str, body: &str) -> Descriptor {
+    let source = format!(
+        "import {{definePlugin,AuthExpired,Expired}} from 'haiku';export default definePlugin({{id:'{id}',name:'Fixture',version:'1.0.0',{body}}});"
+    );
+    host.install_files(
+        BTreeMap::from([("plugin.ts".into(), source.into_bytes())]),
+        false,
+    )
+    .await
+    .unwrap()
+}
+#[tokio::test]
+async fn subsonic_source_id_matches_reference_derive_source_id() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let descriptor = host.package("subsonic.music").unwrap().descriptor;
+    let values = BTreeMap::from([
+        ("baseUrl".into(), " EXAMPLE.COM:80/rest/ ".into()),
+        ("username".into(), " User ".into()),
+    ]);
+    // Reference sources.ts deriveSourceId uses URL normalization, trimmed username,
+    // identity key order baseUrl|username, and the first eight SHA-1 hex digits.
+    // normalizeSourceUrl yields http://example.com, so the hash input is
+    // "http://example.com|User". This golden value includes the reference plugin id.
+    assert_eq!(source_id(&descriptor, &values), "subsonic.music#eeb7a0de");
+}
+
+#[tokio::test]
+async fn descriptor_categories_identity_and_registry_compatibility() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let descriptor = host.package("subsonic.music").unwrap().descriptor;
+    assert_eq!(descriptor.kind, "library");
+    assert!(descriptor.capabilities.contains(&"track.streams".into()));
+    assert_eq!(descriptor.library_cards.len(), 3);
+    for input in [
+        " EXAMPLE.COM:80/rest/ ",
+        "http://example.com/app",
+        "HTTP://EXAMPLE.COM/",
+    ] {
+        assert_eq!(normalize_source_url(input), "http://example.com");
+    }
+    let values = BTreeMap::from([
+        ("baseUrl".into(), " EXAMPLE.COM:80/rest/ ".into()),
+        ("username".into(), " User ".into()),
+    ]);
+    let normalized = BTreeMap::from([
+        ("baseUrl".into(), "http://example.com".into()),
+        ("username".into(), "User".into()),
+    ]);
+    assert_eq!(
+        source_id(&descriptor, &values),
+        source_id(&descriptor, &normalized)
+    );
+    assert_ne!(
+        source_id(&descriptor, &values),
+        source_id(
+            &descriptor,
+            &BTreeMap::from([
+                ("baseUrl".into(), "http://example.com".into()),
+                ("username".into(), "user".into())
+            ])
+        )
+    );
+    assert_eq!(source_id(&descriptor, &values).len(), 23);
+    let provider = install(
+        &host,
+        "provider.test",
+        "track:{streams:async()=>[]},scrape:{search:async()=>[]}",
+    )
+    .await;
+    assert_eq!(provider.kind, "provider");
+    assert!(provider.scraper);
+    let scraper = install(&host, "scraper.test", "scrape:{search:async()=>[]}").await;
+    assert_eq!(scraper.kind, "scraper");
+    let file = dir.path().join("plugins/sources.json");
+    json_file::write(&file,&json!({"version":1,"future":"keep","sources":[{"sourceId":"provider.test","pluginId":"provider.test","kind":"provider","enabled":false,"addedAt":123,"displayName":"Name","futureField":7}]})).unwrap();
+    drop(host);
+    let host = Host::open(dir.path()).await.unwrap();
+    host.rename("provider.test", Some("Renamed".into()))
+        .await
+        .unwrap();
+    let saved: Value = json_file::read(&file).unwrap().unwrap();
+    assert_eq!(saved["version"], 1);
+    assert_eq!(saved["future"], "keep");
+    assert_eq!(saved["sources"][0]["futureField"], 7);
+    assert_eq!(saved["sources"][0]["addedAt"], 123);
+}
+fn zip_files(files: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut cursor = std::io::Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut cursor);
+        for (name, data) in files {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(data).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+    cursor.into_inner()
+}
+#[tokio::test]
+async fn install_limits_traversal_descriptor_and_activation_rollback() {
+    let root = tempfile::tempdir().unwrap();
+    let host = Host::open(root.path()).await.unwrap();
+    assert!(
+        host.install_zip(&vec![0; 10 * 1024 * 1024 + 1])
+            .await
+            .is_err()
+    );
+    assert!(
+        host.install_files(
+            BTreeMap::from([("huge".into(), vec![0; 50 * 1024 * 1024 + 1])]),
+            false
+        )
+        .await
+        .is_err()
+    );
+    for path in ["../escape", "/absolute", "bad\\name", "C:escape"] {
+        assert!(
+            host.install_files(BTreeMap::from([(path.into(), vec![0])]), false)
+                .await
+                .is_err()
+        );
+    }
+    assert!(
+        host.install_zip(&zip_files(&[("../escape", b"bad")]))
+            .await
+            .is_err()
+    );
+    assert!(
+        host.install_files(
+            BTreeMap::from([("plugin.ts".into(), b"export default {}".to_vec())]),
+            false
+        )
+        .await
+        .is_err()
+    );
+    assert!(host.remove_package("subsonic.music").await.is_err());
+    let body = "connection:{fields:{baseUrl:{type:'url',required:true}},identity:['baseUrl'],verify:async(conn,ctx)=>{if(conn.reject){ctx.storage.set('keep',-2);throw new Error('verify failed');}return {};}},track:{streams:async()=>[{url:'old'}]}";
+    install(&host, "upgrade.test", body).await;
+    let source = host
+        .connect(
+            "upgrade.test",
+            BTreeMap::from([("baseUrl".into(), "http://example.com".into())]),
+            None,
+        )
+        .await
+        .unwrap();
+    source
+        .call_raw("connection.verify", vec![json!({})], json!({}), None)
+        .await
+        .unwrap();
+    let id = &source.record.source_id;
+    let kv = root
+        .path()
+        .join("plugins/sources")
+        .join(id)
+        .join("storage.json");
+    json_file::write(&kv, &json!({"keep":42,"activationFail":true})).unwrap();
+    let creds = root
+        .path()
+        .join("plugins/sources")
+        .join(id)
+        .join("credential.json");
+    let before = std::fs::read(&creds).unwrap();
+    let storage_before = std::fs::read(&kv).unwrap();
+    assert!(
+        host.connect(
+            "upgrade.test",
+            BTreeMap::from([
+                ("baseUrl".into(), "http://example.com".into()),
+                ("reject".into(), "true".into()),
+            ]),
+            None
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(std::fs::read(&kv).unwrap(), storage_before);
+    assert_eq!(std::fs::read(&creds).unwrap(), before);
+    let broken = format!(
+        "import {{definePlugin}} from 'haiku';if(localStorage.get('activationFail')){{localStorage.set('keep',-1);throw new Error('activation');}}export default definePlugin({{id:'upgrade.test',name:'New',version:'2.0.0',{body}}});"
+    );
+    assert!(
+        host.install_zip(&zip_files(&[("plugin.ts", broken.as_bytes())]))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        host.package("upgrade.test").unwrap().descriptor.version,
+        "1.0.0"
+    );
+    assert_eq!(std::fs::read(&kv).unwrap(), storage_before);
+    assert_eq!(
+        source
+            .call_raw("track.streams", vec![json!("x")], json!({}), None)
+            .await
+            .unwrap(),
+        json!([{"url":"old"}])
+    );
+    let valid = format!(
+        "import {{definePlugin}} from 'haiku';export default definePlugin({{id:'upgrade.test',name:'New',version:'2.0.0',{body}}});"
+    );
+    host.install_zip(&zip_files(&[("plugin.ts", valid.as_bytes())]))
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(creds).unwrap(), before);
+    assert_eq!(json_file::read::<Value>(&kv).unwrap().unwrap()["keep"], 42);
+    assert!(host.remove_package("upgrade.test").await.is_err());
+}
+#[tokio::test]
+async fn auth_single_flight_refresh_replay_and_validation() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    install(&host,"auth.test",r#"auth:{password:{submit:async()=>({credential:{token:'old',refresh:'keep'}})},user:async()=>null,refresh:async(_,ctx)=>{ctx.storage.set('refreshes',(ctx.storage.get('refreshes')||0)+1);return {token:'fresh'};}},track:{streams:async(id,ctx)=>{if(ctx.credential?.token!=='fresh')throw new AuthExpired();return [{url:'https://example.invalid/'+id}];}},search:{track:async()=>({items:[{id:'good',title:'Good',artists:[],cover:'https://cover/{size}'},{id:'bad'}]})}"#.replace("refresh:async(_,ctx)","refresh:async(ctx)").as_str()).await;
+    let mut draft = host.begin_login("auth.test").await.unwrap();
+    draft.password(BTreeMap::new(), None).await.unwrap();
+    let source = draft.commit().await.unwrap();
+    let (a, b, c) = tokio::join!(
+        source.invoke("track.streams", vec![json!("a")], json!({}), None),
+        source.invoke("track.streams", vec![json!("b")], json!({}), None),
+        source.invoke("track.streams", vec![json!("c")], json!({}), None)
+    );
+    for result in [a, b, c] {
+        assert!(result.is_ok(), "{result:?}");
+    }
+    let storage: Value =
+        json_file::read(&dir.path().join("plugins/sources/auth.test/storage.json"))
+            .unwrap()
+            .unwrap();
+    assert_eq!(storage["refreshes"], 1);
+    let creds: Value =
+        json_file::read(&dir.path().join("plugins/sources/auth.test/credential.json"))
+            .unwrap()
+            .unwrap();
+    assert_eq!(creds["credential"]["refresh"], "keep");
+    assert_eq!(creds["credential"]["token"], "fresh");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(dir.path().join("plugins/sources/auth.test/credential.json"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+    }
+    let api = SourceApi::new(source);
+    let page = api
+        .search(
+            SearchKind::Track,
+            "q",
+            PageArgs {
+                cursor: None,
+                limit: 20,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].cover.as_deref(), Some("https://cover/512"));
+    assert_eq!(api.take_warnings().len(), 1);
+    install(&host,"expired.test","track:{streams:async(id,ctx)=>{if(!ctx.storage.get('once')){ctx.storage.set('once',true);throw new Expired();}return [{url:'fresh'}];}},auth:{password:{submit:async()=>({credential:{ok:true}})},user:async()=>null}").await;
+    let mut draft = host.begin_login("expired.test").await.unwrap();
+    draft.password(BTreeMap::new(), None).await.unwrap();
+    let api = SourceApi::new(draft.commit().await.unwrap());
+    assert_eq!(
+        api.streams("x", "standard", None, None).await.unwrap()[0].url,
+        "fresh"
+    );
+}
+#[tokio::test]
+async fn qrcode_cadence_expiry_cancel_and_failed_draft_cleanup() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    install(&host,"qr.test",r#"auth:{user:async()=>null,qrcode:{start:async(v)=>({state:{v},expiresIn:v==='expire'?0.01:60,image:'data:'}),poll:async(state,ctx)=>{const n=ctx.storage.get('polls')||0;ctx.storage.set('polls',n+1);return n?{status:'done',credential:{token:'qr'}}:{status:'scanned'};}},password:{submit:async()=>{throw new Error('bad login');}}},track:{streams:async()=>[]}"#).await;
+    let mut draft = host.begin_login("qr.test").await.unwrap();
+    assert!(draft.password(BTreeMap::new(), None).await.is_err());
+    assert!(host.records().is_empty());
+    let mut expired = draft
+        .qrcode_start("expire", Cancellation::default())
+        .await
+        .unwrap();
+    assert_eq!(
+        draft.qrcode_poll(&mut expired).await.unwrap()["status"],
+        "expired"
+    );
+    let cancel = Cancellation::default();
+    let mut session = draft.qrcode_start("qr", cancel.clone()).await.unwrap();
+    cancel.cancel();
+    let start = Instant::now();
+    assert_eq!(
+        draft.qrcode_poll(&mut session).await.unwrap_err().code,
+        "CANCELLED"
+    );
+    assert!(start.elapsed() < Duration::from_millis(100));
+    let mut session = draft
+        .qrcode_start("qr", Cancellation::default())
+        .await
+        .unwrap();
+    let start = Instant::now();
+    assert_eq!(
+        draft.qrcode_poll(&mut session).await.unwrap()["status"],
+        "scanned"
+    );
+    assert!(start.elapsed() >= Duration::from_secs(2));
+    assert_eq!(
+        draft.qrcode_poll(&mut session).await.unwrap()["status"],
+        "done"
+    );
+    draft.commit().await.unwrap();
+    assert_eq!(host.records().len(), 1);
+    let draft = host.begin_login("qr.test").await.unwrap();
+    let path = draft.dir.as_ref().unwrap().path().to_owned();
+    drop(draft);
+    assert!(!path.exists());
+}
+
+struct Server {
+    url: String,
+    status: Arc<AtomicU16>,
+    requests: Arc<Mutex<Vec<String>>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+impl Server {
+    fn start() -> Self {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let status = Arc::new(AtomicU16::new(200));
+        let state = status.clone();
+        let requests = Arc::new(Mutex::new(vec![]));
+        let log = requests.clone();
+        let thread = std::thread::spawn(move || {
+            let replies: Value = serde_json::from_str(include_str!(
+                "../../../../plugins/subsonic/fixtures/replies.json"
+            ))
+            .unwrap();
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut data = [0; 8192];
+                let n = stream.read(&mut data).unwrap();
+                let text = String::from_utf8_lossy(&data[..n]).to_string();
+                if text.contains("/stop") {
+                    let _ = stream.write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    );
+                    break;
+                }
+                let method = text
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap()
+                    .split('?')
+                    .next()
+                    .unwrap()
+                    .rsplit('/')
+                    .next()
+                    .unwrap();
+                log.lock().unwrap().push(text.clone());
+                let code = state.load(Ordering::Acquire);
+                let body = if code == 200 {
+                    replies[method].to_string()
+                } else {
+                    "{}".into()
+                };
+                let slow = text.contains("query=slow");
+                std::thread::spawn(move || {
+                    if slow {
+                        std::thread::sleep(Duration::from_millis(500));
+                    }
+                    let header = format!(
+                        "HTTP/1.1 {code} Result\r\nContent-Length: {}\r\nRetry-After: 30\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(header.as_bytes());
+                    let _ = stream.write_all(body.as_bytes());
+                });
+            }
+        });
+        Self {
+            url,
+            status,
+            requests,
+            thread: Some(thread),
+        }
+    }
+    async fn stop(mut self) {
+        reqwest::get(format!("{}/stop", self.url)).await.unwrap();
+        self.thread.take().unwrap().join().unwrap();
+    }
+}
+#[tokio::test]
+async fn subsonic_fixture_verify_search_details_streams_paging_errors_cancel() {
+    let server = Server::start();
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let values = BTreeMap::from([
+        ("baseUrl".into(), server.url.clone()),
+        ("username".into(), "User".into()),
+        ("password".into(), "secret".into()),
+    ]);
+    server.status.store(401, Ordering::Release);
+    assert_eq!(
+        host.connect("subsonic.music", values.clone(), None)
+            .await
+            .err()
+            .unwrap()
+            .code,
+        "AUTH_REQUIRED"
+    );
+    assert!(host.records().is_empty());
+    server.status.store(200, Ordering::Release);
+    let source = host.connect("subsonic.music", values, None).await.unwrap();
+    assert_eq!(
+        source.redacted_connection().unwrap()["password"],
+        "[REDACTED]"
+    );
+    let api = SourceApi::new(source.clone());
+    let page = api
+        .search(
+            SearchKind::Track,
+            "fixture",
+            PageArgs {
+                limit: 1,
+                cursor: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.items[0].title, "Fixture Song");
+    assert_eq!(page.next.as_deref(), Some("1"));
+    let encoded = page.items[0].reference.encode();
+    assert_eq!(
+        haiku_model::EntityRef::decode(&encoded).unwrap(),
+        page.items[0].reference
+    );
+    assert!(page.items[0].cover.as_ref().unwrap().contains("size=512"));
+    for kind in [SearchKind::Album, SearchKind::Artist] {
+        assert_eq!(
+            api.search(
+                kind,
+                "fixture",
+                PageArgs {
+                    limit: 20,
+                    cursor: None
+                },
+                None
+            )
+            .await
+            .unwrap()
+            .items
+            .len(),
+            1
+        );
+    }
+    let album = api
+        .detail(
+            "album",
+            "album1",
+            PageArgs {
+                limit: 1,
+                cursor: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(album.tracks.items[0].title, "One");
+    assert_eq!(album.tracks.next.as_deref(), Some("1"));
+    let next = api
+        .detail(
+            "album",
+            "album1",
+            PageArgs {
+                limit: 1,
+                cursor: album.tracks.next,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(next.tracks.items[0].title, "Two");
+    assert!(next.tracks.next.is_none());
+    assert_eq!(
+        api.streams("song1", "lossless", None, None).await.unwrap()[0]
+            .format
+            .as_deref(),
+        Some("flac")
+    );
+    assert_eq!(
+        api.lyrics("song1", None).await.unwrap().unwrap().format,
+        "lrc"
+    );
+    assert_eq!(api.library_cards().unwrap().len(), 3);
+    for (kind, id) in [("artist", "artist1"), ("playlist", "playlist1")] {
+        assert!(
+            api.detail(
+                kind,
+                id,
+                PageArgs {
+                    limit: 20,
+                    cursor: None
+                },
+                None
+            )
+            .await
+            .unwrap()
+            .info
+            .is_some()
+        );
+    }
+    assert_eq!(
+        api.artist_albums(
+            "artist1",
+            PageArgs {
+                limit: 20,
+                cursor: None
+            },
+            None
+        )
+        .await
+        .unwrap()
+        .items
+        .len(),
+        1
+    );
+    for (card, kind) in [
+        ("albums", "album"),
+        ("artists", "artist"),
+        ("playlists", "playlist"),
+    ] {
+        assert_eq!(
+            api.browse(
+                card,
+                kind,
+                PageArgs {
+                    limit: 20,
+                    cursor: None
+                },
+                None,
+                None
+            )
+            .await
+            .unwrap()
+            .items
+            .len(),
+            1
+        );
+    }
+    server.status.store(401, Ordering::Release);
+    assert_eq!(
+        api.search(
+            SearchKind::Track,
+            "expired",
+            PageArgs {
+                limit: 1,
+                cursor: None
+            },
+            None
+        )
+        .await
+        .unwrap_err()
+        .code,
+        "AUTH_EXPIRED"
+    );
+    assert!(source.needs_login());
+    for (status, expected) in [
+        (404, "NOT_FOUND"),
+        (429, "RATE_LIMITED"),
+        (503, "UPSTREAM_ERROR"),
+    ] {
+        server.status.store(status, Ordering::Release);
+        let error = api
+            .search(
+                SearchKind::Track,
+                "failure",
+                PageArgs {
+                    limit: 1,
+                    cursor: None,
+                },
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, expected);
+        if status == 429 {
+            assert_eq!(error.details.unwrap()["retryAfter"], 30);
+        }
+    }
+    server.status.store(200, Ordering::Release);
+    let cancellation = Cancellation::default();
+    let cancel = cancellation.clone();
+    let task = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        cancel.cancel();
+    });
+    let start = Instant::now();
+    assert_eq!(
+        api.search(
+            SearchKind::Track,
+            "slow",
+            PageArgs {
+                limit: 1,
+                cursor: None
+            },
+            Some(&cancellation)
+        )
+        .await
+        .unwrap_err()
+        .code,
+        "CANCELLED"
+    );
+    assert!(start.elapsed() < Duration::from_millis(300));
+    task.await.unwrap();
+    assert!(
+        server
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|r| r.contains("t=") && r.contains("s=") && !r.contains("secret"))
+    );
+    server.stop().await;
+}

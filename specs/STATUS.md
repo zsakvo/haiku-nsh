@@ -20,8 +20,8 @@
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
-| F02 插件包与来源生命周期 | 运行时 R1–R12 已实现，待审阅；插件宿主未实现 | jsrt 24/24、workspace 203 通过/1 忽略、NSH 同进程并发及 check/build/test 通过；crypto 限制见 M2-01 小节 | `.artifacts/m2-01/` | |
-| F03 来源认证与用户内容 | 未实现 | | | |
+| F02 插件包与来源生命周期 | M2-01 已验收；M2-02 宿主核心与 subsonic.music 已实现，修订待审阅 | `haiku-jsrt`、`haiku-plugins`、`plugins/subsonic`、`sdk/haiku.d.ts`、`native/app/src/core.rs` | workspace 210 通过/1 忽略；修订 plugins 6/6、tsc、nsh test 13/13；`.artifacts/m2-02/` | SourceApi 部分模型/首页链接、完整列表聚合与坏包隔离/崩溃恢复经审阅接受留 M2-03；UI/CLI 留后续 |
+| F03 来源认证与用户内容 | 认证宿主核心与用户内容调用接口已实现，修订待审阅 | `haiku-plugins/src/{source,host,api}.rs`、`sdk/haiku.d.ts` | 单飞刷新、重放、凭据权限、QR 节奏/过期/取消、失败登录清理、连接 verify 回滚通过 | SMS cooldown/状态托管、QR 到期抢占、认证展示元数据与部分认证/cookie 回归经审阅接受留 M2-03；webview/UI 留 M2-03 |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
 | F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
@@ -434,3 +434,40 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - interrupt 无法抢占同步原生 stdlib/crypto/KV/模块读取与编译/宿主回调；返回后检查 deadline。内存限额覆盖 QuickJS heap；Rust HTTP（另限16MiB）/crypto/编译分配不计入。
 - 待审阅决定：是否接受上述 crypto/fetch 子集与 update 重算实现进入 M2-02；确认未展开 runner 告警。未进入插件宿主/SDK/CLI/UI，无额外 GUI 验收。
 - 全部证据 `.artifacts/m2-01/`，无一次性诊断脚本、汇总 JSON/hash；保留工作区等待审阅。
+
+## 2026-11-10 M2-02：插件宿主核心、SDK 与 subsonic（待审阅，部分语义未完成）
+
+- 全部读写/构建在主仓库 `/Users/zsakvo/Project/GPUI/haiku-nsh`；不提交/推送；未改 UI、TSX 导出、参考版、NSH、Rex；保留审阅者未跟踪任务文件。
+- cipher：ECB/CBC 保留尾块与 CBC 链状态，CTR 保留计数器/偏移，GCM 缓冲至 final 一次计算；新增三种 key size × 四种模式多分段加解密等价测试。
+- `haiku` 模块提供 definePlugin、field、十种结构化错误、Context、HTTP builder；合并默认 headers、15s 超时、signal、cookie 持久化与脱敏调试追踪；JsError 增加 details 并保留原 stack/source map 路径。
+- Host/Package/Descriptor/Source：描述模式生成 descriptor.json，类别/能力/认证方式/连接字段缓存；列出包只读描述符；Core::open 首次安装内嵌 subsonic，同数据根共享宿主。
+- 安装：ZIP 10MiB/解压 50MiB 上限、路径/符号链接检查、临时目录校验、备份替换、实例重载；失败恢复旧包/VM/storage，升级保留凭据/KV；内置及被引用包禁止删除。
+- sources.json 沿用参考版 version/sources/sourceId/pluginId/kind/displayName/addedAt/enabled 与顺序；保留顶层/来源未知字段；实例 id 使用规范化 identity 的 SHA-1 前 8 位，用户名大小写保留。
+- 来源启停/排序/重命名/移除写入串行化；新连接 verify 成功才注册；已有连接 verify 失败恢复 storage/凭据及旧实例；secret 脱敏、credential.json 原子写且 0600。
+- LoginDraft 提供 password/cookie/SMS/web done/QR 接口；QR 两秒 poll、等待期过期/取消、临时登录目录清理；AuthExpired 按 credential generation 单飞 refresh、合并凭据、重放一次，失败标记 needs_login。
+- SourceApi 覆盖 search/track/detail/artist/library/toplist/categories/me/radio/home/scrape 调用；EntityRef 元组无损编码、丢弃坏条目并记警告、封面 {size}、Expired 重取 streams。
+- `sdk/haiku.d.ts`、全能力类型夹具、tsconfig；`plugins/subsonic/plugin.ts` 105 行，含连接、token/salt、搜索、详情、流格式/码率、OpenSubsonic 歌词、库浏览、分页、错误映射。
+- Subsonic fixture 在 plugins/subsonic/fixtures/replies.json；仅本地 HTTP，无外网；覆盖 401/404/429/503、搜索三类、album 分页、artist/playlist/browse、歌词、取消与 secret 不进入请求。
+- 新增 haiku-plugins 直接依赖：serde/tokio/haiku-model/haiku-store/tempfile/log（workspace），sha1 0.11.0、url 2.5.8、semver 1.0.27、zip 8.6.0（仅 deflate）；dev reqwest（workspace）。App 增加 haiku-plugins。
+- Cargo.lock 新增 zip 8.6.0、typed-path 0.12.4、zlib-rs 0.5.5、zopfli 0.8.3；未增加第二套 QuickJS。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：最终 210 通过/0 失败/1 忽略，jsrt 25/25、plugins 5/5、app 4/4；cargo-test-workspace-repair2.log。
+- 首轮编译失败（sha1 digest Array 无 LowerHex）及 repair1 通过日志保留；repair2 补 storage/verify 回滚及并发只刷新一次、登录后 401 的明确断言；未再重复 workspace 构建。
+- `node /Users/zsakvo/Project/GPUI/haiku/node_modules/typescript/lib/tsc.js --noEmit -p sdk/tsconfig.json`：通过；TypeScript 7.0.2，只读使用参考版编译器，无应用 npm 运行时依赖；tsc.log、tsc-version.log。
+- `nsh check -v` / `nsh build -v`：通过；nsh-check.log / nsh-build.log；`nsh test -v`：13/13（9 TSX + 4 Rust），nsh-test.log，包含 Core 内置描述符读取与 NSH/插件同进程测试。
+- Rust 验证均设置 HAIKU_DATA_DIR=/tmp/haiku-m1-03-fixtures/m2-02-data、HAIKU_NO_KEYCHAIN=1；沿用根 .cargo/config.toml，未换工具链。
+- 警告仅 block future-incompat、huacnlee target-dir 与 __eh_frame 已知例外；全 workspace rustfmt 遇既有 lyrics_view.rs trailing whitespace，恢复其无关格式化改动后仅格式化本任务 Rust 文件通过。
+- 未完成：SourceApi home.entries/Link/Shelf.more、creator/host/episodeCount/subtitle 等字段、无 id Artist 的保留、完整列表最多 100 页聚合；当前结构校验主要覆盖实体页/曲目。
+- 未完成：SMS state/cooldown 尚由调用者管理；QR 到期未抢占正在进行的 poll，也未自动重启；描述符仅保存认证方式名，未保存 web URL/QR variants/password fields 等认证展示元数据。
+- 未覆盖：cookie 罐持久化回归、SMS/cookie/web/logout 与刷新再失败回归、启动坏包隔离/安装中崩溃恢复；HTTP cookie 路径匹配为前缀简化实现。
+- 审阅决定：是否接受上述未完成语义随 M2-03 补齐；M2-01 已接受的 crypto/fetch 子集保持，GCM 仍 final 缓冲，无新增架构决策。
+- 全部证据 `.artifacts/m2-02/`；无一次性诊断脚本、汇总 JSON/hash；保留改动等待审阅。
+
+## 2026-11-10 M2-02 小轮修订：D5 来源 ID 与 TS 可读性
+
+- 插件 id 改为参考版的 subsonic.music，同步宿主内置包路径、插件测试与 app 内置描述符断言；未改 API 行为。
+- 新增固定期望值回归：baseUrl=" EXAMPLE.COM:80/rest/ "、username=" User " 按参考 deriveSourceId 规范化为 "http://example.com|User"，得到 subsonic.music#eeb7a0de。
+- plugin.ts 按常规 TS 换行整理为 297 行，最长行 104 字符；haiku.d.ts 展开声明、每个导出添加一行 JSDoc；格式与文档变更不改变语义。
+- 仅执行指定三项各一次：cargo test --manifest-path native/Cargo.toml -p haiku-plugins（6/6）；tsc --noEmit -p sdk/tsconfig.json（通过）；nsh test -v（13/13）。
+- tsc 沿用参考版已有 TypeScript 7.0.2；Rust 测试隔离 HAIKU_DATA_DIR=/tmp/haiku-m1-03-fixtures/m2-02-review-data、HAIKU_NO_KEYCHAIN=1。
+- 证据：.artifacts/m2-02/{cargo-test-plugins-review,tsc-review,nsh-test-review}.log；警告仅既有 block、target-dir、__eh_frame。
+- 上节列出的模型/聚合/认证状态/元数据/回归/坏包隔离与崩溃恢复遗留已获审阅者接受，纳入 M2-03 第 0 步，本轮未扩展；未提交 git。
