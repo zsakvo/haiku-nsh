@@ -28,7 +28,7 @@
 | F07 音效与响度 | 未实现 | | | |
 | F08 歌词与正在播放 | 未实现 | | | |
 | F09 桌面集成 | 未实现 | | | |
-| F10 本地曲库与刮削 | 未实现 | | | |
+| F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/service.rs`、`native/app/src/{library,track_source,track_list}.rs`、`src/pages/{LibraryPage,TrackEditor}.tsx` | M1-03 本机实现与自动化验收通过，真实扫描/播放日志、浅深截图已保存，待审阅 | 刮削留 M4；原生双击/选择器交互与听感待人工确认；额外 cargo target-dir 警告见下节 |
 | F11 喜欢、歌单与远端收藏 | 未实现 | | | |
 | F12 历史与听歌统计 | 未实现 | | | |
 | F13 下载与媒体缓存 | 未实现 | | | |
@@ -308,3 +308,24 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 修复记录：初次 workspace 编译补显式 JsonValue/Trace/Tracer 导入；第二次发现会话窗口有符号减法错误，改 usize 饱和减法后通过，原始日志保留。
 - PLAYBACK 完整范围尚未覆盖：网络候选/1-2-4 秒恢复与提前 EOF 缓存处理留 M4；统计上报、专辑/节目 ListeningProgress 尚未接入；真实多曲无缝听感、系统媒体控制及界面留后续任务。
 - 按指定标题提交一次并纳入任务文件；开始时 MILESTONES 无待提交修改；未修改 Rex/上游/参考项目。
+
+## 2026-11-10 M1-03：本地曲库与 Rust TrackList（待审阅）
+
+- 基线 `84c2a60` 为半成品；续接 service/可取消扫描/track_source，未重复 M1-02；旧试播入口与临时 Core 方法已在基线删除。
+- Core.library 现已导出：持久根、扫描/取消、进度/变更→Stop、后台文件操作、Rust 查询句柄、分组分页、编辑/重置/逐文件写回、原生目录/封面选择与 Finder 请求；所有导出有文档。
+- Rust TrackList 使用 virtual_list、固定 token 行高、按当前 Position 读取元数据，选择/锚点/焦点/滚动按 ID 存在数据源；支持 Cmd/Shift/Cmd+A、键盘移动/Return、双击与五项上下文菜单。
+- 接口为 source 句柄 + albumColumn/durationColumn/currentId/active + onPlay/onAction/onSelectionChange；播放在 Rust 中构造当前完整筛选队列，TSX 不接收整库曲目数组。
+- LibraryPage/TrackEditor 接入已确认外壳：歌曲/专辑/艺术家、EntityRef 历史、保留页面状态、搜索排序、根管理/进度/取消/错误、批量稀疏草稿、封面、重置和写回确认；分组按名称正/倒序。
+- LibraryControls 复用应用组件；原有几何/颜色保留，仅新增 track-row-height token。修正显式 display:flex 导致的横向排列；浅深截图均已查看。
+- 构建阻断由审阅者定位为 dyld 拒绝剥离后的宏 dylib（mis-aligned LINKEDIT string pool），不是缓存；设置 CARGO_PROFILE_DEV_BUILD_OVERRIDE_STRIP=false 及 CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false 后通过，无须改 profile 或生成 host；README 已记录。
+- `cargo test --manifest-path native/Cargo.toml --workspace`：退出 0，180 通过、0 失败、1 忽略；服务测试覆盖根持久化/跨根去重、重扫与缺失文件保留覆盖、批量只改提交字段、有效元数据搜索排序；`cargo-test-workspace.log`。
+- `nsh check -v`、`nsh build -v`：最终退出 0，类型/导出文档/应用类无新增警告；`nsh-check-complete.log`、`nsh-build-complete.log`。
+- `nsh test -v`：最终 7/7（6 个 TSX + 1 个 Rust），`nsh-test-repair2.log`；新增可复用 Library.test/LibraryFixture/生成 FLAC helper，123 首临时音频验证空态→加根→扫描、专辑进入/返回、单元格回收保留选择、Cmd 多选批量专辑编辑保留标题/艺术家、双击 Beta→playing 且完整筛选队列 [Alpha,Beta]、恰好五项菜单。
+- Headless 失败修复限两种：首次 /tmp 无 fs 授权；首次修复还受 asset:/ 模块 URL 影响；第二次使用显式专用 /tmp/haiku-m1-03-fixtures，README 说明先创建父目录。nsh.json 仅补 fixture/preview fs 根，原未声明时的其他权限保持等价；应用数据每次用独立 HAIKU_DATA_DIR、禁用 keychain，测试结束移除音频/根。
+- 同时修复 JS finalizer 在 engine 销毁后访问查询 registry 的 panic；查询逐页释放，剩余 registry 随 engine 销毁；早期 Headless/浅色热重载日志保留旧错误，最终测试及深色新 host 无 panic/error。
+- 正式 `App.tsx` 真实运行通过，未出现 unknown classes（`run-app-strip.log`）；浅深预览也无该警告。旧独立试播未加载主题是可能原因，未作为已证明因果；无需修改已确认 token 声明。
+- 固定 LibraryLightPreview/LibraryDarkPreview 真实运行，各扫描 3 首 35 秒 FLAC，report.errors=[]；日志均记录 Beta、完整筛选队列 [Alpha,Beta]、playing/error:null，随后自然 idle；`run-light.log`、`run-dark.log`。未做 GUI 自动操作。
+- 浅/深截图：`library-light-final.png`、`library-dark.png`；首次窗口 ID 截图失败，重新读取当前窗口 ID 后成功，日志 capture-light*.log/capture-dark.log；真实窗口均 Ctrl+C 收尾。
+- 全部证据位于 `.artifacts/m1-03/`，音频和预览数据不提交。已知例外仍有 block 0.1.6、开发 host __eh_frame；额外 huacnlee/cargo 的“忽略 target-dir，使用 ./target”警告已汇报，严格“仅已知例外”条件未达成，未换工具链或改依赖。
+- LIBRARY 全范围未覆盖：刮削/加入歌单按任务留后续；原生目录/封面选择器、Finder、真实鼠标双击和听感待人工确认；未扩展格式矩阵、手工重置/写回/取消视觉验收或 M1-04。
+- 保留全部工作区供审阅，不提交/推送；specs 仅修改本 STATUS，审阅者 HANDOFF/任务改动保留；未修改 Rex 会话/布局、参考版、NSH 或依赖源码。

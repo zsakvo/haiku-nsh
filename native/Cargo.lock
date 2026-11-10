@@ -1816,10 +1816,13 @@ dependencies = [
  "encoding_rs",
  "haiku-lyrics",
  "haiku-model",
+ "haiku-store",
  "lofty",
  "log",
  "serde",
+ "serde_json",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -3078,6 +3081,7 @@ name = "nsh-app-haiku"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "haiku-library",
  "haiku-macos",
  "haiku-model",
  "haiku-playback",

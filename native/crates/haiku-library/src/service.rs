@@ -91,8 +91,9 @@ impl Library {
         let roots = json_file::read(&dir.join("roots.json")).map_err(|e| e.to_string())?.unwrap_or_default();
         let overrides = json_file::read(&dir.join("overrides.json")).map_err(|e| e.to_string())?.unwrap_or_default();
         // Corrupt index may be rebuilt. Never apply this fallback to authoritative files.
-        let index = json_file::read(&dir.join("index.json")).unwrap_or(None).unwrap_or_default();
-        let (events, _) = watch::channel(Snapshot::default());
+        let index: BTreeMap<String, Track> = json_file::read(&dir.join("index.json")).unwrap_or(None).unwrap_or_default();
+        let initial = Snapshot { report: Report { count: index.len(), ..Default::default() }, ..Default::default() };
+        let (events, _) = watch::channel(initial);
         Ok(Self(Arc::new(Inner { dir, data: Mutex::new(Data { roots, index, overrides }), cancelled: AtomicBool::new(false), scanning: AtomicBool::new(false), events })))
     }
     pub fn snapshot(&self) -> Snapshot { self.0.events.borrow().clone() }
@@ -159,7 +160,7 @@ impl Library {
     pub fn write_tags(&self, ids: &[String]) -> Vec<String> {
         let mut errors = Vec::new();
         // Serialize with edits/scans so a late write cannot erase a newer override.
-        let mut data = self.0.data.lock().unwrap();
+        let data = self.0.data.lock().unwrap();
         for id in ids {
             let Some(t) = Self::effective(&data,id) else { errors.push(format!("未找到曲目：{id}")); continue; };
             let tags = AudioTags { title:t.title.clone(), artists:artist_names(&t), album:t.album.as_ref().map(|a| a.title.clone()), album_artist:extra_string(&t,"album_artist"), year:extra_number(&t,"year"), track_no:extra_number(&t,"track_no"), disc_no:extra_number(&t,"disc_no"), cover_path:t.cover.clone(), lyrics:None };

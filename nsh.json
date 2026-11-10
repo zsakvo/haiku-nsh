@@ -4,5 +4,18 @@
   "version": "1.0.0",
   "build": 1,
   "rust": "native/app",
-  "theme": "src/ui/theme/haiku.json"
+  "theme": "src/ui/theme/haiku.json",
+  "capabilities": {
+    "network": { "hosts": ["*"] },
+    "webview": { "hosts": ["*"] },
+    "statusBar": true,
+    "clipboard": true,
+    "picker": true,
+    "speech": true,
+    "openUrl": true,
+    "fs": {
+      "read": ["${pluginDir}/.artifacts/m1-03", "/tmp/haiku-m1-03-fixtures"],
+      "write": ["${pluginDir}/.artifacts/m1-03", "/tmp/haiku-m1-03-fixtures"]
+    }
+  }
 }

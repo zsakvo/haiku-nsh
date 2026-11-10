@@ -1,4 +1,4 @@
-import { cleanup, effect, keymap, signal, token, View } from "nsh";
+import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
 import { Menu as DesktopMenu, Window } from "nsh/desktop";
 import { Core } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
@@ -7,13 +7,19 @@ import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
 import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
-import { createNavigation, destinations } from "./navigation";
+import { LibraryPage } from "../pages/LibraryPage";
+import { createCoreState } from "../state/core";
+import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
 import { CommandPalette } from "./CommandPalette";
 
-export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?: "settings" | "command" } = {}) {
+export function AppShell(props: {
+  initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
+  initialRoute?: Route; injectedLibraryFolders?: string[];
+} = {}) {
   const appearance = createAppearance(props.initialMode);
-  const nav = createNavigation();
+  const nav = createNavigation(props.initialRoute);
+  const core = createCoreState();
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
   const showSettings = () => overlay.set("settings");
   const showCommands = () => overlay.set("command");
@@ -78,7 +84,8 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
           <SectionLabel label={group} />
           {destinations.filter((page) => page.group === group).map((page) =>
             <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
-              selected={nav.current().kind === page.id} onPress={() => nav.navigate({ kind: page.id })} />)}
+              selected={nav.current().kind === page.id || (page.id === "library" && ["album", "artist"].includes(nav.current().kind))}
+              onPress={() => nav.navigate({ kind: page.id })} />)}
         </View>)}
         <View><SectionLabel label="歌单" /></View>
       </View>
@@ -91,7 +98,23 @@ export function AppShell(props: { initialMode?: AppearanceMode; initialOverlay?:
     <WindowPanel>
       <ShellToolbar />
       <View class="flex-1 min-h-0">
-        {destinations.map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => page.id !== "library").map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        <If when={!!core()}>
+          <LibraryPage core={core()!} active={nav.current().kind === "library"}
+            injectedFolders={props.injectedLibraryFolders} navigate={nav.navigate} />
+          <Each of={nav.history().filter((route, index, routes) => "ref" in route
+            && ["album", "artist"].includes(route.kind)
+            && routes.findIndex((other) => routeKey(route) === routeKey(other)) === index)}
+            key={routeKey}>
+            {(route) => <LibraryPage core={core()!}
+              active={routeKey(nav.current()) === routeKey(route())}
+              group={"ref" in route() ? (route() as Extract<Route, { ref: unknown }>).ref : undefined}
+              groupKind={route().kind as "album" | "artist"} navigate={nav.navigate} />}
+          </Each>
+        </If>
+        <If when={nav.current().kind === "library" && !core()}>
+          <Text class="px-5 text-sm text-muted-foreground">{core.error() ? String(core.error()) : "正在加载曲库…"}</Text>
+        </If>
       </View>
     </WindowPanel>
     <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} />

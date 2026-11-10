@@ -19,6 +19,7 @@
       "sidebar-search-gap": "0.75rem",
       "command-entry-min-width": "11rem",
       "compact-control-height": "1.75rem",
+      "track-row-height": "3rem",
       "brand-option-min-width": "7rem",
       "font-sans": "system-ui",
       "font-mono": "monospace"

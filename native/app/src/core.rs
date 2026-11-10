@@ -2,7 +2,7 @@ use futures::{
     FutureExt,
     future::{Either, select},
 };
-use haiku_model::{Error, ErrorCode, Track};
+use haiku_model::{Error, ErrorCode};
 use haiku_playback::{
     Command, Controller, LocalResolver, PlayerState, RealAudio, Status, SystemClock,
 };
@@ -13,7 +13,7 @@ use nsh_core::{
 };
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc, time::Duration};
 
-fn js_error(error: Error) -> JsError {
+pub(crate) fn js_error(error: Error) -> JsError {
     JsError::Error(error.message)
         .with("code", serde_json::to_value(error.code).unwrap_or_default())
         .with("retriable", error.retriable)
@@ -23,7 +23,7 @@ fn js_error(error: Error) -> JsError {
 fn json(state: &PlayerState) -> JsonValue {
     serde_json::to_value(state).expect("finite core state")
 }
-fn decode<T: serde::de::DeserializeOwned>(value: JsonValue) -> Result<T, JsError> {
+pub(crate) fn decode<T: serde::de::DeserializeOwned>(value: JsonValue) -> Result<T, JsError> {
     serde_json::from_value(value)
         .map_err(|e| js_error(Error::new(ErrorCode::InvalidArgument, e.to_string())))
 }
@@ -44,7 +44,7 @@ unsafe impl Trace for Listeners {
 
 /// Engine-thread adapter; its position/buffer signals are for Rust components only.
 pub struct CoreBridge {
-    controller: Controller,
+    pub(crate) controller: Controller,
     owner: Owner,
     pub position: Signal<f64>,
     pub buffered: Signal<f64>,
@@ -121,6 +121,7 @@ impl Drop for CoreBridge {
 #[class]
 pub struct Core {
     player: Instance<PlayerService>,
+    library: Instance<crate::library::LibraryService>,
 }
 #[class]
 impl Core {
@@ -130,17 +131,20 @@ impl Core {
         if let Some(core) = slot.get() {
             return Ok(core);
         }
-        let controller = background(async {
+        let (controller, library) = background(async {
             let root = haiku_store::data_root();
             std::fs::create_dir_all(&root).map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
             let (audio, events) = RealAudio::new();
-            Controller::start(
+            let library = haiku_library::service::Library::open(&root)
+                .map_err(|e| Error::new(ErrorCode::Io, e))?;
+            let controller = Controller::start(
                 audio,
                 Arc::new(LocalResolver),
                 Arc::new(SystemClock::default()),
                 events,
                 Some(root.join("session.json")),
-            )
+            )?;
+            Ok::<_, Error>((controller, library))
         })
         .await
         .map_err(|e| JsError::Error(e.to_string()))?
@@ -152,7 +156,9 @@ impl Core {
         }
         let listeners = Listeners::default();
         let bridge = CoreBridge::new(controller, listeners.clone());
+        let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
+            library,
             player: Instance::new(PlayerService {
                 bridge,
                 listeners,
@@ -167,6 +173,11 @@ impl Core {
     pub fn player(&self) -> Instance<PlayerService> {
         self.player.clone()
     }
+    /// Persistent local roots, scanning, effective metadata and Rust-backed queries.
+    #[getter]
+    pub fn library(&self) -> Instance<crate::library::LibraryService> {
+        self.library.clone()
+    }
 
     /// Install the existing native window lifecycle policy.
     pub fn initialize() {
@@ -178,8 +189,6 @@ impl Core {
         set_tokens(nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?);
         Ok(())
     }
-
-
 }
 
 /// Low-frequency playback commands and state subscription. All business state belongs to Rust.
@@ -326,6 +335,7 @@ impl PlayerService {
 mod tests {
     use super::*;
     use futures::future::BoxFuture;
+    use haiku_model::Track;
     use haiku_playback::{AudioBackend, Progress};
     use std::path::PathBuf;
     use std::sync::Mutex;

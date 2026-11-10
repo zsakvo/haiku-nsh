@@ -9,6 +9,7 @@ nsh-core = "0.4.0"
 nsh-base = "0.4.0"
 haiku-model.workspace = true
 haiku-store.workspace = true
+haiku-library.workspace = true
 haiku-playback = { path = "../crates/haiku-playback" }
 serde.workspace = true
 serde_json.workspace = true

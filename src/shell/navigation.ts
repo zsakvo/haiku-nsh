@@ -8,7 +8,7 @@ export const destinations = [
   { id: "categories", label: "分类", icon: "grid", group: "发现", title: "发现不同的音乐", description: "分类浏览将在来源插件接入后提供。" },
   { id: "radio", label: "电台", icon: "radio", group: "发现", title: "听听下一首", description: "电台将在来源插件接入后提供。" },
   { id: "search", label: "搜索", icon: "search", group: "发现", title: "寻找喜欢的声音", description: "音乐搜索将在后续版本提供，你可以先保留搜索词。" },
-  { id: "library", label: "本地曲库", icon: "music", group: "音乐库", title: "你的音乐，放在这里", description: "本地曲库将在下一版本提供。" },
+  { id: "library", label: "本地曲库", icon: "music", group: "音乐库", title: "你的音乐，放在这里", description: "添加音乐文件夹，扫描歌曲、专辑与艺术家。" },
   { id: "favorites", label: "喜欢", icon: "heart", group: "音乐库", title: "收藏值得重听的音乐", description: "喜欢的音乐将在收藏功能接入后提供。" },
   { id: "history", label: "历史", icon: "clock", group: "音乐库", title: "留下听过的旋律", description: "播放历史将在历史记录功能接入后提供。" },
   { id: "statistics", label: "统计", icon: "stats", group: "音乐库", title: "看见你的聆听习惯", description: "聆听统计将在后续版本提供。" },
@@ -20,8 +20,8 @@ export type Route = { [K in PageKind]: { kind: K } }[PageKind]
 export function routeKey(route: Route): string {
   return "ref" in route ? `${route.kind}:${route.ref}` : route.kind;
 }
-export function createNavigation() {
-  const history = signal<Route[]>([{ kind: "home" }]);
+export function createNavigation(initial: Route = { kind: "home" }) {
+  const history = signal<Route[]>([initial]);
   const index = signal(0);
   const current = () => history()[index()];
   function navigate(route: Route) {
