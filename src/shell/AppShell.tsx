@@ -15,7 +15,7 @@ import { CommandPalette } from "./CommandPalette";
 
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
-  initialSettingsCategory?: string; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
+  initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
@@ -119,7 +119,7 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} onLibrary={() => nav.navigate({kind: "library"})} />
     <If when={!!core()}>
       <NowPlaying open={nowPlaying()} onOpenChange={(event) => nowPlaying.set(event.open)} />
       <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {

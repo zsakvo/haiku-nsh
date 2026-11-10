@@ -14,11 +14,11 @@ export function ToggleGroup(props: {
   </BaseToggleGroup>;
 }
 export function Field(props: {
-  label: string; value: string; placeholder?: string; onChange: (value: string) => void;
+  label: string; value: string; placeholder?: string; secret?: boolean; onChange: (value: string) => void;
 }) {
   return <View class="gap-1">
     <Text class="text-xs text-muted-foreground">{props.label}</Text>
-    <Input accessibilityLabel={props.label} value={props.value} placeholder={props.placeholder}
+    <Input accessibilityLabel={props.label} value={props.value} placeholder={props.placeholder} masked={props.secret}
       onChange={(event) => props.onChange(event.value)}
       class={`min-h-8 rounded-(--radius) border border-input bg-card px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground ${focus}`} />
   </View>;

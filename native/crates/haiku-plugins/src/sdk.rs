@@ -26,7 +26,7 @@ function makeContext(raw){
    let body=options.body;
    if(options.json!==undefined){body=JSON.stringify(options.json);headers.set('content-type','application/json');}
    if(options.form){body=new URLSearchParams(options.form).toString();headers.set('content-type','application/x-www-form-urlencoded');}
-   const start=Date.now();const target=globalThis.__haikuReplayBase?globalThis.__haikuReplayBase+'/?target='+encodeURIComponent(url.toString()):url.toString();const response=await raw.http(target,{method,body,headers,timeout:options.timeout??defaults.timeout??15000});
+   const start=Date.now();const response=await raw.http(url.toString(),{method,body,headers,timeout:options.timeout??defaults.timeout??15000});
    const safe=new URL(url.toString());safe.username='';safe.password='';for(const key of safe.searchParams.keys())if(/token|cookie|password|secret|api.?key|^t$|^s$|^u$/i.test(key))safe.searchParams.set(key,'[REDACTED]');
    ctx.log.debug({method,url:safe.toString(),status:response.status,elapsedMs:Date.now()-start});
    if(defaults.cookies){let jar=raw.storage.get(cookieKey)||[];for(const line of response.headers.getSetCookie()){
@@ -48,4 +48,8 @@ export async function invoke(payload,raw){
  const ctx=makeContext(raw);let owner=globalThis.__haikuDefinition;const parts=payload.path.split('.');for(const key of parts.slice(0,-1))owner=owner?.[key];const fn=owner?.[parts.at(-1)];if(typeof fn!=='function')throw new Unsupported(payload.path);
  const result=await fn.call(owner,...payload.args,ctx);return result===undefined?null:result;}
 "#;
-pub(crate) const BRIDGE: &str = "export {invoke} from 'haiku';";
+pub(crate) const BRIDGE: &str = r#"
+export {invoke} from 'haiku';
+export function debugStorage() { return JSON.parse(__storage('dump','','null')); }
+export function clearStorage() { localStorage.clear(); return null; }
+"#;

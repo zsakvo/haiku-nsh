@@ -17,6 +17,7 @@
     "../plugins/subsonic/plugin.ts",
     "../plugins/feiniu/plugin.ts",
     "../plugins/qq-scraper/plugin.ts",
-    "../plugins/kugou-scraper/plugin.ts"
+    "../plugins/kugou-scraper/plugin.ts",
+    "../native/app/tests/fixtures/settings-plugin/plugin.ts"
   ]
 }

@@ -893,3 +893,48 @@ async fn cipher_many_chunks_equal_single_chunk() {
         json!(true)
     );
 }
+
+#[tokio::test]
+async fn timers_repeat_clear_abort_and_unload() {
+    let runtime = loaded(
+        r#"
+        let fired = 0;
+        export async function run() {
+          const removed = setTimeout(() => { fired += 100; }, 5);
+          clearTimeout(removed);
+          await new Promise(resolve => {
+            const interval = setInterval(() => {
+              if (++fired === 3) { clearInterval(interval); resolve(); }
+            }, 2);
+          });
+          return await new Promise(resolve => setTimeout((n) => resolve(fired + n), 5, 4));
+        }
+        export async function pending() {
+          setInterval(() => fired += 100, 60);
+          await new Promise(() => {});
+        }
+        export async function check() {
+          await new Promise(resolve => setTimeout(resolve, 90));
+          return fired;
+        }
+    "#,
+    )
+    .await;
+    assert_eq!(runtime.call("run", "null", SECOND).await.unwrap(), 7);
+    let call = runtime
+        .start_call("pending", Value::Null, json!({}), SECOND)
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    call.abort.abort();
+    assert_eq!(call.result().await.unwrap_err().name, "AbortError");
+    assert_eq!(runtime.call("check", "null", SECOND).await.unwrap(), 3);
+    runtime.unload().await.unwrap();
+    runtime
+        .load_module(
+            "fresh.js",
+            "export async function run(){return await new Promise(r=>setTimeout(()=>r(42),2));}",
+        )
+        .await
+        .unwrap();
+    assert_eq!(runtime.call("run", "null", SECOND).await.unwrap(), 42);
+}

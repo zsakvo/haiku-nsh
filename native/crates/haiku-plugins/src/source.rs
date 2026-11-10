@@ -41,6 +41,8 @@ struct Credentials {
     credential: Value,
     #[serde(default)]
     connection: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    user: Option<Value>,
 }
 pub struct Source {
     pub record: SourceRecord,
@@ -85,15 +87,24 @@ pub(crate) async fn open_runtime(
         ),
         false,
     );
-    if let Some(base) = replay {
-        options.modules.insert(
-            "haiku".into(),
-            format!(
-                "globalThis.__haikuReplayBase={};\n{}",
-                serde_json::to_string(base)?,
-                sdk::MODULE
-            ),
+    let events = crate::events::sender(root);
+    let logs = events.clone();
+    options.log = Some(Arc::new(move |record| {
+        let _ = logs.send(json!({"kind":"log","sourceId":record.instance_id,"level":record.level,"message":record.message}));
+    }));
+    options.http_hook = Some(Arc::new(move |event| {
+        let _ = events.send(
+            json!({"kind":"http","sourceId":event.instance_id,"phase":event.phase,
+            "method":event.method,"url":event.url,"headers":event.headers,"status":event.status}),
         );
+    }));
+    if let Some(base) = replay {
+        let base = base.to_string();
+        options.fetch_url = Some(Arc::new(move |url| {
+            let mut target = reqwest::Url::parse(&base).map_err(|e| e.to_string())?;
+            target.query_pairs_mut().append_pair("target", url);
+            Ok(target.to_string())
+        }));
     }
     let vm = Runtime::with_options(options)?;
     vm.load_package(&root.join("packages").join(&descriptor.id), "plugin.ts")
@@ -115,7 +126,7 @@ impl Source {
                 .join("credential.json"),
         )?
         .unwrap_or_default();
-        Self::open_with(
+        let source = Self::open_with(
             root,
             record,
             descriptor,
@@ -123,7 +134,9 @@ impl Source {
             credentials.connection,
             replay,
         )
-        .await
+        .await?;
+        source.credentials.lock().unwrap().user = credentials.user;
+        Ok(source)
     }
     pub(crate) async fn open_with(
         root: &Path,
@@ -136,6 +149,11 @@ impl Source {
         let directory = root.join("sources").join(&record.source_id);
         std::fs::create_dir_all(&directory)?;
         let runtime = open_runtime(root, record, &descriptor, replay).await?;
+        let needs_login = if descriptor.kind == "library" {
+            connection.is_none()
+        } else {
+            !descriptor.auth_methods.is_empty() && credential.is_null()
+        };
         Ok(Self {
             record: record.clone(),
             descriptor: Mutex::new(descriptor),
@@ -144,10 +162,11 @@ impl Source {
             credentials: Mutex::new(Credentials {
                 credential,
                 connection,
+                user: None,
             }),
             generation: AtomicU64::new(0),
             refresh: tokio::sync::Mutex::new(()),
-            needs_login: Mutex::new(false),
+            needs_login: Mutex::new(needs_login),
             active: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(0),
         })
@@ -157,6 +176,10 @@ impl Source {
     }
     pub fn needs_login(&self) -> bool {
         *self.needs_login.lock().unwrap()
+    }
+    /// Last authenticated user's presentation data (never credentials).
+    pub fn user(&self) -> Option<Value> {
+        self.credentials.lock().unwrap().user.clone()
     }
     pub fn redacted_connection(&self) -> Option<BTreeMap<String, String>> {
         let descriptor = self.descriptor();
@@ -319,6 +342,13 @@ impl Source {
             Ok(())
         };
         self.set_credential(Value::Null, false)?;
+        {
+            let mut credentials = self.credentials.lock().unwrap();
+            credentials.connection = None;
+            credentials.user = None;
+        }
+        self.persist_credentials()?;
+        *self.needs_login.lock().unwrap() = true;
         remote
     }
 }
@@ -354,6 +384,8 @@ impl LoginDraft {
         }
         self.source
             .set_credential(login.credential.clone(), false)?;
+        self.source.credentials.lock().unwrap().user = login.user.clone();
+        self.source.persist_credentials()?;
         self.authenticated = true;
         Ok(login)
     }

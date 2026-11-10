@@ -120,6 +120,9 @@ pub struct RuntimeOptions {
     pub native_modules: BTreeMap<String, NativeModule>,
     pub log: Option<Arc<dyn Fn(LogRecord) + Send + Sync>>,
     pub http_hook: Option<Arc<dyn Fn(HttpEvent) + Send + Sync>>,
+    /// Rewrite every fetch URL before transport (for isolated fixture replay).
+    /// Redirects are returned to the caller when installed, never followed outside the hook.
+    pub fetch_url: Option<Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>>,
 }
 impl Default for RuntimeOptions {
     fn default() -> Self {
@@ -132,6 +135,7 @@ impl Default for RuntimeOptions {
             native_modules: BTreeMap::new(),
             log: None,
             http_hook: None,
+            fetch_url: None,
         }
     }
 }

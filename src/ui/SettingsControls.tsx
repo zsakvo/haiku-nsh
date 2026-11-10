@@ -2,12 +2,12 @@ import { Text, View } from "nsh";
 import { Select as BaseSelect, Slider as BaseSlider, Switch as BaseSwitch } from "nsh/base";
 import { focus } from "./Button";
 import { popupItem, popupSurface } from "./Surfaces";
-export function SettingSwitch(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+export function SettingSwitch(props: { label: string; hideLabel?: boolean; checked: boolean; onChange: (checked: boolean) => void }) {
   return <BaseSwitch checked={props.checked} onChange={(e) => props.onChange(e.checked)}
     accessibilityLabel={props.label} class={`min-h-8 flex-row items-center gap-3 ${focus}`}
     trackClass="w-9 rounded-full bg-muted p-0.5 checked:bg-primary disabled:opacity-40"
     thumbClass="size-4 rounded-full bg-background checked:translate-x-4">
-    <Text class="text-sm text-foreground">{props.label}</Text>
+    <If when={!props.hideLabel}><Text class="text-sm text-foreground">{props.label}</Text></If>
   </BaseSwitch>;
 }
 export function SettingSlider(props: { label: string; value: number; min: number; max: number; step?: number; disabled?: boolean; onChange: (value: number) => void; testID?: string }) {

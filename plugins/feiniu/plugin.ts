@@ -1,4 +1,5 @@
 import { definePlugin, field, AuthRequired, AuthExpired, NotFound, RateLimited, Upstream } from 'haiku';
+import { Buffer } from 'buffer';
 import type { Context, Track, Album, Artist, Playlist, Page, PageArgs, Stream } from 'haiku';
 
 type Remote = {
@@ -14,19 +15,70 @@ type Remote = {
   releaseDate?: string;
 };
 type Envelope<T> = { code: number; msg?: string; data: T };
-type Session = { token: string; deviceId: string };
+type Session = {
+  token: string;
+  deviceId: string;
+  baseUrl: string;
+  relayMode: boolean;
+  fnId?: string;
+};
 const prefix = '/music/api/v1';
-function base(ctx: Context, conn = ctx.connection) {
-  if (!conn?.baseUrl) throw new AuthRequired();
-  return conn.baseUrl.replace(/\/+$/, '').replace(/\/music(?:\/api\/v1)?$/, '');
+const relayApi = 'https://5ddd.com/api/v1/fn/con';
+function normalize(input: string) {
+  let value = input.trim();
+  if (!/^https?:\/\//i.test(value)) value = `http://${value}`;
+  return value.replace(/\/+$/, '').replace(/\/music(?:\/api\/v1)?$/i, '');
+}
+async function resolve(ctx: Context, input: string) {
+  const value = input.trim();
+  // Match reference isFnId before URL normalization; identity still uses field.url.
+  if (value.length < 6 || /^https?:\/\//i.test(value)) {
+    return { baseUrl: normalize(value), relayMode: false };
+  }
+  const body = { fnId: value };
+  const md5 = (text: string) => ctx.crypto.createHash('md5').update(text).digest('hex');
+  const bytes = Array.from(ctx.crypto.randomBytes(4));
+  const nonce = String(bytes.reduce((n, byte) => n * 256 + byte, 0) % 900000 + 100000);
+  const timestamp = String(Date.now());
+  const sign = md5([
+    'NDzZTVxnRKP8Z0jXg1VAMonaG8akvh', '/api/v1/fn/con', nonce, timestamp,
+    md5(JSON.stringify(body)), 'zIGtkc3dqZnJpd29qZXJqa2w7c',
+  ].join('_'));
+  const response = await ctx.http.post(relayApi, {
+    json: body,
+    headers: { authx: `nonce=${nonce}&timestamp=${timestamp}&sign=${sign}` },
+    throwOnError: false,
+  }).response();
+  const result = await decode<{ fn?: string[] }>(response, true);
+  const address = result.fn?.find(Boolean) || `${value}.5ddd.com`;
+  const host = address.replace(/^https?:\/\//i, '').replace(/:\d+\/?$/, '')
+    .replace(/\/+$/, '');
+  if (!host) throw new Upstream('中继响应缺少地址');
+  return { baseUrl: `https://${host}`, relayMode: true, fnId: value };
+}
+function base(ctx: Context) {
+  if (!ctx.connection) throw new AuthRequired();
+  const session = ctx.storage.get<Session>('feiniu.session');
+  if (!session?.baseUrl) throw new AuthRequired();
+  return session.baseUrl;
 }
 function endpoint(ctx: Context, path: string) {
   return base(ctx) + prefix + path;
 }
+function accessHeaders(ctx: Context): Record<string, string> {
+  const code = ctx.connection?.accessCode;
+  return code ? {
+    'x-access-code': Buffer.from(code, 'utf8').toString('base64'),
+    'x-access-source': 'app',
+  } : {};
+}
 function headers(ctx: Context) {
   const session = ctx.storage.get<Session>('feiniu.session');
   if (!session?.token) throw new AuthRequired();
-  return { Cookie: `music-token=${session.token}` };
+  return {
+    ...accessHeaders(ctx),
+    Cookie: `music-token=${session.token}${session.relayMode ? '; mode=relay' : ''}`,
+  };
 }
 async function decode<T>(response: Response, login = false): Promise<T> {
   if (response.status === 401) throw login ? new AuthRequired() : new AuthExpired();
@@ -46,9 +98,14 @@ async function login(ctx: Context, conn = ctx.connection) {
   if (!conn?.username || !conn.password) throw new AuthRequired();
   const deviceId = ctx.storage.get<Session>('feiniu.session')?.deviceId
     || ctx.crypto.randomBytes(16).toString('hex');
-  const response = await ctx.http.post(base(ctx, conn) + prefix + '/user/password-login', {
+  const connection = await resolve(ctx, conn.baseUrl);
+  const response = await ctx.http.post(connection.baseUrl + prefix + '/user/password-login', {
+    headers: {
+      ...accessHeaders({ ...ctx, connection: conn }),
+      ...(connection.relayMode ? { Cookie: 'mode=relay' } : {}),
+    },
     json: {
-      username: conn.username,
+      username: conn.username.trim(),
       password: ctx.crypto.createHash('sha256').update(conn.password).digest('hex'),
       deviceId,
     },
@@ -56,7 +113,7 @@ async function login(ctx: Context, conn = ctx.connection) {
   }).response();
   const result = await decode<{ userToken: string }>(response, true);
   if (!result.userToken) throw new AuthRequired('Missing user token');
-  ctx.storage.set('feiniu.session', { token: result.userToken, deviceId });
+  ctx.storage.set('feiniu.session', { ...connection, token: result.userToken, deviceId });
   return { token: result.userToken };
 }
 async function request<T>(ctx: Context, path: string, query: Record<string, string | number> = {}) {
@@ -137,9 +194,10 @@ export default definePlugin({
   version: '2.0.0',
   connection: {
     fields: {
-      baseUrl: field.url('服务器地址'),
+      baseUrl: field.url('服务器地址或 FNID'),
       username: field.text('用户名'),
       password: field.secret('密码'),
+      accessCode: field.secret('安全码（可选）', { required: false }),
     },
     identity: ['baseUrl', 'username'],
     async verify(conn, ctx) {

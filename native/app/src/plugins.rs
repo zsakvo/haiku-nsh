@@ -1,0 +1,501 @@
+//! Plugin settings bridge. The host owns packages, sources, credentials and login drafts.
+use haiku_plugins::{Cancellation, Host, LoginDraft, QrSession};
+use nsh_core::{
+    JsonValue,
+    element::{Trace, Tracer},
+    prelude::*,
+};
+use serde_json::json;
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
+
+#[derive(Clone, Default)]
+struct Listeners(Rc<RefCell<BTreeMap<u64, Callback<JsonValue>>>>);
+unsafe impl Trace for Listeners {
+    fn trace(&self, t: &mut Tracer<'_>) {
+        self.0.as_ref().trace(t);
+    }
+}
+struct Login {
+    draft: LoginDraft,
+    qr: Option<QrSession>,
+    cancel: Cancellation,
+}
+/// Packages, sources and plugin development tools. All writes commit in Rust.
+#[class]
+pub struct PluginService {
+    host: Arc<Host>,
+    listeners: Listeners,
+    event_listeners: Listeners,
+    alive: Rc<std::cell::Cell<bool>>,
+    next: u64,
+    fixtures: Arc<Mutex<Vec<haiku_plugins::contract::ReplayServer>>>,
+    logins: Arc<tokio::sync::Mutex<BTreeMap<String, Login>>>,
+    cancellations: Arc<Mutex<BTreeMap<String, Cancellation>>>,
+}
+impl PluginService {
+    pub(crate) fn new(host: Arc<Host>) -> Instance<Self> {
+        let event_listeners = Listeners::default();
+        let listeners = event_listeners.clone();
+        let alive = Rc::new(std::cell::Cell::new(true));
+        let running = alive.clone();
+        let mut events = host.subscribe_events();
+        // Rust async initialization is entered under the engine's reactive graph;
+        // synchronous JS class calls are not. Keep the pump at this boundary.
+        Owner::detached().run(|| {
+            spawn(async move {
+                while running.get() {
+                    loop {
+                        match events.try_recv() {
+                            Ok(event) => {
+                                let callbacks: Vec<_> =
+                                    listeners.0.borrow().values().cloned().collect();
+                                for callback in callbacks {
+                                    if running.get() {
+                                        callback.post(event.clone());
+                                    }
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+                            Err(_) => break,
+                        }
+                    }
+                    timer(std::time::Duration::from_millis(100)).await;
+                }
+            });
+        });
+        Instance::new(Self {
+            host,
+            listeners: Listeners::default(),
+            event_listeners,
+            alive,
+            next: 0,
+            fixtures: Arc::default(),
+            logins: Arc::default(),
+            cancellations: Arc::default(),
+        })
+    }
+    pub(crate) fn host(this: &Instance<Self>) -> Arc<Host> {
+        this.with(|s| s.host.clone())
+    }
+    fn notify(this: &Instance<Self>, value: &JsonValue) {
+        let listeners = this.with(|s| s.listeners.clone());
+        let callbacks: Vec<_> = listeners.0.borrow().values().cloned().collect();
+        for callback in callbacks {
+            callback.post(value.clone());
+        }
+    }
+    async fn snapshot(host: Arc<Host>) -> Result<JsonValue, String> {
+        background(async move {
+            let packages = host
+                .packages()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|p| {
+                    let mut descriptor = serde_json::to_value(&p.descriptor).unwrap();
+                    descriptor["enabled"] = json!(host.package_enabled(&p.descriptor.id));
+                    descriptor
+                })
+                .collect::<Vec<_>>();
+            let sources = host
+                .records()
+                .into_iter()
+                .map(|r| {
+                    let mut value = serde_json::to_value(&r).unwrap();
+                    if let Ok(source) = host.source(&r.source_id) {
+                        value["needsLogin"] = json!(source.needs_login());
+                        value["user"] = json!(source.user());
+                        value["connection"] = json!(source.redacted_connection());
+                    }
+                    value
+                })
+                .collect::<Vec<_>>();
+            Ok(json!({"packages":packages,"sources":sources,"errors":host.source_errors()}))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    async fn changed(this: &Instance<Self>) -> Result<JsonValue, String> {
+        let value = Self::snapshot(Self::host(this)).await?;
+        Self::notify(this, &value);
+        Ok(value)
+    }
+}
+impl Drop for PluginService {
+    fn drop(&mut self) {
+        self.alive.set(false);
+        for cancel in self.cancellations.lock().unwrap().values() {
+            cancel.cancel();
+        }
+    }
+}
+#[class]
+impl PluginService {
+    /// Read installed descriptors and committed sources (secret connection fields are redacted).
+    pub async fn list(this: Instance<Self>) -> Result<JsonValue, String> {
+        Self::snapshot(Self::host(&this)).await
+    }
+    /// Subscribe to committed writes through this bridge. Call list for the initial snapshot.
+    pub fn on_change(&mut self, #[args(snapshot)] callback: Callback<JsonValue>) -> Stop {
+        self.next += 1;
+        let id = self.next;
+        self.listeners.0.borrow_mut().insert(id, callback);
+        let listeners = self.listeners.clone();
+        Stop::new(move || {
+            listeners.0.borrow_mut().remove(&id);
+        })
+    }
+    /// Hear redacted log/HTTP events from this host. Stop prevents further callbacks.
+    pub fn on_event(&mut self, #[args(event)] callback: Callback<JsonValue>) -> Stop {
+        self.next += 1;
+        let id = self.next;
+        self.event_listeners.0.borrow_mut().insert(id, callback);
+        let listeners = self.event_listeners.clone();
+        Stop::new(move || {
+            listeners.0.borrow_mut().remove(&id);
+        })
+    }
+    /// Start a loopback fixture server for an explicit offline developer preview.
+    pub async fn start_fixture(this: Instance<Self>, plugin: String) -> Result<String, String> {
+        let host = Self::host(&this);
+        let fixtures = this.with(|s| s.fixtures.clone());
+        background(async move {
+            let server =
+                haiku_plugins::contract::ReplayServer::from_package(&host.package(&plugin)?.path)?;
+            let url = server.url().to_string();
+            fixtures.lock().unwrap().push(server);
+            Ok::<_, haiku_plugins::PluginError>(url)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+    }
+    /// Stop explicit fixture previews when the test or preview surface closes.
+    pub async fn stop_fixtures(this: Instance<Self>) -> Result<(), String> {
+        let fixtures = this.with(|s| s.fixtures.clone());
+        background(async move {
+            fixtures.lock().unwrap().clear();
+        })
+        .await
+        .map_err(|e| e.to_string())
+    }
+    /// Reserve a cancellable library connection draft before verification starts.
+    pub fn begin_connection(&mut self) -> String {
+        self.next += 1;
+        let id = format!("connection-{}", self.next);
+        self.cancellations
+            .lock()
+            .unwrap()
+            .insert(id.clone(), Cancellation::default());
+        id
+    }
+    /// Verify connection fields before registering a library; failed attempts roll back.
+    pub async fn connect(
+        this: Instance<Self>,
+        plugin: String,
+        values: JsonValue,
+        name: Option<String>,
+        request: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let cancel = this.with(|s| {
+            request
+                .as_ref()
+                .and_then(|id| s.cancellations.lock().unwrap().get(id).cloned())
+        });
+        let values = serde_json::from_value(values).map_err(|e| e.to_string())?;
+        background(async move {
+            host.connect_cancellable(&plugin, values, name, cancel.as_ref())
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Enable or disable one existing source, cancelling its active calls when disabled.
+    pub async fn set_enabled(
+        this: Instance<Self>,
+        source: String,
+        enabled: bool,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            host.set_enabled(&source, enabled)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Apply package enablement to its instances; activate public packages on first use.
+    pub async fn set_package_enabled(
+        this: Instance<Self>,
+        plugin: String,
+        enabled: bool,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            host.set_package_enabled(&plugin, enabled)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Persist a complete ordering of source ids.
+    pub async fn reorder(this: Instance<Self>, ids: Vec<String>) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { host.reorder(&ids).await.map_err(|e| e.to_string()) })
+            .await
+            .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Change the display name without changing a source identity.
+    pub async fn rename(
+        this: Instance<Self>,
+        source: String,
+        name: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { host.rename(&source, name).await.map_err(|e| e.to_string()) })
+            .await
+            .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Remove a source and its local credentials/storage after caller confirmation.
+    pub async fn remove(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { host.remove_source(&source).await.map_err(|e| e.to_string()) })
+            .await
+            .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Log out; local credentials are cleared even if remote logout fails.
+    pub async fn logout(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let result = background(async move { host.source(&source)?.logout().await })
+            .await
+            .map_err(|e| e.to_string())?;
+        let snapshot = Self::changed(&this).await?;
+        result.map_err(|e| e.to_string())?;
+        Ok(snapshot)
+    }
+    /// Import a directory, ZIP or single TypeScript file, or download an HTTPS ZIP/package.
+    pub async fn import_package(
+        this: Instance<Self>,
+        location: String,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            host.import_location(&location)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Delete an unused third-party package; the host rejects builtins and referenced packages.
+    pub async fn delete_package(this: Instance<Self>, plugin: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            host.remove_package(&plugin)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
+    /// Begin a temporary platform login. Closing the surface must call cancelLogin.
+    pub async fn begin_login(this: Instance<Self>, plugin: String) -> Result<String, String> {
+        let (logins, cancellations, id) = this.with_mut(|s| {
+            s.next += 1;
+            (
+                s.logins.clone(),
+                s.cancellations.clone(),
+                format!("login-{}", s.next),
+            )
+        });
+        let host = Self::host(&this);
+        let key = id.clone();
+        let cancel = Cancellation::default();
+        cancellations
+            .lock()
+            .unwrap()
+            .insert(id.clone(), cancel.clone());
+        let result = background(async move {
+            let draft = host.begin_login(&plugin).await.map_err(|e| e.to_string())?;
+            if cancel.is_cancelled() {
+                return Err("Login cancelled".into());
+            }
+            logins.lock().await.insert(
+                key,
+                Login {
+                    draft,
+                    qr: None,
+                    cancel,
+                },
+            );
+            Ok::<_, String>(())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        if result.is_err() {
+            cancellations.lock().unwrap().remove(&id);
+        }
+        result?;
+        Ok(id)
+    }
+    /// Drive password/cookie/SMS/web/QR authentication; only a successful login is committed.
+    pub async fn login_step(
+        this: Instance<Self>,
+        id: String,
+        action: String,
+        input: JsonValue,
+    ) -> Result<JsonValue, String> {
+        let sessions = this.with(|s| s.logins.clone());
+        let key = id.clone();
+        let result = background(async move {
+            let mut sessions = sessions.lock().await;
+            let login = sessions.get_mut(&key).ok_or("Login is closed")?;
+            let cancel = Some(&login.cancel);
+            let text = input.as_str().unwrap_or("");
+            let mut done = false;
+            let result = match action.as_str() {
+                "password" => {
+                    let values = serde_json::from_value(input).map_err(|e| e.to_string())?;
+                    login.draft.password(values, cancel).await.map(|r| {
+                        done = true;
+                        json!(r.user)
+                    })
+                }
+                "cookie" => login.draft.cookie(text, cancel).await.map(|r| {
+                    done = true;
+                    json!(r.user)
+                }),
+                "sms.send" => login.draft.sms_send(text, cancel).await,
+                "sms.verify" => login.draft.sms_verify(text, cancel).await.map(|r| {
+                    done = true;
+                    json!(r.user)
+                }),
+                "web" => login.draft.web_done(input, cancel).await.map(|r| {
+                    done = r.is_some();
+                    json!(r.map(|r| r.user))
+                }),
+                "qrcode.start" => {
+                    let qr = login
+                        .draft
+                        .qrcode_start(text, login.cancel.clone())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let presentation = qr.presentation.clone();
+                    login.qr = Some(qr);
+                    Ok(presentation)
+                }
+                "qrcode.poll" => {
+                    let qr = login.qr.as_mut().ok_or("Start QR first")?;
+                    login.draft.qrcode_poll(qr).await.map(|r| {
+                        done = r["status"] == "done";
+                        r
+                    })
+                }
+                _ => return Err("Unknown login action".into()),
+            }
+            .map_err(|e| e.to_string())?;
+            if done {
+                let login = sessions.remove(&key).unwrap();
+                login.draft.commit().await.map_err(|e| e.to_string())?;
+            }
+            Ok::<_, String>(json!({"done":done,"result":result}))
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        if result.is_err() || result.as_ref().is_ok_and(|v| v["done"] == true) {
+            Self::cancel_login(this.clone(), id).await?;
+        }
+        if result.as_ref().is_ok_and(|v| v["done"] == true) {
+            Self::changed(&this).await?;
+        }
+        result
+    }
+    /// Cancel in-flight auth immediately, then remove the temporary instance.
+    pub async fn cancel_login(this: Instance<Self>, id: String) -> Result<(), String> {
+        let sessions = this.with(|s| {
+            if let Some(cancel) = s.cancellations.lock().unwrap().remove(&id) {
+                cancel.cancel();
+            }
+            s.logins.clone()
+        });
+        background(async move {
+            sessions.lock().await.remove(&id);
+        })
+        .await
+        .map_err(|e| e.to_string())
+    }
+    /// Invoke a selected instance capability; return schema warnings alongside its JSON value.
+    pub async fn invoke(
+        this: Instance<Self>,
+        source: String,
+        path: String,
+        args: Vec<JsonValue>,
+        context: JsonValue,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            let value = host
+                .source(&source)?
+                .invoke(&path, args, context, None)
+                .await?;
+            let warnings: Vec<_> = haiku_plugins::contract::inferred_schema(&path)
+                .and_then(|schema| haiku_plugins::contract::validate_schema(&schema, &value).err())
+                .map(|e| vec![e.to_string()])
+                .unwrap_or_default();
+            Ok::<_, haiku_plugins::PluginError>(json!({"value":value,"warnings":warnings}))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+    }
+    /// Run the package's offline contract fixtures without contacting the upstream service.
+    pub async fn test_contract(this: Instance<Self>, plugin: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            let package = host.package(&plugin)?;
+            let report = haiku_plugins::contract::run_contract(
+                &package.path,
+                haiku_plugins::contract::ContractMode::Replay,
+            )
+            .await?;
+            Ok::<_, haiku_plugins::PluginError>(serde_json::to_value(report)?)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+    }
+    /// Read instance KV data. Credentials are represented only by redacted connection fields.
+    pub async fn storage(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { host.debug_storage(&source).await })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+    }
+    /// Clear the selected instance's KV store through its own runtime.
+    pub async fn clear_storage(this: Instance<Self>, source: String) -> Result<(), String> {
+        let host = Self::host(&this);
+        background(async move { host.clear_storage(&source).await })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+    }
+}

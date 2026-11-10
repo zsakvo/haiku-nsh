@@ -163,22 +163,27 @@ impl Host {
             errors: Mutex::default(),
             replay_base,
         });
-        for (id, source) in [
+        for (id, source, fixture) in [
             (
                 "subsonic.music",
                 include_bytes!("../../../../plugins/subsonic/plugin.ts").as_slice(),
+                include_bytes!("../../../../plugins/subsonic/fixtures/contract.json").as_slice(),
             ),
             (
                 "feiniu.music",
                 include_bytes!("../../../../plugins/feiniu/plugin.ts").as_slice(),
+                include_bytes!("../../../../plugins/feiniu/fixtures/contract.json").as_slice(),
             ),
             (
                 "qq.scraper",
                 include_bytes!("../../../../plugins/qq-scraper/plugin.ts").as_slice(),
+                include_bytes!("../../../../plugins/qq-scraper/fixtures/contract.json").as_slice(),
             ),
             (
                 "kugou.scraper",
                 include_bytes!("../../../../plugins/kugou-scraper/plugin.ts").as_slice(),
+                include_bytes!("../../../../plugins/kugou-scraper/fixtures/contract.json")
+                    .as_slice(),
             ),
         ] {
             if !host
@@ -189,7 +194,10 @@ impl Host {
                 .exists()
             {
                 host.install_files(
-                    BTreeMap::from([("plugin.ts".into(), source.to_vec())]),
+                    BTreeMap::from([
+                        ("plugin.ts".into(), source.to_vec()),
+                        ("fixtures/contract.json".into(), fixture.to_vec()),
+                    ]),
                     true,
                 )
                 .await?;
@@ -225,6 +233,10 @@ impl Host {
         }
         hosts.lock().unwrap().insert(data, Arc::downgrade(&host));
         Ok(host)
+    }
+    /// Observe this host's redacted plugin log and HTTP events; receiver lag drops old entries.
+    pub fn subscribe_events(&self) -> tokio::sync::broadcast::Receiver<Value> {
+        crate::events::sender(&self.root).subscribe()
     }
     pub fn source_errors(&self) -> BTreeMap<String, PluginError> {
         self.errors.lock().unwrap().clone()
@@ -506,6 +518,79 @@ impl Host {
             }
         }
     }
+    /// Import a local package or bounded HTTPS ZIP/TypeScript download.
+    pub async fn import_location(&self, location: &str) -> Result<Descriptor> {
+        let path = Path::new(location);
+        if path.is_dir() {
+            return self.install_directory(path, false).await;
+        }
+        let (bytes, typescript) = if location.starts_with("https://") {
+            let client = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|e| PluginError::new("UPSTREAM_ERROR", e.to_string()))?;
+            let mut response = client
+                .get(location)
+                .timeout(std::time::Duration::from_secs(30))
+                .send()
+                .await
+                .map_err(|e| PluginError::new("UPSTREAM_ERROR", e.to_string()))?
+                .error_for_status()
+                .map_err(|e| PluginError::new("UPSTREAM_ERROR", e.to_string()))?;
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response
+                .chunk()
+                .await
+                .map_err(|e| PluginError::new("UPSTREAM_ERROR", e.to_string()))?
+            {
+                if bytes.len() + chunk.len() > 10 * 1024 * 1024 {
+                    return Err(PluginError::new(
+                        "INVALID_PACKAGE",
+                        "Download exceeds 10 MiB",
+                    ));
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            let url = url::Url::parse(location)
+                .map_err(|e| PluginError::new("INVALID_ARGUMENT", e.to_string()))?;
+            (bytes, url.path().ends_with(".ts"))
+        } else {
+            if location.contains("://") {
+                return Err(PluginError::new("INVALID_ARGUMENT", "Use HTTPS"));
+            }
+            let metadata = std::fs::metadata(path)?;
+            if metadata.len() > 10 * 1024 * 1024 {
+                return Err(PluginError::new("INVALID_PACKAGE", "File exceeds 10 MiB"));
+            }
+            (
+                std::fs::read(path)?,
+                path.extension().is_some_and(|v| v == "ts"),
+            )
+        };
+        if typescript {
+            self.install_files(BTreeMap::from([("plugin.ts".into(), bytes)]), false)
+                .await
+        } else {
+            self.install_zip(&bytes).await
+        }
+    }
+    /// Inspect KV without reading stale files while the VM is active.
+    pub async fn debug_storage(&self, id: &str) -> Result<Value> {
+        let source = self.source(id)?;
+        let runtime = source.runtime.read().await;
+        Ok(runtime
+            .call("debugStorage", "null", std::time::Duration::from_secs(5))
+            .await?)
+    }
+    /// Clear KV in the VM, atomically persisting through the storage binding.
+    pub async fn clear_storage(&self, id: &str) -> Result<()> {
+        let source = self.source(id)?;
+        let runtime = source.runtime.read().await;
+        runtime
+            .call("clearStorage", "null", std::time::Duration::from_secs(5))
+            .await?;
+        Ok(())
+    }
     pub async fn remove_package(&self, id: &str) -> Result<()> {
         let _transaction = self.transaction.lock().await;
         let package = self.package(id)?;
@@ -521,11 +606,30 @@ impl Host {
     pub async fn connect(
         self: &Arc<Self>,
         plugin: &str,
-        mut values: BTreeMap<String, String>,
+        values: BTreeMap<String, String>,
         name: Option<String>,
     ) -> Result<Arc<Source>> {
+        self.connect_cancellable(plugin, values, name, None).await
+    }
+    /// Connect with an optional UI cancellation token, rolling back failed/closed drafts.
+    pub async fn connect_cancellable(
+        self: &Arc<Self>,
+        plugin: &str,
+        values: BTreeMap<String, String>,
+        name: Option<String>,
+        cancel: Option<&crate::Cancellation>,
+    ) -> Result<Arc<Source>> {
         let _transaction = self.transaction.lock().await;
+        if cancel.is_some_and(|c| c.is_cancelled()) {
+            return Err(PluginError::new("CANCELLED", "Connection cancelled"));
+        }
         let descriptor = self.package(plugin)?.descriptor;
+        if !self.package_enabled(plugin) {
+            return Err(PluginError::new(
+                "PLUGIN_DISABLED",
+                "Enable the package before connecting",
+            ));
+        }
         if descriptor.kind != "library" {
             return Err(PluginError::new(
                 "INVALID_ARGUMENT",
@@ -540,11 +644,6 @@ impl Host {
                         "INVALID_ARGUMENT",
                         format!("Missing {key}"),
                     ));
-                }
-                if field["type"] == "url" {
-                    if let Some(v) = values.get_mut(key) {
-                        *v = descriptor::normalize_source_url(v);
-                    }
                 }
             }
         }
@@ -589,8 +688,11 @@ impl Host {
             )
             .await?;
             source
-                .call_raw("connection.verify", vec![json!(values)], json!({}), None)
+                .call_raw("connection.verify", vec![json!(values)], json!({}), cancel)
                 .await?;
+            if cancel.is_some_and(|c| c.is_cancelled()) {
+                return Err(PluginError::new("CANCELLED", "Connection cancelled"));
+            }
             source.persist_credentials()?;
             let mut next = self.registry.lock().unwrap().clone();
             if let Some(previous) = next.sources.iter_mut().find(|s| s.source_id == id) {
@@ -636,6 +738,12 @@ impl Host {
         draft.commit().await
     }
     pub async fn begin_login(self: &Arc<Self>, plugin: &str) -> Result<LoginDraft> {
+        if !self.package_enabled(plugin) {
+            return Err(PluginError::new(
+                "PLUGIN_DISABLED",
+                "Enable the package before login",
+            ));
+        }
         let descriptor = self.package(plugin)?.descriptor;
         if descriptor.kind == "library" {
             return Err(PluginError::new(
@@ -730,6 +838,63 @@ impl Host {
             }
         }
     }
+    /// Package enablement is independent of whether an account has been added.
+    pub fn package_enabled(&self, id: &str) -> bool {
+        !self
+            .registry
+            .lock()
+            .unwrap()
+            .extra
+            .get("disabledPlugins")
+            .and_then(Value::as_array)
+            .is_some_and(|ids| ids.iter().any(|v| v == id))
+    }
+    /// Atomically change a package and its instances, preparing all VMs before committing.
+    pub async fn set_package_enabled(&self, id: &str, enabled: bool) -> Result<()> {
+        let _transaction = self.transaction.lock().await;
+        let descriptor = self.package(id)?.descriptor;
+        let mut next = self.registry.lock().unwrap().clone();
+        let mut disabled = next
+            .extra
+            .get("disabledPlugins")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        disabled.retain(|v| v != id);
+        if !enabled {
+            disabled.push(json!(id));
+        }
+        next.extra.insert("disabledPlugins".into(), json!(disabled));
+        let mut replacements = Vec::new();
+        for record in next.sources.iter_mut().filter(|r| r.plugin_id == id) {
+            record.enabled = enabled;
+            let source = if enabled {
+                Some(Arc::new(
+                    Source::open(
+                        &self.root,
+                        record,
+                        descriptor.clone(),
+                        self.replay_base.as_deref(),
+                    )
+                    .await?,
+                ))
+            } else {
+                None
+            };
+            replacements.push((record.source_id.clone(), source));
+        }
+        self.save(next)?;
+        let mut sources = self.sources.lock().unwrap();
+        for (id, replacement) in replacements {
+            if let Some(old) = sources.remove(&id) {
+                old.cancel_all();
+            }
+            if let Some(source) = replacement {
+                sources.insert(id, source);
+            }
+        }
+        Ok(())
+    }
     pub async fn set_enabled(&self, id: &str, enabled: bool) -> Result<()> {
         let _transaction = self.transaction.lock().await;
         let mut next = self.registry.lock().unwrap().clone();
@@ -738,6 +903,12 @@ impl Host {
             .iter_mut()
             .find(|r| r.source_id == id)
             .ok_or_else(|| PluginError::new("NOT_FOUND", "Unknown source"))?;
+        if enabled && !self.package_enabled(&record.plugin_id) {
+            return Err(PluginError::new(
+                "PLUGIN_DISABLED",
+                "Enable the package first",
+            ));
+        }
         record.enabled = enabled;
         let replacement = if enabled {
             Some(Arc::new(

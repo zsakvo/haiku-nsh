@@ -71,7 +71,7 @@ fn http_error(error: reqwest::Error) -> String {
     if error.is_timeout() {
         "Request timed out".into()
     } else {
-        error.to_string()
+        error.without_url().to_string()
     }
 }
 
@@ -113,6 +113,21 @@ struct ResponseData {
 }
 
 pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs::Result<()> {
+    ctx.globals().set(
+        "__timerSleep",
+        Func::from(Async(
+            |delay: u64, signal: Class<'js, AbortSignal<'js>>| async move {
+                let cancelled = signal.borrow().sender.subscribe();
+                if signal.borrow().aborted {
+                    return false;
+                }
+                tokio::select! {
+                    _ = cancelled.recv() => false,
+                    _ = tokio::time::sleep(Duration::from_millis(delay)) => true,
+                }
+            },
+        )),
+    )?;
     let path = options.storage_path.clone();
     let initial: BTreeMap<String, serde_json::Value> = match path.as_ref().filter(|p| p.exists()) {
         Some(path) => serde_json::from_slice(
@@ -131,6 +146,9 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                   value: String|
                   -> rquickjs::Result<String> {
                 let mut guard = storage.lock().unwrap();
+                if action == "dump" {
+                    return Ok(serde_json::to_string(&*guard).unwrap());
+                }
                 if action == "get" {
                     return Ok(guard
                         .get(&key)
@@ -188,6 +206,7 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
         }),
     )?;
     let hook = options.http_hook.clone();
+    let fetch_url = options.fetch_url.clone();
     let id = options.instance_id.clone();
     // Separate policies keep redirect semantics explicit, sharing connection pools per instance.
     let client = reqwest::Client::builder()
@@ -205,6 +224,7 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                 let client = client.clone();
                 let direct = direct.clone();
                 let hook = hook.clone();
+                let fetch_url = fetch_url.clone();
                 let id = id.clone();
                 async move {
                     let data: RequestData = serde_json::from_str(&text)
@@ -215,13 +235,16 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                     }
                     let method = reqwest::Method::from_bytes(data.method.as_bytes())
                         .map_err(|e| Exception::throw_type(&ctx, &e.to_string()))?;
-                    let mut request = if data.redirect == "follow" {
-                        &client
-                    } else {
-                        &direct
-                    }
-                    .request(method, &data.url)
-                    .timeout(Duration::from_millis(data.timeout));
+                    let target = match &fetch_url {
+                        Some(rewrite) => {
+                            rewrite(&data.url).map_err(|e| Exception::throw_message(&ctx, &e))?
+                        }
+                        None => data.url.clone(),
+                    };
+                    let follow = data.redirect == "follow" && fetch_url.is_none();
+                    let mut request = if follow { &client } else { &direct }
+                        .request(method, &target)
+                        .timeout(Duration::from_millis(data.timeout));
                     for (key, value) in &data.headers {
                         request = request.header(key, value);
                     }
@@ -242,16 +265,16 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                         });
                     }
                     let operation = async {
-                        let response = if data.redirect == "follow" {
-                            &client
-                        } else {
-                            &direct
-                        }
-                        .execute(request)
-                        .await
-                        .map_err(http_error)?;
+                        let response = if follow { &client } else { &direct }
+                            .execute(request)
+                            .await
+                            .map_err(http_error)?;
                         let status = response.status().as_u16();
-                        let url = response.url().to_string();
+                        let url = if fetch_url.is_some() {
+                            data.url.clone()
+                        } else {
+                            response.url().to_string()
+                        };
                         if let Some(hook) = &hook {
                             hook(HttpEvent {
                                 instance_id: id,
@@ -304,6 +327,36 @@ const BOOTSTRAP: &str = r#"
 (() => {
  const { Buffer } = globalThis;
  let currentSignal;
+ const timers = new Map();
+ let timerId = 0;
+ function schedule(callback, delay, repeat, args) {
+   if (typeof callback !== 'function') throw new TypeError('Timer callback must be a function');
+   const id = ++timerId, controller = new AbortController(), owner = currentSignal;
+   const cancel = () => { controller.abort(); timers.delete(id); };
+   if (owner?.aborted) return id;
+   owner?.addEventListener('abort', cancel, { once: true });
+   timers.set(id, cancel);
+   const ms = Math.max(1, Math.min(2147483647, Number(delay) || 0));
+   (async () => {
+     try {
+       do {
+         if (!await __timerSleep(ms, controller.signal) || !timers.has(id)) return;
+         if (!repeat) timers.delete(id);
+         callback(...args);
+       } while (repeat && timers.has(id));
+     } finally {
+       timers.delete(id);
+       owner?.removeEventListener('abort', cancel);
+     }
+   })();
+   return id;
+ }
+ Object.assign(globalThis, {
+   setTimeout: (fn, delay = 0, ...args) => schedule(fn, delay, false, args),
+   setInterval: (fn, delay = 0, ...args) => schedule(fn, delay, true, args),
+   clearTimeout: id => timers.get(id)?.(),
+   clearInterval: id => timers.get(id)?.(),
+ });
  class Headers {
    constructor(init = {}) { this._pairs = []; if (init instanceof Headers) init = init._pairs;
      for (const [k,v] of (Array.isArray(init) ? init : Object.entries(init))) this.append(k,v); }

@@ -1013,3 +1013,45 @@ async fn contract_runs_auth_expired_refresh_and_replay() {
         serde_json::to_string_pretty(&report).unwrap()
     );
 }
+
+#[tokio::test]
+async fn contract_intercepts_bare_fetch_and_traverses_detail_tracks() {
+    let package = tempfile::tempdir().unwrap();
+    std::fs::create_dir(package.path().join("fixtures")).unwrap();
+    std::fs::write(package.path().join("plugin.ts"), r#"
+      import {definePlugin} from 'haiku';
+      export default definePlugin({id:'contract.bare',name:'Bare fetch',version:'1.0.0',
+        album:{get:async(id,ctx)=>{
+          const response = await fetch('https://must-never-resolve.invalid/detail?page='+(ctx.cursor||'1'));
+          return response.json();
+        }}
+      });"#).unwrap();
+    let fixture = json!({"routes":[
+      {"path":"/detail","query":{"page":"1"},"body":{"info":{"id":"a","title":"Album","artists":[]},"tracks":{"items":[{"id":"t1","title":"One","artists":[]}],"next":"2"}}},
+      {"path":"/detail","query":{"page":"2"},"body":{"info":{"id":"a","title":"Album","artists":[]},"tracks":{"items":[{"id":"t2","title":"Two","artists":[]}]}}}
+    ],"cases":[{"name":"detail pages via bare fetch","path":"album.get","args":["a"]}]});
+    let file = package.path().join("fixtures/contract.json");
+    json_file::write(&file, &fixture).unwrap();
+    let report = contract::run_contract(package.path(), contract::ContractMode::Replay)
+        .await
+        .unwrap();
+    assert!(
+        report.passed,
+        "{}",
+        serde_json::to_string_pretty(&report).unwrap()
+    );
+    // A duplicate that exists only on page two must fail the very same case.
+    let mut bad = fixture;
+    bad["routes"][1]["body"]["tracks"]["items"][0]["id"] = json!("t1");
+    json_file::write(&file, &bad).unwrap();
+    let report = contract::run_contract(package.path(), contract::ContractMode::Replay)
+        .await
+        .unwrap();
+    assert!(!report.passed);
+    assert!(
+        report
+            .cases
+            .iter()
+            .any(|c| c.error.as_deref().is_some_and(|e| e.contains("Duplicate")))
+    );
+}

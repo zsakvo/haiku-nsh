@@ -2,6 +2,7 @@
 mod api;
 pub mod contract;
 mod descriptor;
+mod events;
 mod host;
 pub mod scraper;
 mod sdk;

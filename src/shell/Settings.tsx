@@ -1,3 +1,5 @@
+import { createPlugins } from "../state/plugins";
+import { SourcesSettings, PluginsSettings, DeveloperSettings } from "./PluginSettings";
 import { createSettings } from "../state/settings";
 import { PlaybackSettings } from "./PlaybackSettings";
 import { StorageSettings } from "./StorageSettings";
@@ -20,9 +22,10 @@ const categories = [
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; onLibrary?: () => void }) {
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; onLibrary?: () => void }) {
   const selected = signal(props.initialCategory ?? "外观");
   const settings = createSettings();
+  const plugins = createPlugins();
   const query = signal("");
   return <Overlay open={props.open} onClose={props.onClose}>
     <ShellFrame>
@@ -44,15 +47,20 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <IconButton icon="close" label="关闭设置" hint="关闭设置 · Esc" onPress={props.onClose} />
         </ShellToolbar>
         <Scroll class="flex-1" contentClass="flex-col px-(--content-inset) py-4">
-          <View class="w-full max-w-2xl flex-col" style={{ display: selected() === "外观" ? "flex" : "none" }}>
+          {/* Hidden checked Radio rings paint at the zero-size origin; mount only the active panel. */}
+          <If when={selected() === "外观"}><View class="w-full max-w-2xl flex-col">
             <AppearanceOptions appearance={props.appearance} />
-          </View>
+          </View></If>
           <If when={!!settings.value()}>
             <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
             <View class="w-full max-w-2xl" style={{ display: selected() === "存储" ? "flex" : "none" }}><StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} /></View>
           </If>
           <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
-          <View class="flex-col" style={{ display: ["外观", "播放", "存储"].includes(selected()) ? "none" : "flex" }}>
+          <View class="w-full max-w-2xl" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
+          <View class="w-full max-w-2xl" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
+          <View class="w-full max-w-2xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
+          <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
+          <View class="flex-col" style={{ display: ["外观", "播放", "存储", "来源", "插件", "开发者"].includes(selected()) ? "none" : "flex" }}>
             <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
           </View>
         </Scroll>

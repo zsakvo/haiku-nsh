@@ -129,7 +129,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
-    plugins: Arc<haiku_plugins::Host>,
+    plugins: Instance<crate::plugins::PluginService>,
     player: Instance<PlayerService>,
     settings: Instance<crate::settings::SettingsService>,
     library: Instance<crate::library::LibraryService>,
@@ -184,7 +184,7 @@ impl Core {
         let settings = crate::settings::SettingsService::new(settings, bridge.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
-            plugins,
+            plugins: crate::plugins::PluginService::new(plugins),
             settings,
             library,
             player: Instance::new(PlayerService {
@@ -200,6 +200,16 @@ impl Core {
     #[getter]
     pub fn settings(&self) -> Instance<crate::settings::SettingsService> {
         self.settings.clone()
+    }
+    /// Installed plugin packages and developer tooling, shared with the source settings service.
+    #[getter]
+    pub fn plugins(&self) -> Instance<crate::plugins::PluginService> {
+        self.plugins.clone()
+    }
+    /// Committed source registry and temporary authentication workflows.
+    #[getter]
+    pub fn sources(&self) -> Instance<crate::plugins::PluginService> {
+        self.plugins.clone()
     }
     /// The local playback/queue service; position stays in Rust.
     #[getter]
@@ -445,7 +455,9 @@ mod plugin_host_tests {
         spawn(async move {
             let core = Core::open().await.unwrap();
             core.with(|value| {
-                let packages = value.plugins.packages().unwrap();
+                let packages = crate::plugins::PluginService::host(&value.plugins)
+                    .packages()
+                    .unwrap();
                 for (id, kind) in [
                     ("subsonic.music", "library"),
                     ("feiniu.music", "library"),

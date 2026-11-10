@@ -97,14 +97,28 @@ impl ContractReport {
         )
     }
 }
-struct ReplayServer {
+/// Loopback fixture server retained by the contract runner or an explicit developer preview.
+pub struct ReplayServer {
     base: String,
     status: Arc<AtomicU16>,
     unmatched: Arc<Mutex<Vec<String>>>,
     recorded: Arc<Mutex<Vec<HttpFixture>>>,
     thread: Option<std::thread::JoinHandle<()>>,
+    #[cfg(test)]
+    requests: Arc<Mutex<Vec<String>>>,
 }
 impl ReplayServer {
+    /// Serve package fixtures on loopback; no upstream requests are made.
+    pub fn from_package(package: &Path) -> Result<Self> {
+        let fixture: ContractFixture =
+            serde_json::from_slice(&std::fs::read(package.join("fixtures/contract.json"))?)?;
+        Self::start(fixture.routes, false)
+    }
+    /// Base URL for local fixture connections; dropping the server closes its listener.
+    pub fn url(&self) -> &str {
+        &self.base
+    }
+
     fn start(routes: Vec<HttpFixture>, record: bool) -> Result<Self> {
         let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
         let base = format!("http://{}", listener.local_addr()?);
@@ -112,6 +126,10 @@ impl ReplayServer {
         let unmatched = Arc::new(Mutex::new(Vec::new()));
         let recorded = Arc::new(Mutex::new(Vec::new()));
         let (forced, missing, captures) = (status.clone(), unmatched.clone(), recorded.clone());
+        #[cfg(test)]
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        #[cfg(test)]
+        let request_log = requests.clone();
         let thread = std::thread::spawn(move || {
             let routes = Arc::new(routes);
             for stream in listener.incoming() {
@@ -153,7 +171,13 @@ impl ReplayServer {
                         u.query_pairs()
                             .find(|(k, _)| k == "target")
                             .map(|(_, v)| v.into_owned())
-                    });
+                    })
+                    .or_else(|| Some(format!("http://fixture{path}")));
+                #[cfg(test)]
+                request_log.lock().unwrap().push(format!(
+                    "{target:?}\n{head}\n{}",
+                    String::from_utf8_lossy(&body)
+                ));
                 let routes = routes.clone();
                 let forced = forced.load(Ordering::Acquire);
                 let missing = missing.clone();
@@ -261,6 +285,8 @@ impl ReplayServer {
             unmatched,
             recorded,
             thread: Some(thread),
+            #[cfg(test)]
+            requests,
         })
     }
 }
@@ -405,7 +431,7 @@ fn validate_link(value: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn inferred_schema(path: &str) -> Option<String> {
+pub fn inferred_schema(path: &str) -> Option<String> {
     if let Some(kind) = path.strip_prefix("search.") {
         Some(format!("page:{kind}"))
     } else if [
@@ -476,11 +502,19 @@ async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCas
         .or_else(|| inferred_schema(&case.path))
         .ok_or_else(|| invalid("Fixture must supply a schema for this capability"))?;
     validate_schema(&schema, &value)?;
-    if let Some(kind) = schema.strip_prefix("page:") {
+    if let Some(kind) = schema
+        .strip_prefix("page:")
+        .or_else(|| schema.starts_with("detail:").then_some("track"))
+    {
         let mut ids = BTreeSet::new();
         let mut cursors = BTreeSet::new();
         for page_index in 0..100 {
-            for item in value["items"].as_array().unwrap() {
+            let page = if schema.starts_with("detail:") {
+                &value["tracks"]
+            } else {
+                &value
+            };
+            for item in page["items"].as_array().unwrap() {
                 if let Some(id) = item["id"].as_str() {
                     if !ids.insert(id.to_string()) {
                         return Err(invalid("Duplicate entity across pages"));
@@ -501,7 +535,7 @@ async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCas
                     }
                 }
             }
-            let Some(next) = value["next"].as_str() else {
+            let Some(next) = page["next"].as_str() else {
                 return Ok(());
             };
             if page_index == 99 || !cursors.insert(next.to_string()) {
@@ -611,4 +645,80 @@ pub async fn run_contract(package: &Path, mode: ContractMode) -> Result<Contract
         passed: cases.iter().all(|c| c.passed),
         cases,
     })
+}
+
+#[cfg(test)]
+mod regressions {
+    use super::*;
+
+    #[tokio::test]
+    async fn feiniu_direct_fnid_relay_access_code_and_identity() {
+        let fixture: ContractFixture = serde_json::from_str(include_str!(
+            "../../../../plugins/feiniu/fixtures/contract.json"
+        ))
+        .unwrap();
+        for (input, access, relay) in [
+            ("https://direct.invalid/music", "", false),
+            ("FixtureFNID", "", true),
+            ("FixtureFNID", "安全码", true),
+        ] {
+            let mut routes = fixture.routes.clone();
+            routes.push(serde_json::from_value(json!({"path":"/api/v1/fn/con","method":"POST","body":{"code":0,"data":{"fn":["relay.invalid:5666"]}}})).unwrap());
+            let server = ReplayServer::start(routes, false).unwrap();
+            let data = tempfile::tempdir().unwrap();
+            let host = Host::open_with_replay(data.path(), Some(server.base.clone()))
+                .await
+                .unwrap();
+            let source = host
+                .connect(
+                    "feiniu.music",
+                    BTreeMap::from([
+                        ("baseUrl".into(), input.into()),
+                        ("username".into(), "fixture".into()),
+                        ("password".into(), "fake-password".into()),
+                        ("accessCode".into(), access.into()),
+                    ]),
+                    None,
+                )
+                .await
+                .unwrap();
+            source
+                .invoke("track.streams", vec![json!("t1")], json!({}), None)
+                .await
+                .unwrap();
+            let requests = server.requests.lock().unwrap().clone();
+            let login = requests
+                .iter()
+                .find(|s| s.contains("/user/password-login"))
+                .unwrap();
+            assert_eq!(login.contains("cookie: mode=relay"), relay);
+            assert_eq!(login.contains("x-access-source: app"), !access.is_empty());
+            if !access.is_empty() {
+                assert!(login.contains("x-access-code: 5a6J5YWo56CB"));
+            }
+            if relay {
+                assert!(login.contains("https://relay.invalid/"));
+                let resolver = requests
+                    .iter()
+                    .find(|s| s.contains("/api/v1/fn/con"))
+                    .unwrap();
+                assert!(resolver.contains("authx: nonce="));
+                assert!(resolver.contains("&timestamp="));
+                assert!(resolver.contains("&sign="));
+                assert!(resolver.contains(r#""fnId":"FixtureFNID""#));
+            }
+            let descriptor = host.package("feiniu.music").unwrap().descriptor;
+            // Reference manifest declares baseUrl as URL, even for FNID. The
+            // original input must reach login while only identity is normalized.
+            let values = BTreeMap::from([
+                ("baseUrl".into(), input.into()),
+                ("username".into(), "fixture".into()),
+            ]);
+            assert_eq!(
+                host.records()[0].source_id,
+                crate::source_id(&descriptor, &values)
+            );
+            assert!(server.unmatched.lock().unwrap().is_empty());
+        }
+    }
 }

@@ -106,6 +106,55 @@
             "bitRate": 800
           }
         }
+      },
+      "query": {
+        "id": "song:1/字"
+      }
+    },
+    {
+      "path": "/rest/getSong",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "song": {
+            "id": "song1",
+            "title": "One"
+          }
+        }
+      },
+      "query": {
+        "id": "song1"
+      }
+    },
+    {
+      "path": "/rest/getSong",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "song": {
+            "id": "song2",
+            "title": "Two",
+            "artist": "Artist"
+          }
+        }
+      },
+      "query": {
+        "id": "song2"
+      }
+    },
+    {
+      "path": "/rest/getSong",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "song": {
+            "id": "song:1/字",
+            "title": "Fixture Song",
+            "artist": "Artist",
+            "suffix": "flac",
+            "bitRate": 800
+          }
+        }
       }
     },
     {

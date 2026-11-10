@@ -23,6 +23,13 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M2-04（部分）已验收并提交，剩余转 M2-05
+
+- 完成：timers、feiniu FNID/中继/access-code、契约 detail 分页与裸 fetch 拦截；`core.sources`/`core.plugins` 导出；设置“来源/插件/开发者”面板（UI 修订后四张浅色截图已审阅）；设置左上橙色细线（隐藏外观面板 Radio ring 残留）已修。workspace 224 通过，nsh test 14/14。
+- web 登录降级：NSH 0.4.0 webview 无独立会话、无法读 cookie，改为手动粘贴 Cookie/完成 URL 再调用 `auth.web.done`。M6 或 NSH 升级后复核。
+- 转 M2-05：qq-music v2、`sdk/GUIDE.md`、开发者面板目录监听与自动参数表单、插件 logo 渲染、系统文件选择器导入、URL 转二维码、QR/SMS/web 面板与订阅 Stop 的 UI 回归、插件行无作者时不显示“未提供作者”。
+- 待人工确认：真实 Subsonic/飞牛（含中继与安全码）连接、平台账号登录、键盘焦点与滚动。
+
 ## 2026-11-10 更新：M2-03 已验收并提交
 
 - M2-02 遗留补齐；feiniu（237 行）、qq-scraper、kugou-scraper v2；刮削编排（`haiku-plugins::scraper`）；`native/tools/haiku-plugin` CLI（new/check/test）；契约套件 `haiku-plugins::contract`（JSON 报告到 stdout，摘要到 stderr）。workspace 221 通过；四个内置插件与三个模板契约全部通过；nsh test 13/13。

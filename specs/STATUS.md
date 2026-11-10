@@ -20,8 +20,8 @@
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
-| F02 插件包与来源生命周期 | M2-01/02 已验收；M2-03 遗留、四内置包、契约与离线 CLI 已实现，待审阅 | `haiku-plugins/src/{api,host,contract}.rs`、`native/tools/haiku-plugin`、`plugins/` | workspace 221 通过/1 忽略；四插件契约 60/60；三模板 new/check/test；tsc、nsh check/build/test 13/13；`.artifacts/m2-03/` | 详情契约自动翻页、所有认证方式逐包契约枚举、联网录制增强与裸 fetch 拦截未完成；UI/GUIDE 留 M2-04 |
-| F03 来源认证与用户内容 | M2-03 认证宿主遗留已补齐，待审阅 | `haiku-plugins/src/{source,descriptor,api}.rs`、`sdk/haiku.d.ts` | SMS state/cooldown、QR 进行中 HTTP 到期 abort/重新 start、认证元数据、cookie 重载、password/cookie/SMS/web/logout、refresh 再失败回归通过 | webview、来源面板、qq.music 实际登录留 M2-04；真实上游未验证 |
+| F02 插件包与来源生命周期 | M2-01～03 已验收；M2-04 第 0 步与设置核心已实现，待审阅，M2 尚未全部完成 | `haiku-plugins/src/{host,contract,events}.rs`、`native/app/src/plugins.rs`、`src/shell/PluginSettings.tsx` | workspace 224 通过/1 忽略；feiniu CLI 契约 21/21；tsc、nsh check/build、nsh test 14/14；四张真实截图 `.artifacts/m2-04/` | qq.music、GUIDE、目录自动监听、自动参数表单、包 logo、文件选择器与 URL→二维码生成未完成；record/live 仍为基础实现 |
+| F03 来源认证与用户内容 | M2-03 已验收；M2-04 来源表单、认证桥与飞牛远程连接已实现，待审阅，仍有缺口 | `haiku-plugins/src/source.rs`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs`、`src/shell/PluginSettings.tsx` | timers/abort、FNID/中继/安全码、detail 分页、裸 fetch 拦截回归；Headless 来源成功/失败清理、状态 Stop；`.artifacts/m2-04/` | web 使用手动 Cookie + 完成 URL 降级，无独立 webview 会话；QQ 登录未实现；QR/SMS/web 新面板与事件 Stop 尚无专门 Headless 回归，真实上游未验证 |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
 | F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
@@ -504,3 +504,41 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 飞牛 FNID/中继/access-code、真实服务器与需鉴权封面展示未验证；记录器当前写 fixtures/recorded.json，复杂真实认证录制不能视为完整可用。
 - 发现 stdlib 默认 loader 未注册 timers/global setTimeout；本轮不改 jsrt，测试不依赖它；是否补运行时注册与上述契约/联网增强，交审阅者决定后续任务。
 - 全部证据 .artifacts/m2-03/；未留一次性诊断脚本或额外汇总 JSON/hash；本节范围外 UI/webview/qq.music/GUIDE 留 M2-04。
+
+## 2026-11-10 M2-04：遗留与设置核心（部分交付，待审阅）
+
+- 在主仓库工作，无 git 提交；按额度优先交付第 0 步及设置核心，F02/F03 保留未完成状态。
+- jsrt 新增四个 timers 全局，调用 abort 清理其 timers、卸载释放 VM；新增通用 fetch URL 钩子，裸 fetch 也进入离线 replay。
+- replay 钩子启用时返回重定向、不跟随到外网；record/live 仍为基础版。
+- feiniu 实现参考 FNID 签名解析、中继 Cookie、安全码 base64 头；identity 仍按参考 URL 字段规则，登录保留原始输入。
+- 契约遍历 detail.tracks、检测第二页重复；Subsonic fixture 补齐按曲目 ID 的 getSong 应答。
+- core.sources/core.plugins 共用 PluginService：快照/状态 Stop、来源启停排序重命名移除、取消式连接、五种认证驱动。
+- 导出目录/ZIP/单 TS/HTTPS 导入、包启停/删除、能力调用/结构警告、KV 查看清理、登出清凭据、离线契约与日志/HTTP 事件 Stop。
+- Rust 持有临时登录、用户展示信息与状态，TSX 镜像；登出清连接字段及用户信息，包禁用阻止新连接/登录。
+- 三个设置面板复用已有组件/token；来源表单 secret 输入、包详情 Popover/删除确认、开发者 JSON 参数/结果树/日志。
+- NSH 0.4.0 WebView 声明无 cookie 读取/独立会话；macOS 使用默认 WKWebViewConfiguration，无隔离数据存储设置。
+- 因此不启用共享会话内嵌登录，web 表面要求手动粘贴 Cookie 和完成 URL，再调用 auth.web.done。
+- workspace 首轮新增 detail 检查发现旧 fixture 缺 ID 应答；修复后 224 passed / 0 failed / 1 ignored（含 jsrt 26、plugins 18）。
+- feiniu CLI check 通过、test 21/21；全插件 tsc 初轮发现设置测试插件缺 streams，修复后通过。
+- nsh check 经两轮修复通过（菜单项使用 children）；nsh build 通过，行为修复后的 final build 亦通过。
+- nsh test 初轮订阅任务上下文错误；首修又发现 signal.set 失去 this，二修后 14/14（含 Rust 4）。
+- Headless 覆盖本地 HTTP Subsonic 添加成功、失败无残留、状态 Stop、包导入/启停/删除确认、开发者真实调用结果。
+- 证据：`.artifacts/m2-04/` 的 cargo-test-workspace[-repair1]、cli-*-feiniu、tsc[-repair1]、nsh-* 日志，保留首次失败。
+- 浅色真实窗口：sources.png、login.png、plugins.png、developer.png；预览使用本地 fixture，无真实账号/上游请求。
+- 未完成：整个 dev-plugins/qq-music 与其 CLI/契约、sdk/GUIDE.md；未声称 QQ 认证或内容能力已覆盖。
+- 未完成：开发者目录自动监听/自动参数表单（目前手动重载/JSON 数组）、凭据明文查看、logo 与系统文件选择器。
+- 未完成：仅提供 image 的二维码渲染，url→二维码生成未做；QR/SMS/web 面板、事件 Stop、连接中取消缺专门 UI 回归。
+- 待人工：真实 Subsonic/飞牛（含安全码）及认证交互、键盘焦点/滚动；既有设置左上橙色细线仍存在。
+- 审阅建议：本轮可审第 0 步及设置核心；安排剩余项后再关闭 M2，不将 F02/F03 标为全部完成。
+
+
+## 2026-11-10 M2-04 UI 修订
+
+- 主仓库内修订，无 git 提交；qq-music、GUIDE、目录监听/自动表单、logo 文件选择器按审阅要求留 M2-05。
+- 来源：库副标题为服务器主机（含端口）· 用户名；平台显示登录用户/未登录状态。库操作改为编辑连接，预填非敏感字段、重新输入密码并 verify；右侧开关与按钮统一对齐。
+- 插件：统一 logo/占位图标、名称、版本 · 作者 · id；开关固定右列、仅保留无障碍标签；主体行打开详情 Popover。
+- 开发者：结果树分支与叶子共用图标槽，每层缩进 16pt、从左对齐；结果区限制 256pt 高度并内部滚动。
+- 橙色细线定位为 display:none 外观面板中 checked Radio ring 的残留绘制；外观改为条件挂载，真实窗口确认移除。
+- nsh check / build / test 各一次通过；14 tests passed，新增编辑连接与库来源无登录/登出回归；未新增构建警告（host 仍有既有例外）。
+- 日志：.artifacts/m2-04/nsh-{check,build,test}-ui-revision.log；浅色真实窗口覆盖 sources.png、login.png、plugins.png、developer.png。
+- 截图使用隔离数据目录与 loopback fixture，来源截图含同名、不同用户的两条来源；真实平台账号登录仍待人工确认。
