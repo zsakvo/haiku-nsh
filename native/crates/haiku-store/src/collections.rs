@@ -1,253 +1,539 @@
-//! 本地歌单同步引擎的 FRB 暴露面。
-//!
-//! [`crate::playlist_core`]（Loro CRDT 权威源）之上的薄壳：镜像出 FRB 友好的
-//! 结构体，并提供落盘 / 快照导入导出接口。SQLite 物化缓存、Gist 同步编排均在
-//! Dart 侧（见 `lib/src/data/sync/playlist_sync_controller.dart`）。
-//!
-//! 所有写操作与 `import` 返回**本次实际受影响的歌单 id 列表**，Dart 侧只重写
-//! SQLite 中对应歌单的行。
+//! Reference-compatible collections with serialized mutations, automatic persistence and events.
+use crate::playlist_core::{LIKED_PLAYLIST_ID, PlaylistCore, PlaylistMeta, TrackEntry};
+use haiku_model::{Album, Artist, EntityRef, Track};
+use serde::Serialize;
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, mpsc},
+    thread::{self, JoinHandle},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-use std::sync::Mutex;
-
-use crate::playlist_core::{PlaylistCore, TrackEntry, LIKED_PLAYLIST_ID};
-
-/// 内置「喜欢」歌单固定 id（Dart 侧同名常量须一致）。
-pub fn liked_playlist_id() -> String {
-    LIKED_PLAYLIST_ID.to_string()
+/// A committed change. IDs include deleted collections; consumers reread their views.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Change {
+    pub revision: u64,
+    pub playlist_ids: Vec<String>,
 }
-
-/// 歌单摘要（物化用）。
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct PlaylistInfo {
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collection {
     pub id: String,
     pub title: String,
     pub description: String,
-    /// `user` | `liked` | `plugin`（插件歌单收藏）。
     pub kind: String,
-    /// 创建时间（epoch 秒）。
-    pub created_at: i64,
-    /// 展示顺序（0 起）。
     pub position: u32,
     pub track_count: u32,
-    /// 插件歌单收藏元数据；普通本地歌单为 `None`。
-    pub source_plugin_id: Option<String>,
-    pub source_playlist_id: Option<String>,
+    pub created_at: i64,
+    pub source_id: Option<String>,
+    pub remote_id: Option<String>,
     pub source_label: Option<String>,
-    pub cover_url: Option<String>,
-    /// 收藏时间（epoch 秒；普通歌单回退为创建时间）。
-    pub favorited_at: i64,
-    /// 最近一次成功刷新完整快照的时间（epoch 毫秒）。
-    pub refreshed_at: i64,
-}
-
-/// 歌单内曲目（跨插件引用，字段约定同 Dart `LikedTrack`）。
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct PlaylistTrack {
-    pub plugin_id: String,
-    pub track_id: String,
-    pub provider: String,
-    pub title: String,
-    pub artists: Vec<String>,
-    pub album: Option<String>,
     pub cover: Option<String>,
-    /// 时长（秒）。
-    pub duration: Option<i64>,
-    /// 加入时间（epoch 秒）。
-    pub added_at: i64,
+    pub refreshed_at: i64,
+    pub favorited_at: i64,
 }
-
-impl From<TrackEntry> for PlaylistTrack {
-    fn from(t: TrackEntry) -> Self {
-        PlaylistTrack {
-            plugin_id: t.plugin_id,
-            track_id: t.track_id,
-            provider: t.provider,
-            title: t.title,
-            artists: t.artists,
-            album: t.album,
-            cover: t.cover,
-            duration: t.duration,
-            added_at: t.added_at,
+impl From<PlaylistMeta> for Collection {
+    fn from(p: PlaylistMeta) -> Self {
+        Self {
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            kind: p.kind,
+            position: p.position,
+            track_count: p.track_count,
+            created_at: p.created_at,
+            source_id: p.source_plugin_id,
+            remote_id: p.source_playlist_id,
+            source_label: p.source_label,
+            cover: p.cover_url,
+            refreshed_at: p.refreshed_at,
+            favorited_at: p.favorited_at,
         }
     }
 }
-
-impl From<&PlaylistTrack> for TrackEntry {
-    fn from(t: &PlaylistTrack) -> Self {
-        TrackEntry {
-            plugin_id: t.plugin_id.clone(),
-            track_id: t.track_id.clone(),
-            provider: t.provider.clone(),
-            title: t.title.clone(),
-            artists: t.artists.clone(),
-            album: t.album.clone(),
-            cover: t.cover.clone(),
-            duration: t.duration,
-            added_at: t.added_at,
+struct State {
+    core: PlaylistCore,
+    revision: u64,
+    dirty: bool,
+    listeners: Vec<mpsc::Sender<Change>>,
+    error: Option<String>,
+}
+impl State {
+    fn changed(&mut self, ids: Vec<String>) {
+        if ids.is_empty() {
+            return;
         }
-    }
-}
-
-/// 本地歌单权威源（内部 LoroDoc）。FRB opaque，Dart 侧全 app 单例持有。
-pub struct PlaylistSyncEngine {
-    core: Mutex<PlaylistCore>,
-}
-
-impl PlaylistSyncEngine {
-    /// 从磁盘快照打开；文件不存在或损坏视为空文档（设计稿 §7），不报错。
-    pub fn open(path: String) -> PlaylistSyncEngine {
-        let core = match std::fs::read(&path) {
-            Ok(bytes) => PlaylistCore::from_snapshot(&bytes).unwrap_or_default(),
-            Err(_) => PlaylistCore::new(),
+        self.dirty = true;
+        self.revision += 1;
+        let event = Change {
+            revision: self.revision,
+            playlist_ids: ids,
         };
-        PlaylistSyncEngine {
-            core: Mutex::new(core),
+        self.listeners
+            .retain(|listener| listener.send(event.clone()).is_ok());
+    }
+    fn writable(&self, id: &str, liked: bool) -> Result<(), String> {
+        match self.core.playlists().into_iter().find(|p| p.id == id) {
+            Some(p) if p.kind == "user" || (liked && p.kind == "liked") => Ok(()),
+            Some(_) => Err("收藏镜像只读；喜欢请使用专用操作".into()),
+            None => Err("歌单不存在".into()),
         }
     }
-
-    /// 快照落盘（临时文件 + rename，避免半截文件）。
-    pub fn save_to_disk(&self, path: String) -> Result<(), String> {
-        let bytes = self.core.lock().unwrap().export_snapshot();
-        if let Some(dir) = std::path::Path::new(&path).parent() {
+}
+enum Wake {
+    Changed,
+    Shutdown,
+}
+struct Inner {
+    state: Arc<Mutex<State>>,
+    path: PathBuf,
+    tx: mpsc::Sender<Wake>,
+    worker: Mutex<Option<JoinHandle<()>>>,
+}
+impl Drop for Inner {
+    fn drop(&mut self) {
+        let _ = self.tx.send(Wake::Shutdown);
+        if let Some(worker) = self.worker.get_mut().unwrap().take() {
+            let _ = worker.join();
+        }
+    }
+}
+/// Shared service. The final handle flushes and joins its writer; `flush` is an exit barrier.
+#[derive(Clone)]
+pub struct Collections(Arc<Inner>);
+fn save(state: &Mutex<State>, path: &Path) -> Result<(), String> {
+    let mut state = state.lock().unwrap();
+    if !state.dirty {
+        return Ok(());
+    }
+    let bytes = state.core.export_snapshot();
+    let result = (|| {
+        if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
-        let tmp = format!("{path}.tmp");
-        std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
-        Ok(())
+        let tmp = path.with_extension("loro.tmp");
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(tmp, path).map_err(|e| e.to_string())
+    })();
+    state.error = result.as_ref().err().cloned();
+    if result.is_ok() {
+        state.dirty = false;
     }
-
-    /// 替换内存文档为磁盘快照（一般仅 open 后无需再调；损坏视为空文档）。
-    pub fn load_from_disk(&self, path: String) {
+    result
+}
+impl Collections {
+    /// Open only this application's data root. Preserve corrupt input for diagnosis.
+    pub fn open(root: &Path) -> Result<Self, String> {
+        let path = root.join("playlists.loro");
         let core = match std::fs::read(&path) {
-            Ok(bytes) => PlaylistCore::from_snapshot(&bytes).unwrap_or_default(),
-            Err(_) => PlaylistCore::new(),
+            Ok(bytes) => match PlaylistCore::from_snapshot(&bytes) {
+                Ok(core) => core,
+                Err(_) => {
+                    let stamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis();
+                    std::fs::rename(&path, path.with_extension(format!("loro.corrupt-{stamp}")))
+                        .map_err(|e| e.to_string())?;
+                    PlaylistCore::new()
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PlaylistCore::new(),
+            Err(e) => return Err(e.to_string()),
         };
-        *self.core.lock().unwrap() = core;
+        let dirty = core.ensure_liked_playlist("喜欢");
+        let state = Arc::new(Mutex::new(State {
+            core,
+            dirty,
+            revision: 0,
+            listeners: vec![],
+            error: None,
+        }));
+        let (tx, rx) = mpsc::channel();
+        let disk_state = state.clone();
+        let disk_path = path.clone();
+        let worker = thread::Builder::new()
+            .name("haiku-collections".into())
+            .spawn(move || {
+                loop {
+                    match rx.recv() {
+                        Ok(Wake::Changed) => loop {
+                            match rx.recv_timeout(Duration::from_millis(500)) {
+                                Ok(Wake::Changed) => continue,
+                                Ok(Wake::Shutdown) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                                    let _ = save(&disk_state, &disk_path);
+                                    return;
+                                }
+                                Err(mpsc::RecvTimeoutError::Timeout) => {
+                                    let _ = save(&disk_state, &disk_path);
+                                    break;
+                                }
+                            }
+                        },
+                        Ok(Wake::Shutdown) | Err(_) => {
+                            let _ = save(&disk_state, &disk_path);
+                            return;
+                        }
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        let service = Self(Arc::new(Inner {
+            state,
+            path,
+            tx,
+            worker: Mutex::new(Some(worker)),
+        }));
+        if dirty {
+            let _ = service.0.tx.send(Wake::Changed);
+        }
+        Ok(service)
     }
-
-    // ───────────────────────────── 读 ─────────────────────────────
-
-    pub fn playlists(&self) -> Vec<PlaylistInfo> {
-        self.core
+    fn mutate<T>(
+        &self,
+        f: impl FnOnce(&mut State) -> Result<(T, Vec<String>), String>,
+    ) -> Result<T, String> {
+        let mut state = self.0.state.lock().unwrap();
+        let (result, ids) = f(&mut state)?;
+        let changed = !ids.is_empty();
+        state.changed(ids);
+        if changed {
+            let _ = self.0.tx.send(Wake::Changed);
+        }
+        Ok(result)
+    }
+    /// Current summaries in stored display order.
+    pub fn list(&self) -> Vec<Collection> {
+        self.0
+            .state
             .lock()
             .unwrap()
+            .core
             .playlists()
             .into_iter()
-            .map(|p| PlaylistInfo {
-                id: p.id,
-                title: p.title,
-                description: p.description,
-                kind: p.kind,
-                created_at: p.created_at,
-                position: p.position,
-                track_count: p.track_count,
-                source_plugin_id: p.source_plugin_id,
-                source_playlist_id: p.source_playlist_id,
-                source_label: p.source_label,
-                cover_url: p.cover_url,
-                favorited_at: p.favorited_at,
-                refreshed_at: p.refreshed_at,
-            })
+            .map(Into::into)
             .collect()
     }
-
-    pub fn playlist_tracks(&self, id: String) -> Vec<PlaylistTrack> {
-        self.core
-            .lock()
-            .unwrap()
-            .playlist_tracks(&id)
-            .into_iter()
-            .map(PlaylistTrack::from)
-            .collect()
+    /// SDK tracks; likes are ordered by addition time, newest first, with stable ties.
+    pub fn tracks(&self, id: &str) -> Vec<Track> {
+        let mut entries = self.0.state.lock().unwrap().core.playlist_tracks(id);
+        if id == LIKED_PLAYLIST_ID {
+            entries.sort_by_key(|t| std::cmp::Reverse(t.added_at));
+        }
+        entries.into_iter().map(from_entry).collect()
     }
-
-    // ───────────────────────────── 写 ─────────────────────────────
-
-    /// 新建用户歌单，返回新 id。
-    pub fn create_playlist(&self, title: String) -> String {
-        self.core.lock().unwrap().create_playlist(&title)
+    /// Subscribe to committed mutations. Dropping the receiver stops delivery.
+    pub fn subscribe(&self) -> mpsc::Receiver<Change> {
+        let (tx, rx) = mpsc::channel();
+        self.0.state.lock().unwrap().listeners.push(tx);
+        rx
     }
-
-    /// 确保内置「喜欢」歌单存在（幂等）。返回是否本次新建。
-    pub fn ensure_liked_playlist(&self, title: String) -> bool {
-        self.core.lock().unwrap().ensure_liked_playlist(&title)
+    pub fn revision(&self) -> u64 {
+        self.0.state.lock().unwrap().revision
     }
-
-    /// 收藏插件歌单：记录来源、封面、简介与曲目快照，返回本地歌单 id。
-    /// 重复收藏幂等（元数据更新、完整曲目快照替换）。
-    pub fn favorite_plugin_playlist(
+    /// Most recent background write failure, cleared by a successful retry.
+    pub fn persistence_error(&self) -> Option<String> {
+        self.0.state.lock().unwrap().error.clone()
+    }
+    /// Synchronous persistence barrier for exit/backup. Normal callers never need it.
+    pub fn flush(&self) -> Result<(), String> {
+        save(&self.0.state, &self.0.path)
+    }
+    pub fn is_liked(&self, key: &EntityRef) -> bool {
+        key.kind == "track"
+            && self
+                .0
+                .state
+                .lock()
+                .unwrap()
+                .core
+                .playlist_tracks(LIKED_PLAYLIST_ID)
+                .iter()
+                .any(|t| t.plugin_id == key.source && t.track_id == key.id)
+    }
+    /// Dedicated, atomic like/unlike path; toggle uses the same serialized transaction.
+    pub fn set_liked(&self, track: &Track, value: Option<bool>) -> Result<bool, String> {
+        self.mutate(|state| {
+            let old = state
+                .core
+                .playlist_tracks(LIKED_PLAYLIST_ID)
+                .iter()
+                .any(|t| t.plugin_id == track.source && t.track_id == track.id);
+            let liked = value.unwrap_or(!old);
+            let ids = if old == liked {
+                vec![]
+            } else if liked {
+                state.core.add_track(LIKED_PLAYLIST_ID, &to_entry(track))
+            } else {
+                state
+                    .core
+                    .remove_track(LIKED_PLAYLIST_ID, &track.source, &track.id)
+            };
+            Ok((liked, ids))
+        })
+    }
+    pub fn create(&self, title: &str) -> Result<String, String> {
+        let title = title.trim();
+        if title.is_empty() {
+            return Err("歌单名称不能为空".into());
+        }
+        self.mutate(|s| {
+            let id = s.core.create_playlist(title);
+            Ok((id.clone(), vec![id]))
+        })
+    }
+    pub fn rename(&self, id: &str, title: &str, description: &str) -> Result<(), String> {
+        if title.trim().is_empty() {
+            return Err("歌单名称不能为空".into());
+        }
+        self.mutate(|s| {
+            s.writable(id, false)?;
+            Ok(((), s.core.rename_playlist(id, title.trim(), description)))
+        })
+    }
+    pub fn delete(&self, id: &str) -> Result<(), String> {
+        self.mutate(|s| {
+            if id == LIKED_PLAYLIST_ID {
+                return Err("不能删除喜欢歌单".into());
+            }
+            if !s.core.playlists().iter().any(|p| p.id == id) {
+                return Err("歌单不存在".into());
+            }
+            Ok(((), s.core.delete_playlist(id)))
+        })
+    }
+    pub fn add(&self, id: &str, tracks: &[Track]) -> Result<(), String> {
+        self.mutate(|s| {
+            s.writable(id, false)?;
+            let mut ids = vec![];
+            for track in tracks {
+                ids.extend(s.core.add_track(id, &to_entry(track)));
+            }
+            ids.sort();
+            ids.dedup();
+            Ok(((), ids))
+        })
+    }
+    pub fn remove(&self, id: &str, keys: &[EntityRef]) -> Result<(), String> {
+        self.mutate(|s| {
+            s.writable(id, true)?;
+            let mut ids = vec![];
+            for key in keys.iter().filter(|k| k.kind == "track") {
+                ids.extend(s.core.remove_track(id, &key.source, &key.id));
+            }
+            ids.sort();
+            ids.dedup();
+            Ok(((), ids))
+        })
+    }
+    pub fn move_track(&self, id: &str, from: u32, to: u32) -> Result<(), String> {
+        self.mutate(|s| {
+            s.writable(id, false)?;
+            Ok(((), s.core.move_track(id, from as usize, to as usize)))
+        })
+    }
+    pub fn reorder(&self, order: &[String]) -> Result<(), String> {
+        self.mutate(|s| {
+            let mut order = order.to_vec();
+            order.retain(|id| id != LIKED_PLAYLIST_ID);
+            order.insert(0, LIKED_PLAYLIST_ID.into());
+            Ok(((), s.core.reorder_playlists(&order)))
+        })
+    }
+    /// Offline immutable remote mirror. Source ID is the installed source instance identity.
+    pub fn favorite(
         &self,
-        plugin_id: String,
-        playlist_id: String,
-        source_label: String,
-        title: String,
-        description: String,
-        cover_url: String,
-        tracks: Vec<PlaylistTrack>,
-    ) -> String {
-        let tracks: Vec<TrackEntry> = tracks.iter().map(TrackEntry::from).collect();
-        self.core.lock().unwrap().favorite_plugin_playlist(
-            &plugin_id,
-            &playlist_id,
-            &source_label,
-            &title,
-            &description,
-            &cover_url,
-            &tracks,
-        )
+        source: &str,
+        remote: &str,
+        label: &str,
+        title: &str,
+        description: &str,
+        cover: &str,
+        tracks: &[Track],
+    ) -> Result<String, String> {
+        self.mutate(|s| {
+            let entries = tracks.iter().map(to_entry).collect::<Vec<_>>();
+            let id = s.core.favorite_plugin_playlist(
+                source,
+                remote,
+                label,
+                title,
+                description,
+                cover,
+                &entries,
+            );
+            Ok((id.clone(), vec![id]))
+        })
     }
-
-    pub fn rename_playlist(&self, id: String, title: String, description: String) -> Vec<String> {
-        self.core
-            .lock()
-            .unwrap()
-            .rename_playlist(&id, &title, &description)
-    }
-
-    pub fn delete_playlist(&self, id: String) -> Vec<String> {
-        self.core.lock().unwrap().delete_playlist(&id)
-    }
-
-    pub fn add_track(&self, playlist_id: String, track: PlaylistTrack) -> Vec<String> {
-        self.core
-            .lock()
-            .unwrap()
-            .add_track(&playlist_id, &TrackEntry::from(&track))
-    }
-
-    pub fn remove_track(
-        &self,
-        playlist_id: String,
-        plugin_id: String,
-        track_id: String,
-    ) -> Vec<String> {
-        self.core
-            .lock()
-            .unwrap()
-            .remove_track(&playlist_id, &plugin_id, &track_id)
-    }
-
-    pub fn move_track(&self, playlist_id: String, from: u32, to: u32) -> Vec<String> {
-        self.core
-            .lock()
-            .unwrap()
-            .move_track(&playlist_id, from as usize, to as usize)
-    }
-
-    pub fn reorder_playlists(&self, order: Vec<String>) -> Vec<String> {
-        self.core.lock().unwrap().reorder_playlists(&order)
-    }
-
-    // ───────────────────────────── 同步 ─────────────────────────────
-
-    /// 导出全量快照（推送 Gist 用）。
     pub fn export_snapshot(&self) -> Vec<u8> {
-        self.core.lock().unwrap().export_snapshot()
+        self.0.state.lock().unwrap().core.export_snapshot()
     }
+    pub fn import(&self, bytes: &[u8]) -> Result<Vec<String>, String> {
+        self.mutate(|s| {
+            let ids = s.core.import(bytes)?;
+            Ok((ids.clone(), ids))
+        })
+    }
+}
+fn to_entry(t: &Track) -> TrackEntry {
+    TrackEntry {
+        sdk_track: Some(t.clone()),
+        plugin_id: t.source.clone(),
+        track_id: t.id.clone(),
+        provider: String::new(),
+        title: t.title.clone(),
+        artists: t
+            .artists
+            .iter()
+            .map(|a| match a {
+                Artist::Name(n) | Artist::Entity { name: n, .. } => n.clone(),
+            })
+            .collect(),
+        album: t.album.as_ref().map(|a| a.title.clone()),
+        cover: t.cover.clone(),
+        duration: t.duration.map(|v| v as i64),
+        added_at: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+    }
+}
+fn from_entry(t: TrackEntry) -> Track {
+    if let Some(track) = t.sdk_track {
+        return track;
+    }
+    let mut track = Track::local(&t.track_id);
+    track.source = t.plugin_id;
+    track.local_path = if track.source == "local" {
+        Some(t.track_id.clone())
+    } else {
+        None
+    };
+    track.title = t.title;
+    track.artists = t.artists.into_iter().map(Artist::Name).collect();
+    track.album = t.album.map(|title| Album { id: None, title });
+    track.cover = t.cover;
+    track.duration = t.duration.map(|v| v as f64);
+    track
+}
 
-    /// 合并远端快照，返回受影响歌单 id。快照损坏返回 Err（上层记为同步失败）。
-    pub fn import(&self, bytes: Vec<u8>) -> Result<Vec<String>, String> {
-        self.core.lock().unwrap().import(&bytes)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn debounce_flush_restart_identity_crud_and_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let service = Collections::open(dir.path()).unwrap();
+        service.flush().unwrap();
+        let initial = std::fs::read(dir.path().join("playlists.loro")).unwrap();
+        let events = service.subscribe();
+        let mut a = Track::local("/a.mp3");
+        a.title = "A".into();
+        let mut b = a.clone();
+        b.source = "subsonic#雪".into();
+        b.local_path = None;
+        assert!(service.set_liked(&a, None).unwrap());
+        assert!(service.set_liked(&b, None).unwrap());
+        assert!(!service.set_liked(&a, None).unwrap());
+        assert!(service.is_liked(&b.entity_ref()));
+        assert_eq!(
+            std::fs::read(dir.path().join("playlists.loro")).unwrap(),
+            initial
+        );
+        let id = service.create(" Mix ").unwrap();
+        service
+            .add(&id, &[a.clone(), b.clone(), a.clone()])
+            .unwrap();
+        assert_eq!(service.tracks(&id).len(), 2);
+        service.move_track(&id, 0, 1).unwrap();
+        assert_eq!(service.tracks(&id)[0], b);
+        service.rename(&id, "Renamed", "Description").unwrap();
+        assert!(service.rename(LIKED_PLAYLIST_ID, "No", "").is_err());
+        assert!(service.add(LIKED_PLAYLIST_ID, &[a.clone()]).is_err());
+        let second = service.create("Second").unwrap();
+        service.reorder(&[second.clone(), id.clone()]).unwrap();
+        assert_eq!(service.list()[1].id, second);
+        service.remove(&id, &[b.entity_ref()]).unwrap();
+        assert_eq!(service.tracks(&id), vec![a.clone()]);
+        service.delete(&second).unwrap();
+        assert!(!service.list().iter().any(|p| p.id == second));
+        assert!(events.try_iter().any(|e| e.playlist_ids.contains(&id)));
+        drop(events);
+        assert!(service.set_liked(&a, Some(true)).unwrap());
+        // Wait on observable persistence, bounded by a generous deadline (no repeated builds).
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while std::fs::read(dir.path().join("playlists.loro")).unwrap() == initial {
+            assert!(std::time::Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(20));
+        }
+        let reopened = Collections::open(dir.path()).unwrap();
+        assert_eq!(reopened.tracks(&id), vec![a.clone()]);
+        drop(reopened);
+        service.rename(&id, "Exit flush", "").unwrap();
+        drop(service);
+        let reopened = Collections::open(dir.path()).unwrap();
+        assert!(reopened.list().iter().any(|p| p.title == "Exit flush"));
+        assert!(reopened.is_liked(&a.entity_ref()));
+        assert!(reopened.is_liked(&b.entity_ref()));
+    }
+    #[test]
+    fn reads_reference_binary_fixture() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(
+            root.path().join("playlists.loro"),
+            include_bytes!("../tests/fixtures/reference-playlists.loro"),
+        )
+        .unwrap();
+        let service = Collections::open(root.path()).unwrap();
+        let track = &service.tracks(LIKED_PLAYLIST_ID)[0];
+        assert_eq!(track.source, "subsonic.music#参考");
+        assert_eq!(track.id, "id:/?#雪");
+        assert_eq!(track.title, "Reference song");
+        assert_eq!(track.duration, Some(123.));
+        let pl = service
+            .list()
+            .into_iter()
+            .find(|p| p.kind == "user")
+            .unwrap();
+        assert_eq!(pl.title, "参考版歌单");
+        assert_eq!(pl.track_count, 1);
+        assert_eq!(pl.description, "由参考版 dist/haiku-native 生成");
+        let reread = PlaylistCore::from_snapshot(&service.export_snapshot()).unwrap();
+        assert_eq!(
+            reread.playlist_tracks(LIKED_PLAYLIST_ID)[0].plugin_id,
+            "subsonic.music#参考"
+        );
+    }
+    #[test]
+    fn two_services_merge_idempotently_and_mirrors_are_read_only() {
+        let a_dir = tempfile::tempdir().unwrap();
+        let b_dir = tempfile::tempdir().unwrap();
+        let a = Collections::open(a_dir.path()).unwrap();
+        let b = Collections::open(b_dir.path()).unwrap();
+        let id = a.create("Shared").unwrap();
+        b.import(&a.export_snapshot()).unwrap();
+        a.add(&id, &[Track::local("/a")]).unwrap();
+        b.add(&id, &[Track::local("/b")]).unwrap();
+        a.import(&b.export_snapshot()).unwrap();
+        b.import(&a.export_snapshot()).unwrap();
+        assert_eq!(a.tracks(&id), b.tracks(&id));
+        assert_eq!(a.tracks(&id).len(), 2);
+        assert!(a.import(&b.export_snapshot()).unwrap().is_empty());
+        let remote = a
+            .favorite(
+                "source#1",
+                "remote:/雪",
+                "Server",
+                "Remote",
+                "",
+                "",
+                &[Track::local("/a")],
+            )
+            .unwrap();
+        assert_eq!(remote, "favorite:source#1:remote:/雪");
+        assert!(a.add(&remote, &[Track::local("/b")]).is_err());
+        assert!(a.rename(&remote, "No", "").is_err());
+        a.delete(&remote).unwrap();
     }
 }

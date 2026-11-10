@@ -11,7 +11,7 @@ export function LibraryPreview(props: { mode: AppearanceMode; artifacts: string 
   const ready = resource(async () => {
     const root = `${props.artifacts}/preview-music-${props.mode}`;
     await prepareLibrary(root, 0, await readFile(`${props.artifacts}/audio/fixture.flac`));
-    const core = await Core.open();
+    const core = await Core.openIsolated();
     await core.library.addRoots([root]);
     const report = await core.library.scan();
     console.log("M1-03 real scan", JSON.stringify({ root, report }));

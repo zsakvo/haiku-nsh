@@ -42,10 +42,35 @@ unsafe impl Trace for Listeners {
     }
 }
 
+#[derive(Clone)]
+struct DataRoot {
+    path: std::path::PathBuf,
+    // A fixture directory lives as long as its Core/bridge or engine selection.
+    _temporary: Option<Arc<tempfile::TempDir>>,
+}
+impl Core {
+    async fn select_root(root: DataRoot) -> Result<Instance<Self>, JsError> {
+        if let Some(existing) = global::<Option<DataRoot>>().get() {
+            if existing.path != root.path {
+                return Err(JsError::Error(
+                    "An engine already owns a different Core data root".into(),
+                ));
+            }
+        } else {
+            global::<Option<DataRoot>>().set(Some(root));
+        }
+        Self::open().await
+    }
+}
+
 /// Engine-thread adapter; its position/buffer signals are for Rust components only.
 pub struct CoreBridge {
     pub(crate) controller: Controller,
+    pub(crate) collections: haiku_store::collections::Collections,
+    pub(crate) collections_revision: Signal<u64>,
     owner: Owner,
+    _root: DataRoot,
+    _exit: crate::exit::ExitGuard,
     pub(crate) settings: Signal<haiku_store::settings::Settings>,
     pub position: Signal<f64>,
     pub buffered: Signal<f64>,
@@ -56,6 +81,8 @@ impl CoreBridge {
         controller: Controller,
         listeners: Listeners,
         settings: haiku_store::settings::Settings,
+        collections: haiku_store::collections::Collections,
+        root: DataRoot,
     ) -> Rc<Self> {
         let owner = Owner::detached();
         let (position, buffered, state) = owner.run(|| {
@@ -108,7 +135,15 @@ impl CoreBridge {
             (position, buffered, state)
         });
         let settings = owner.run(|| signal(settings));
+        let collections_revision = owner.run(|| signal(collections.revision()));
+        let exit_store = collections.clone();
+        let exit = crate::exit::register(move || exit_store.flush());
+        crate::platform::install_exit_hook();
         Rc::new(Self {
+            _root: root,
+            _exit: exit,
+            collections,
+            collections_revision,
             settings,
             controller,
             owner,
@@ -121,6 +156,9 @@ impl CoreBridge {
 impl Drop for CoreBridge {
     fn drop(&mut self) {
         self.owner.dispose();
+        if let Err(e) = self.collections.flush() {
+            log::error!("Collections exit flush: {e}");
+        }
         self.controller.shutdown();
         crate::platform::clear_media();
     }
@@ -129,6 +167,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    collections: Instance<crate::collections::CollectionsService>,
     plugins: Instance<crate::plugins::PluginService>,
     player: Instance<PlayerService>,
     settings: Instance<crate::settings::SettingsService>,
@@ -142,8 +181,15 @@ impl Core {
         if let Some(core) = slot.get() {
             return Ok(core);
         }
-        let (controller, library, settings, plugins) = background(async {
-            let root = haiku_store::data_root();
+        let selected = global::<Option<DataRoot>>()
+            .get()
+            .unwrap_or_else(|| DataRoot {
+                path: haiku_store::data_root(),
+                _temporary: None,
+            });
+        global::<Option<DataRoot>>().set(Some(selected.clone()));
+        let root = selected.path.clone();
+        let (controller, library, settings, plugins, collections) = background(async move {
             std::fs::create_dir_all(&root).map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
             let settings = Arc::new(
                 haiku_store::settings::SettingsStore::open(&root)
@@ -165,7 +211,9 @@ impl Core {
             let plugins = haiku_plugins::Host::open(&root)
                 .await
                 .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
-            Ok::<_, Error>((controller, library, settings, plugins))
+            let collections = haiku_store::collections::Collections::open(&root)
+                .map_err(|e| Error::new(ErrorCode::Io, e))?;
+            Ok::<_, Error>((controller, library, settings, plugins, collections))
         })
         .await
         .map_err(|e| JsError::Error(e.to_string()))?
@@ -176,14 +224,23 @@ impl Core {
             return Ok(core);
         }
         let listeners = Listeners::default();
-        let bridge = CoreBridge::new(controller, listeners.clone(), settings.get());
+        let bridge = CoreBridge::new(
+            controller,
+            listeners.clone(),
+            settings.get(),
+            collections,
+            selected,
+        );
         crate::presentation::initialize(bridge.clone(), library.clone());
         bridge
             .owner
             .run(|| crate::platform::initialize_media(bridge.clone()));
         let settings = crate::settings::SettingsService::new(settings, bridge.clone());
+        let collections =
+            crate::collections::CollectionsService::new(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
+            collections,
             plugins: crate::plugins::PluginService::new(plugins),
             settings,
             library,
@@ -195,6 +252,63 @@ impl Core {
         });
         slot.set(Some(core.clone()));
         Ok(core)
+    }
+    /// Open an explicit data directory owned by this engine; no process environment is mutated.
+    pub async fn open_in(dir: String) -> Result<Instance<Self>, JsError> {
+        let path = std::path::PathBuf::from(dir);
+        std::fs::create_dir_all(&path).map_err(|e| JsError::Error(e.to_string()))?;
+        let path = path
+            .canonicalize()
+            .map_err(|e| JsError::Error(e.to_string()))?;
+        Self::select_root(DataRoot {
+            path,
+            _temporary: None,
+        })
+        .await
+    }
+    /// Create a unique temporary Core for one test or preview, retained through close/open.
+    pub async fn open_isolated() -> Result<Instance<Self>, JsError> {
+        let base = std::env::temp_dir().join("haiku-m1-03-fixtures");
+        std::fs::create_dir_all(&base).map_err(|e| JsError::Error(e.to_string()))?;
+        let dir = tempfile::Builder::new()
+            .prefix("core-")
+            .tempdir_in(base)
+            .map_err(|e| JsError::Error(e.to_string()))?;
+        let path = dir
+            .path()
+            .canonicalize()
+            .map_err(|e| JsError::Error(e.to_string()))?;
+        Self::select_root(DataRoot {
+            path,
+            _temporary: Some(Arc::new(dir)),
+        })
+        .await
+    }
+    /// Actual engine-owned root, for explicit persistence tests that reopen another engine.
+    pub fn data_dir(&self) -> String {
+        self.player
+            .with(|p| p.bridge._root.path.display().to_string())
+    }
+    /// Likes, user playlists and offline favorite mirrors, with automatic persistence.
+    #[getter]
+    pub fn collections(&self) -> Instance<crate::collections::CollectionsService> {
+        self.collections.clone()
+    }
+    /// Flush pending collections and playback, releasing the cached Core for a later open.
+    pub async fn close(this: Instance<Self>) -> Result<(), String> {
+        let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));
+        let store = bridge.collections.clone();
+        blocking(move || store.flush())
+            .await
+            .map_err(|e| e.to_string())??;
+        bridge
+            .controller
+            .execute(Command::Flush)
+            .await
+            .map_err(|e| e.message)?;
+        bridge.controller.shutdown();
+        global::<Option<Instance<Core>>>().set(None);
+        Ok(())
     }
     /// Durable settings, effects and cache preferences; TSX is a subscribed mirror.
     #[getter]
@@ -410,6 +524,68 @@ mod tests {
             *self.0.lock().unwrap()
         }
     }
+    #[component]
+    fn IsolatedFixture() -> impl IntoElement {
+        let report = signal(String::new());
+        spawn(async move {
+            let core = Core::open_isolated().await.unwrap();
+            let (root, count) = core.with(|c| {
+                c.collections.with(|collections| {
+                    collections.create("Only mine".into()).unwrap();
+                });
+                let count = c
+                    .collections
+                    .with(|collections| collections.list().as_array().unwrap().len());
+                // The Core registers its exit barrier before native media is available
+                // (Headless never installs a system media session).
+                crate::exit::flush_all().unwrap();
+                let restored =
+                    haiku_store::collections::Collections::open(std::path::Path::new(&c.data_dir()))
+                        .unwrap();
+                assert!(restored.list().iter().any(|p| p.title == "Only mine"));
+                (c.data_dir(), count)
+            });
+            report.set(format!("isolated:{count}:{root}"));
+        });
+        text(move || report.get())
+    }
+    #[test]
+    fn engines_own_independent_temporary_data_roots() {
+        let mut first =
+            nsh_testing::Headless::start(nsh_engine::EngineConfig::new(nsh_engine::Root::of::<
+                IsolatedFixture,
+            >()))
+            .unwrap();
+        first
+            .wait_until("first independent Core", Duration::from_secs(5), |app| {
+                app.texts().iter().any(|s| s.starts_with("isolated:2:"))
+            })
+            .unwrap();
+        let first_root = first
+            .screen()
+            .texts()
+            .into_iter()
+            .find(|s| s.starts_with("isolated:2:"))
+            .unwrap()
+            .to_owned();
+        let mut second =
+            nsh_testing::Headless::start(nsh_engine::EngineConfig::new(nsh_engine::Root::of::<
+                IsolatedFixture,
+            >()))
+            .unwrap();
+        second
+            .wait_until("second independent Core", Duration::from_secs(5), |app| {
+                app.texts().iter().any(|s| s.starts_with("isolated:2:"))
+            })
+            .unwrap();
+        let second_root = second
+            .screen()
+            .texts()
+            .into_iter()
+            .find(|s| s.starts_with("isolated:2:"))
+            .unwrap();
+        assert_ne!(first_root, second_root);
+    }
     #[tokio::test]
     async fn rust_component_clock_reads_progress_and_freezes_when_paused() {
         let audio = Arc::new(Audio::default());
@@ -453,7 +629,7 @@ mod plugin_host_tests {
     fn Fixture() -> impl IntoElement {
         let installed = signal(false);
         spawn(async move {
-            let core = Core::open().await.unwrap();
+            let core = Core::open_isolated().await.unwrap();
             core.with(|value| {
                 let packages = crate::plugins::PluginService::host(&value.plugins)
                     .packages()

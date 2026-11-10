@@ -105,8 +105,7 @@ mod mac {
             hook!(nextTrackCommand, "next");
             hook!(previousTrackCommand, "previous");
             hook!(changePlaybackPositionCommand, "seek");
-            let like:id=msg_send![center,likeCommand];
-            let _:()=msg_send![like,setEnabled:NO];
+            hook!(likeCommand, "favorite");
             hook!(changeRepeatModeCommand, "repeat");
             hook!(changeShuffleModeCommand, "shuffle");
             let observer=block::ConcreteBlock::new(move |_notification:id| {clear_main();let _=keep_awake_main(false);}).copy();
@@ -147,7 +146,7 @@ mod mac {
             let _:()=msg_send![center,setPlaybackState:if info.playing{1usize}else{2usize}];
             let remote:id=msg_send![class!(MPRemoteCommandCenter),sharedCommandCenter];
             let next:id=msg_send![remote,nextTrackCommand];let prev:id=msg_send![remote,previousTrackCommand];let like:id=msg_send![remote,likeCommand];
-            let _:()=msg_send![next,setEnabled:if info.can_next{YES}else{NO}];let _:()=msg_send![prev,setEnabled:if info.can_previous{YES}else{NO}];let _:()=msg_send![like,setActive:if info.favorite{YES}else{NO}];
+            let _:()=msg_send![next,setEnabled:if info.can_next{YES}else{NO}];let _:()=msg_send![prev,setEnabled:if info.can_previous{YES}else{NO}];let _:()=msg_send![like,setActive:if info.favorite{YES}else{NO}];let _:()=msg_send![like,setEnabled:YES];
             true
         })
     }
@@ -158,6 +157,9 @@ mod mac {
             let _: () = msg_send![artwork as id, release];
         }
         let _: () = msg_send![center,setPlaybackState:3usize];
+        let remote: id = msg_send![class!(MPRemoteCommandCenter), sharedCommandCenter];
+        let like: id = msg_send![remote, likeCommand];
+        let _: () = msg_send![like,setEnabled:NO];
     }
     pub fn clear() {
         dispatch::Queue::main().exec_sync(|| unsafe { clear_main() });
@@ -186,8 +188,12 @@ mod mac {
             } else {
                 String::new()
             };
+            let remote:id=msg_send![class!(MPRemoteCommandCenter),sharedCommandCenter];
+            let like:id=msg_send![remote,likeCommand];
+            let favorite:bool=msg_send![like,isActive];
+            let favorite_enabled:bool=msg_send![like,isEnabled];
             let artwork:id=if info!=nil {msg_send![info,objectForKey:MPMediaItemPropertyArtwork]}else{nil};
-            serde_json::json!({"title":title,"playback_state":state,"has_info":info!=nil,"has_artwork":artwork!=nil})
+            serde_json::json!({"title":title,"playback_state":state,"has_info":info!=nil,"has_artwork":artwork!=nil,"favorite":favorite,"favorite_enabled":favorite_enabled})
         })
     }
     fn keep_awake_main(enabled: bool) -> Result<bool, String> {

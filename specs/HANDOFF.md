@@ -23,6 +23,13 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M3-01 已验收并提交
+
+- collections 服务（串行修改、500ms 防抖原子写盘、Core 生命周期与应用退出钩子冲刷）、`core.collections` 导出、侧栏“喜欢/歌单…”、喜欢页、用户歌单页（四格合成封面）、TrackList 右键喜欢/加入歌单、Dock 喜欢、媒体中心 favorite。workspace 234 通过，nsh test 20/20。
+- 测试隔离：Core 新增 `openIn`/`openIsolated`，数据根按引擎保存；新测试与预览一律用独立临时目录。
+- 遗留并入 M3-02 第 0 步：Dock 已喜欢时爱心应为实心（与列表一致），目前是强调色描边。右键子菜单展开截图因不做 GUI 自动化未拍，行为由 Headless 覆盖。
+- 待人工确认：控制中心 favorite 点击、真实 Cmd+Q 冲刷。
+
 ## 2026-11-10 更新：M2-05 已验收并提交，M2 完成
 
 - qq-music v2（`dev-plugins/qq-music`，327 行，契约 34/34，不默认安装）、开发者面板（500ms 内容哈希轮询热重载、描述符参数表单 + 原始 JSON、日志/HTTP 追踪）、插件 logo（沿用参考版图标）与系统文件选择器、Rust 生成二维码（qrcode 0.14.1）、`sdk/GUIDE.md`（7 节，以 subsonic 为例）。workspace 228 通过，nsh test 17/17。

@@ -12,7 +12,7 @@ function Fixture() {
     await prepareLibrary(root);
     await writeFile(`${root}/0.lrc`, "[00:00]Alpha opening\n[00:10]Alpha middle\n[00:30]Alpha ending");
     await writeFile(`${root}/1.lrc`, "[00:00]Beta opening\n[00:10]Beta middle\n[00:30]Beta ending");
-    const core = await Core.open();
+    const core = await Core.openIsolated();
     await core.player.clear();
     await core.player.setMode("sequential");
     await core.player.setVolume(0);

@@ -10,7 +10,7 @@ function Fixture() {
   const url = signal(""), commits = signal(0), report = signal("");
   let stop: (() => void) | undefined;
   const ready = resource(async () => {
-    const c = await Core.open();
+    const c = await Core.openIsolated();
     url.set(await c.plugins.startFixture("subsonic.music"));
     stop = c.plugins.onChange(() => commits.set(commits() + 1));
     return c;

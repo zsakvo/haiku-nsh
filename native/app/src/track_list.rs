@@ -1,7 +1,7 @@
 //! A reusable compact table. Cells bind their current position, never row-local state.
 use crate::track_source::{self, Source};
 use haiku_library::service::artist_names;
-use nsh_base::{context_menu, menu, menu_item, theme};
+use nsh_base::{context_menu, menu, menu_item, submenu, theme};
 use nsh_core::{PressEvent, prelude::*};
 use std::collections::BTreeSet;
 
@@ -80,14 +80,135 @@ fn command(
         .app_class("rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent")
         .child(text(label))
 }
+fn selected_tracks(props: TrackListProps, at: Position) -> Vec<haiku_model::Track> {
+    let Some(s) = source(props) else {
+        return vec![];
+    };
+    targets(props, at)
+        .iter()
+        .filter_map(|id| s.provider.track(id))
+        .collect()
+}
 fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> impl IntoElement {
+    let bridge = crate::presentation::get().map(|p| p.bridge.clone());
+    let store = bridge.as_ref().map(|b| b.collections.clone());
+    let read = store.clone();
+    let write = store.clone();
+    let add = store.clone();
+    let revision = bridge.as_ref().map(|b| b.collections_revision);
+    let all_liked = move || {
+        if let Some(r) = revision {
+            r.get();
+        }
+        let tracks = selected_tracks(props, at);
+        !tracks.is_empty()
+            && read
+                .as_ref()
+                .is_some_and(|s| tracks.iter().all(|t| s.is_liked(&t.entity_ref())))
+    };
     view()
         .child(command(props, at, cx, "play", "播放"))
         .child(command(props, at, cx, "next", "下一首播放"))
         .child(command(props, at, cx, "append", "加入队列"))
-        .child(command(props, at, cx, "edit", "编辑信息…"))
-        .child(command(props, at, cx, "reveal", "在 Finder 中显示"))
+        .child(when(
+            move || revision.is_some(),
+            move || {
+                let all_liked = all_liked.clone();
+                let write = write.clone();
+                menu_item()
+                    .app_class(ITEM)
+                    .child(text(move || {
+                        if all_liked() {
+                            "取消喜欢"
+                        } else {
+                            "喜欢"
+                        }
+                    }))
+                    .on_select(move || {
+                        if let Some(store) = &write {
+                            let tracks = selected_tracks(props, at);
+                            let value = !tracks.iter().all(|t| store.is_liked(&t.entity_ref()));
+                            for track in tracks {
+                                if let Err(e) = store.set_liked(&track, Some(value)) {
+                                    log::error!("Like: {e}");
+                                }
+                            }
+                        }
+                    })
+            },
+        ))
+        .child(
+            submenu()
+                .trigger(view().app_class(ITEM).child(text("加入歌单 ▸")))
+                .child(each(
+                    move || {
+                        if let Some(r) = revision {
+                            r.get();
+                        }
+                        store
+                            .as_ref()
+                            .map(|s| {
+                                s.list()
+                                    .into_iter()
+                                    .filter(|p| p.kind == "user")
+                                    .map(|p| (p.id, p.title))
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default()
+                    },
+                    |p| p.0.clone(),
+                    move |item, _| {
+                        let add = add.clone();
+                        menu_item()
+                            .app_class(ITEM)
+                            .child(text(move || item.get().1))
+                            .on_select(move || {
+                                if let Some(store) = &add {
+                                    if let Err(e) = store
+                                        .add(&item.get_untracked().0, &selected_tracks(props, at))
+                                    {
+                                        log::error!("Add playlist: {e}");
+                                    }
+                                }
+                            })
+                    },
+                ))
+                .child(command(props, at, cx, "new-playlist", "新建歌单…")),
+        )
+        .child(when(
+            move || {
+                source(props)
+                    .and_then(|s| s.provider.collection_id())
+                    .is_some_and(|id| id != "__liked__")
+            },
+            move || {
+                view()
+                    .child(command(props, at, cx, "move-up", "上移"))
+                    .child(command(props, at, cx, "move-down", "下移"))
+            },
+        ))
+        .child(when(
+            move || {
+                source(props)
+                    .and_then(|s| s.provider.collection_id())
+                    .is_some()
+            },
+            move || command(props, at, cx, "remove", "从此列表移除"),
+        ))
+        .child(when(
+            move || {
+                selected_tracks(props, at)
+                    .iter()
+                    .all(|t| t.source == "local")
+            },
+            move || {
+                view()
+                    .child(command(props, at, cx, "edit", "编辑信息…"))
+                    .child(command(props, at, cx, "reveal", "在 Finder 中显示"))
+            },
+        ))
 }
+const ITEM: &str = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent";
 const POPUP: &str =
     "rounded-(--radius-surface) border border-border bg-popover shadow-lg min-w-48 p-1";
 
@@ -345,6 +466,27 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                                 .w_12()
                                 .text_xs()
                                 .text_color(move || theme().muted_foreground)
+                            },
+                        ))
+                        .child(when(
+                            move || crate::presentation::get().is_some(),
+                            move || {
+                                let p = crate::presentation::get().unwrap();
+                                let revision = p.bridge.collections_revision;
+                                let store = p.bridge.collections.clone();
+                                text(move || {
+                                    revision.get();
+                                    if track.with(|t| {
+                                        t.as_ref().is_some_and(|t| store.is_liked(&t.entity_ref()))
+                                    }) {
+                                        "♥"
+                                    } else {
+                                        ""
+                                    }
+                                })
+                                .w_5()
+                                .text_sm()
+                                .text_color(move || theme().primary)
                             },
                         ))
                         .child(

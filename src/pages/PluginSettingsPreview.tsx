@@ -5,7 +5,7 @@ import { AppShell } from "../shell/AppShell";
 /** Real-window evidence uses the loopback HTTP fixture and an actual capability invocation. */
 export function PluginSettingsPreview(props: { category: string; login?: boolean; loginPlugin?: string; devtools?: boolean }) {
   const ready = resource(async () => {
-    const c = await Core.open();
+    const c = await Core.openIsolated();
     await c.settings.update({ themeMode: "light" });
     if (props.loginPlugin || props.devtools) {
       await c.plugins.importPackage("native/app/tests/fixtures/auth-plugin");

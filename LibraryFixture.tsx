@@ -11,7 +11,7 @@ function Fixture() {
     // Headless modules have asset:/ URLs, so the host grants this explicit fixture root.
     const root = `/tmp/haiku-m1-03-fixtures/music-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     await prepareLibrary(root, 120);
-    return { root, core: await Core.open() };
+    return { root, core: await Core.openIsolated() };
   });
   return <View class="flex-1">
     <If when={!!ready()}>

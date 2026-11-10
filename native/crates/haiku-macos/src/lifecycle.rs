@@ -85,3 +85,24 @@ pub fn install_async() {
         }
     });
 }
+
+static EXIT_HANDLER: std::sync::Mutex<Option<fn()>> = std::sync::Mutex::new(None);
+/// Register Core's exit barrier independently of the media center and window delegate.
+pub fn set_exit_handler(handler: fn()) {
+    *EXIT_HANDLER.lock().unwrap() = Some(handler);
+    dispatch::Queue::main().exec_async(|| {
+        static INSTALL: std::sync::Once = std::sync::Once::new();
+        INSTALL.call_once(|| unsafe {
+            use cocoa::{base::{id,nil}, foundation::NSString};
+            use objc::{class,msg_send,sel,sel_impl};
+            let observer=block::ConcreteBlock::new(move |_notification:id| {
+                let handler=*EXIT_HANDLER.lock().unwrap();
+                if let Some(handler)=handler {handler();}
+            }).copy();
+            let center:id=msg_send![class!(NSNotificationCenter),defaultCenter];
+            let name=NSString::alloc(nil).init_str("NSApplicationWillTerminateNotification");
+            let _:id=msg_send![center,addObserverForName:name object:nil queue:nil usingBlock:&*observer];
+            let _:()=msg_send![name,release];
+        });
+    });
+}

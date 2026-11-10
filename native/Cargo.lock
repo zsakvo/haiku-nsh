@@ -1991,6 +1991,7 @@ dependencies = [
 name = "haiku-store"
 version = "0.1.0"
 dependencies = [
+ "haiku-model",
  "loro",
  "serde",
  "serde_json",
@@ -3255,6 +3256,7 @@ dependencies = [
  "qrcode",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

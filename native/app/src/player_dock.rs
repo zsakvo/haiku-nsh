@@ -83,6 +83,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
             .on_seek(move |seconds: &f64| send(&seek_c,Command::Seek(*seconds)))
             .flex_1().min_w_0())
         .child(view().flex_row().items_center().gap_1()
+            .child(crate::collections::like_button(false))
             .child(control("切换播放模式","repeat",false).w_12().disabled(empty)
                 .on_press(move ||send(&mode_c,Command::SetMode(match state.with_untracked(|s|s.mode) {
                     Mode::Sequential=>Mode::RepeatAll,Mode::RepeatAll=>Mode::RepeatOne,Mode::RepeatOne=>Mode::Shuffle,Mode::Shuffle=>Mode::Sequential,

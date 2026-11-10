@@ -1,9 +1,9 @@
 import { expect, test } from "nsh/test";
 import { Core } from "haiku/native";
 
-// nsh test is run with HAIKU_DATA_DIR pointing to an isolated temporary directory.
+// Each test owns a Core directory, independent of test order and process environment.
 test("Core player queue commands publish low-frequency state and Stop unregisters", async () => {
-  const core = await Core.open();
+  const core = await Core.openIsolated();
   expect((await Core.open()).player === core.player).toBe(true);
   const player = core.player;
   const heard: any[] = [];
@@ -47,5 +47,5 @@ test("Core player queue commands publish low-frequency state and Stop unregister
     await stateAfter((state) => state.tracks.length === 0);
     expect(heard.length).toBe(count);
     await player.flush();
-  } finally { stop(); await player.clear(); }
+  } finally { stop(); await player.clear(); await core.close(); }
 });

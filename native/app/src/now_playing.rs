@@ -84,6 +84,7 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
                                 .text_sm().text_color(move ||theme().color("now-playing-muted").unwrap()))
                             .child(text(move ||track.with(|t|t.as_ref().and_then(|t|t.album.as_ref()).map(|a|a.title.clone()).unwrap_or_default()))
                                 .text_sm().text_color(move ||theme().color("now-playing-muted").unwrap())))
+                        .child(crate::collections::like_button(true))
                         .child(lyrics_view(p.clone()))))
         }))
 }
@@ -119,7 +120,7 @@ mod tests {
     fn Fixture() -> impl IntoElement {
         let ready = signal(false);
         spawn(async move {
-            crate::Core::open().await.expect("isolated Core");
+            crate::Core::open_isolated().await.expect("isolated Core");
             ready.set(true);
         });
         view()

@@ -4,7 +4,7 @@ import { AppShell } from "../shell/AppShell";
 /** Real-window M1-05 acceptance: ordinary Core commands, no synthesized GUI input. */
 export function EffectsSettingsPreview(props: { artifacts: string; category: string }) {
   const ready = resource(async () => {
-    const core = await Core.open();
+    const core = await Core.openIsolated();
     await core.settings.update({ themeMode: "light", brandColor: "orange", audioEffects: { enabled: true, presetId: "vocal", bandGainsDb: [-2,-2,-1,2,4,4,3,1,0,-1] } });
     await core.player.clear();
     await core.library.addRoots([`${props.artifacts}/media`]);

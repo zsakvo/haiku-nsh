@@ -16,3 +16,9 @@ pub(crate) fn clear_media() {
     #[cfg(target_os = "macos")]
     haiku_macos::system::shutdown_async();
 }
+
+/// Install the Core durability barrier even when no media session has ever existed.
+pub(crate) fn install_exit_hook() {
+    #[cfg(target_os = "macos")]
+    haiku_macos::lifecycle::set_exit_handler(crate::exit::on_exit);
+}

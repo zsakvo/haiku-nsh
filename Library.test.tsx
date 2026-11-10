@@ -52,8 +52,9 @@ test("local library scan, groups, recycled selection, sparse batch edit and filt
     await app.rightClick("label:Song Beta");
     for (const label of ["播放", "下一首播放", "加入队列", "编辑信息…", "在 Finder 中显示"])
       expect(app.shows(`role:menuitem[${label}]`)).toBe(true);
-    expect(app.count("role:menuitem")).toBe(5);
-    console.log("library: context menu has exactly the five implemented commands");
+    expect(app.shows("text:喜欢")).toBe(true);
+    expect(app.shows("text:加入歌单 ▸")).toBe(true);
+    console.log("library: context menu includes collections and the five existing implemented commands");
     await app.keyboard.press("escape");
   } finally {
     if (app.shows("清理测试数据")) {

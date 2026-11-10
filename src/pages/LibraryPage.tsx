@@ -7,6 +7,7 @@ import { SearchField } from "../ui/SearchField";
 import { ToggleGroup } from "../ui/LibraryControls";
 import { Button } from "../ui/Button";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
+import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 
 const views = [{ id: "tracks", label: "歌曲" }, { id: "albums", label: "专辑" }, { id: "artists", label: "艺术家" }];
@@ -33,6 +34,7 @@ export function LibraryPage(props: {
   const errorsOpen = signal(false);
   const selected = signal<string[]>([]);
   const editor = signal<string[] | null>(null);
+  const playlistTracks = signal<unknown[] | null>(null);
   const groupLimit = signal(100);
   const query = () => ({ search: search(), sort: sort(), descending: descending(), group: props.group ?? null });
   const source = resource(async () => library.query(query()));
@@ -74,6 +76,7 @@ export function LibraryPage(props: {
   }
   async function action(command: string, ids: string[]) {
     if (command === "edit") { editor.set(ids); return; }
+    if (command === "new-playlist") { playlistTracks.set(ids.map((id) => library.track(id)).filter(Boolean)); return; }
     await act(async () => {
       if (command === "reveal") { for (const id of ids) await library.reveal(id); return; }
       const tracks = ids.map((id) => library.track(id)).filter(Boolean);
@@ -149,7 +152,7 @@ export function LibraryPage(props: {
       <Text class="p-5 text-sm text-muted-foreground">正在加载曲库…</Text>
     </If>
     <If when={!!roots().length && !!source() && showTracks()}>
-      <TrackList source={source()!} active={props.active && !editor() && !rootsOpen()}
+      <TrackList source={source()!} active={props.active && !editor() && !rootsOpen() && !playlistTracks()}
         currentId={mirrors.player()?.current?.id ?? null}
         onPlay={(event) => void act(() => library.playSource(event.source, event.id))}
         onAction={(event) => void action(event.command, event.ids)}
@@ -186,6 +189,7 @@ export function LibraryPage(props: {
         <Button label="完成" onPress={() => rootsOpen.set(false)} />
       </View>
     </Dialog>
+    <If when={!!playlistTracks()}><PlaylistEditor core={props.core} tracks={playlistTracks()!} onClose={() => playlistTracks.set(null)} /></If>
     <If when={!!editor()}><TrackEditor core={props.core} ids={editor()!} onClose={() => editor.set(null)} /></If>
   </View>;
 }

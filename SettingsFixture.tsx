@@ -1,4 +1,4 @@
-import { cleanup, mount, resource, signal, Text, View } from "nsh";
+import { cleanup, host, mount, resource, signal, Text, View } from "nsh";
 import { Core } from "haiku/native";
 import { AppShell } from "./src/shell/AppShell";
 import { Button } from "./src/ui/Button";
@@ -11,9 +11,10 @@ function Fixture() {
   }
   let stop: (() => void) | undefined;
   cleanup(() => stop?.());
-  const core = resource(async () => { const c = await Core.open(); stop = c.settings.onChange(() => read(c)); return c; });
+  const core = resource(async () => { const c = typeof host.params.dataRoot === "string" ? await Core.openIn(host.params.dataRoot) : await Core.openIsolated(); stop = c.settings.onChange(() => read(c)); return c; });
   return <View class="flex-1">
-    <AppShell initialOverlay="settings" />
+    <If when={!!core()}><AppShell initialOverlay="settings" /></If>
+    <If when={!!core()}><Text>{`data-root:${core()!.dataDir()}`}</Text></If>
     <Button label="读取接线配置" onPress={() => read(core()!)} />
     <Text>{report()}</Text>
   </View>;

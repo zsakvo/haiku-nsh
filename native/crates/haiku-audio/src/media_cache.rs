@@ -79,6 +79,9 @@ pub fn set_root(path: String) -> Result<(), String> {
     let root = PathBuf::from(path);
     ensure_layout(&root).map_err(|e| format!("创建缓存目录失败: {e}"))?;
     let mut g = cache().lock().map_err(|e| e.to_string())?;
+    if g.root.as_ref() != Some(&root) {
+        *g = State::default();
+    }
     g.root = Some(root);
     Ok(())
 }

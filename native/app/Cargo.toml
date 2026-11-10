@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+tempfile.workspace = true
 qrcode = { version = "0.14.1", default-features = false, features = ["image"] }
 image.workspace = true
 haiku-plugins = { path = "../crates/haiku-plugins" }

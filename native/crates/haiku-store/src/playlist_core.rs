@@ -57,6 +57,9 @@ fn plugin_favorite_id(plugin_id: &str, playlist_id: &str) -> String {
 /// 作为**普通 JSON 值**整条写入 MovableList，不做字段级合并。
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TrackEntry {
+    /// Optional SDK snapshot; legacy readers ignore this extension.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdk_track: Option<haiku_model::Track>,
     #[serde(rename = "pluginId")]
     pub plugin_id: String,
     #[serde(rename = "trackId")]
@@ -687,6 +690,7 @@ mod tests {
 
     fn track(n: u32) -> TrackEntry {
         TrackEntry {
+            sdk_track: None,
             plugin_id: "netease".into(),
             track_id: format!("t{n}"),
             provider: "netease".into(),
@@ -900,6 +904,25 @@ mod tests {
         assert_eq!(track_ids(&a, &fav[0].id), track_ids(&b, &fav[0].id));
     }
 
+    #[test]
+    fn mirror_version_breaks_equal_timestamp_ties_in_both_import_orders() {
+        let a = PlaylistCore::new();
+        let b = PlaylistCore::new();
+        let id =
+            a.write_plugin_playlist_snapshot("src", "remote", "A", "A", "", "", &[track(1)], 200);
+        b.write_plugin_playlist_snapshot("src", "remote", "B", "B", "", "", &[track(2)], 200);
+        let av = a.latest_plugin_snapshot(&id).unwrap().version;
+        let bv = b.latest_plugin_snapshot(&id).unwrap().version;
+        let expected = if av > bv {
+            vec!["t1".to_string()]
+        } else {
+            vec!["t2".to_string()]
+        };
+        cross_sync(&a, &b);
+        assert_eq!(track_ids(&a, &id), expected);
+        assert_eq!(track_ids(&b, &id), expected);
+        assert!(a.import(&b.export_snapshot()).unwrap().is_empty());
+    }
     #[test]
     fn stale_plugin_snapshot_does_not_overwrite_newer() {
         let core = PlaylistCore::new();

@@ -21,7 +21,8 @@ test("durable appearance survives a new engine; EQ reaches player; cache clear r
   await app.press("role:button[清理]");
   await app.waitUntil(() => !app.shows("text:清理媒体缓存？"));
   // Opening a fresh surface constructs a new Core and reads settings.json again.
-  const restarted = await open("./SettingsFixture.tsx", options);
+  const dataRoot = app.texts().find((text) => text.startsWith("data-root:"))!.slice("data-root:".length);
+  const restarted = await open("./SettingsFixture.tsx", { ...options, host: { params: { dataRoot } } });
   await restarted.waitFor("id:settings-heading");
   await restarted.press("读取接线配置");
   await restarted.waitUntil(() => restarted.texts().some((text) => text.startsWith("persist:dark:teal;")));

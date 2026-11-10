@@ -7,7 +7,7 @@ import type { PlayerSnapshot } from "../state/core";
 /** Real-window acceptance entry. Rust reads only the generated media and isolated data root. */
 export function PlayerPreview(props: { mode: AppearanceMode; artifacts: string; expanded?: boolean; settings?: boolean }) {
   const ready = resource(async () => {
-    const core = await Core.open();
+    const core = await Core.openIsolated();
     await core.player.clear();
     await core.library.addRoots([`${props.artifacts}/media`]);
     const report = await core.library.scan();

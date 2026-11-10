@@ -7,6 +7,8 @@ import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
 import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
+import { CollectionPage } from "../pages/CollectionPage";
+import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
 import { LibraryPage } from "../pages/LibraryPage";
 import { createCoreState } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
@@ -89,7 +91,7 @@ export function AppShell(props: {
               selected={nav.current().kind === page.id || (page.id === "library" && ["album", "artist"].includes(nav.current().kind))}
               onPress={() => nav.navigate({ kind: page.id })} />)}
         </View>)}
-        <View><SectionLabel label="歌单" /></View>
+        <If when={!!core()}><PlaylistSidebar core={core()!} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
       <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-(--dock-clearance)">
         <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
@@ -100,8 +102,17 @@ export function AppShell(props: {
     <WindowPanel>
       <ShellToolbar />
       <View class="flex-1 min-h-0">
-        {destinations.filter((page) => page.id !== "library").map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["library", "favorites", "playlists"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
+          <CollectionPage core={core()!} id="__liked__" active={nav.current().kind === "favorites"} onDeleted={() => nav.navigate({ kind: "favorites" })} />
+          <CollectionsBrowser core={core()!} active={nav.current().kind === "playlists"} navigate={nav.navigate} />
+          <Each of={nav.history().filter((route, index, routes) => route.kind === "playlist"
+            && routes.findIndex((other) => routeKey(route) === routeKey(other)) === index)} key={routeKey}>
+            {(route) => <CollectionPage core={core()!}
+              id={core()!.collections.idForKey((route() as Extract<Route, {ref: unknown}>).ref)}
+              active={routeKey(nav.current()) === routeKey(route())}
+              onDeleted={() => nav.navigate({ kind: "playlists" })} />}
+          </Each>
           <LibraryPage core={core()!} active={nav.current().kind === "library"}
             injectedFolders={props.injectedLibraryFolders} navigate={nav.navigate} />
           <Each of={nav.history().filter((route, index, routes) => "ref" in route

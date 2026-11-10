@@ -29,7 +29,7 @@
 | F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
-| F11 喜欢、歌单与远端收藏 | 未实现 | | | |
+| F11 喜欢、歌单与远端收藏 | 部分实现（本地） | `haiku-store::collections`、`native/app/src/collections.rs`、collections 页面与菜单 | M3-01：workspace 232 通过/1 忽略；新增 collections Headless 流程通过；参考版 Loro fixture 可读 | 全套 nsh test 未通过；最终截图、首次媒体会话前退出冲刷与媒体命令实机验证未完成 |
 | F12 历史与听歌统计 | 未实现 | | | |
 | F13 下载与媒体缓存 | 部分实现（媒体缓存） | `haiku-audio::media_cache`、`haiku-playback::backend`、`src/shell/StorageSettings.tsx` | M1-05：容量/LRU/pin/完整性/失败删除/原文件保护测试通过；清理确认 Headless 与浅色截图通过 | 网络缓存真实写入/恢复留 M4，下载留 M5；缓存路径按任务使用 media-cache/ |
 | F14 Haiku 账号 | 未实现 | | | |
@@ -564,3 +564,32 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 偏离：目录轮询而非新增 OS watcher 依赖；参数元数据来自固定 SDK 签名，复杂认证使用 JSON；web 维持已接受降级；record/live 基础版。
 - 既有已安装且无 logo 元数据的内置旧包继续显示占位图标；本轮随新安装包提供 logo，不自动覆盖旧包。
 - 本轮无已知验收阻塞；M2 范围实现提交审阅，实际平台可用性不以 fixture 代替人工确认。
+
+
+## 2026-11-10 M3-01：喜欢与用户歌单（修订后测试通过，截图未齐）
+
+- 全部改动在主仓库，未提交 git；保留审阅者的未跟踪任务文件。
+- collections 服务：串行修改、500ms 防抖原子写盘、句柄释放/Core.close/独立应用退出钩子冲刷、重开恢复、错误状态查询。
+- 喜欢按 EntityRef 身份去重，专用 setLiked(bool/null) 写入路径；用户歌单 CRUD/描述、批量加歌/移除、曲目与歌单重排。
+- 远端收藏沿用 favorite:<sourceId>:<remoteId> 和只读完整镜像；测试 (refreshedAt, version) 冲突取大方及重复导入。
+- core.collections 导出列表/曲目/写操作、onChange(受影响 id)→Stop、onLiked→Stop、快照导入导出、Rust 虚拟查询与播放。
+- Dock/正在播放/TrackList/媒体中心直接消费 Rust 喜欢状态；TSX 仅订阅镜像。
+- 参考 fixture 由只读参考版 dist/haiku-native RPC 生成，写入 native/crates/haiku-store/tests/fixtures/reference-playlists.loro。
+- 沿用旧根容器与 pluginId/trackId 字段；可选 sdk_track 扩展保留 SDK 元信息；本轮验证旧快照读取，未另跑参考版反读新扩展。
+- UI：侧栏歌单滚动列表与新建、喜欢页搜索/来源/批量管理、详情合成封面/编辑/删除确认、总览列表/网格、原生曲目子菜单与菜单重排。
+- 首轮 workspace 232 passed；nsh test 最终 12/18，复用数据根导致导航、来源与 EQ 断言污染；旧失败日志保留。
+- 经审阅者授权修订：Core.openIn/openIsolated 按引擎选择根，临时目录随 Core/引擎存活；所有测试/预览先隔离再建业务镜像。
+- 媒体缓存换根时重置进程单例；Settings 重开测试只显式共享本用例的目录，不清理用户目录或依赖执行顺序。
+- NowPlaying 隔离后单项通过；整套同样通过，底边仍为 688（800−112），未改 Dock 高度或断言。
+- 退出冲刷注册在 CoreBridge，macOS 生命周期独立订阅终止通知；测试覆盖无媒体会话时冲刷及注销、两个引擎独立根。
+- collections 订阅 Library revision，刷新原生查询并通知受影响页面；tracks 读取本地有效元数据。
+- 封面文件读取/base64 移到 blocking 池，按请求序号拒绝旧结果；同步 artwork 只读缓存，完成后推送 artwork 事件。
+- Collections Headless 新增元数据标题/封面变化回归；原有 Dock→喜欢、菜单建歌单、编辑/删除、Stop、close/open 全通过。
+- 修订 workspace 首次编译因新增测试 API 用法失败，修正后 234 passed / 0 failed / 1 ignored。
+- nsh check/build 各一次通过；nsh test 首次 15/20（App 未等就绪、认证镜像过早 open），修正夹具时序后 20/20 全绿。
+- 仅既有工具链/依赖警告；日志：cargo-test-workspace-revision{1,2}.log、nsh-{check,build}-revision.log、nsh-test-revision[-repair].log。
+- 证据均在 .artifacts/m3-01/；repair-now-playing-isolated.log 保留单项结果，reference-fixture.log 保留参考快照生成记录。
+- 已重拍真实浅色 likes.png、playlist.png（四格合成封面）、liked-dock.png；窗口使用独立临时 Core 与本地静音音频。
+- run-playlist-media-revision.log 再次记录 favorite:true/favorite_enabled:true、Song Alpha、paused、has_artwork:true。
+- 未完成：展开“加入歌单”子菜单的真实窗口截图；行为已由 Headless 覆盖，未使用 GUI 自动化补图。
+- 待人工：控制中心 favorite、真实 Cmd+Q、展开菜单外观；远端在线刷新仍按计划留 M4，无新增业务架构决策。

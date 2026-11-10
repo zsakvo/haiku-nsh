@@ -7,7 +7,7 @@ export type LibrarySnapshot = {
   report: { count: number; skipped: number; errors: string[]; cancelled: boolean };
 };
 export type TrackSummary = {
-  id: string; title: string; artists: (string | { name: string })[];
+  source: string; id: string; title: string; artists: (string | { name: string })[];
   album?: { title: string } | null; cover?: string | null;
   extra?: Record<string, string | number | null> | null;
 };

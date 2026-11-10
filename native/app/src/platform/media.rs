@@ -15,9 +15,16 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
         }
     });
     let controller = bridge.controller.clone();
+    let collections = bridge.collections.clone();
     spawn(async move {
         while let Some(event) = rx.recv().await {
             if event.name == "media.event" {
+                if event.data["kind"].as_str() == Some("favorite") {
+                    if let Some(track) = controller.state().current {
+                        let _ = collections.set_liked(&track, None);
+                    }
+                    continue;
+                }
                 if let Some(command) = remote_command(&event.data, controller.state().mode) {
                     if let Err(e) = controller.execute(command).await {
                         log::warn!("Media command: {}", e.message);
@@ -60,6 +67,8 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
         }
     });
     let state = bridge.state;
+    let collections = bridge.collections.clone();
+    let revision = bridge.collections_revision;
     let controller = bridge.controller.clone();
     let last = stored(None);
     let info_updates = updates.clone();
@@ -68,6 +77,11 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             return;
         }
         let s = state.get();
+        revision.get();
+        let favorite = s
+            .current
+            .as_ref()
+            .is_some_and(|t| collections.is_liked(&t.entity_ref()));
         let key = (
             s.current.clone(),
             s.status,
@@ -75,6 +89,7 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             s.timeline_revision,
             s.next_index,
             s.mode,
+            favorite,
         );
         if last.with(|old| old.as_ref() == Some(&key)) {
             return;
@@ -102,7 +117,7 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
                 .map(|p| p.strip_prefix("file://").unwrap_or(&p).to_owned()),
             can_next: s.next_index.is_some(),
             can_previous: s.index >= 0,
-            favorite: false,
+            favorite,
         });
         let _ = info_updates.send(Update::Info(info));
     });
