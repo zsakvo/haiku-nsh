@@ -25,16 +25,16 @@
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
 | F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
-| F07 音效与响度 | 未实现 | | | |
+| F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
-| F09 桌面集成 | 未实现 | | | |
+| F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/service.rs`、`native/app/src/{library,track_source,track_list}.rs`、`src/pages/{LibraryPage,TrackEditor}.tsx` | M1-03 本机实现与自动化验收通过，真实扫描/播放日志、浅深截图已保存，待审阅 | 刮削留 M4；原生双击/选择器交互与听感待人工确认；额外 cargo target-dir 警告见下节 |
 | F11 喜欢、歌单与远端收藏 | 未实现 | | | |
 | F12 历史与听歌统计 | 未实现 | | | |
-| F13 下载与媒体缓存 | 未实现 | | | |
+| F13 下载与媒体缓存 | 部分实现（媒体缓存） | `haiku-audio::media_cache`、`haiku-playback::backend`、`src/shell/StorageSettings.tsx` | M1-05：容量/LRU/pin/完整性/失败删除/原文件保护测试通过；清理确认 Headless 与浅色截图通过 | 网络缓存真实写入/恢复留 M4，下载留 M5；缓存路径按任务使用 media-cache/ |
 | F14 Haiku 账号 | 未实现 | | | |
 | F15 同步与备份 | 未实现 | | | |
-| F16 设置、通知与日志 | 未实现 | | | |
+| F16 设置、通知与日志 | 部分实现（外观/播放/存储设置） | `haiku-store::settings`、`native/app/src/settings.rs`、`src/state/settings.ts`、`src/shell/Settings.tsx` | M1-05：原子合并、未知字段保留、clamp、跨 Core 重启恢复通过；core.settings 文档与 Stop 订阅齐全 | 其他设置分组、通知与持久日志留后续；损坏设置目前备份并输出诊断，尚无 UI 通知 |
 
 ## 2026-11-09 实施文档
 
@@ -369,3 +369,28 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - unknown classes 结论：最终 check/build/Headless/真实运行均未出现；编译警告仅有允许的 block 0.1.6、__eh_frame、huacnlee/cargo target-dir；停止 host 后有 dev WebSocket 断连 debug 日志。
 - 待人工确认/后续：动画问题复核与恢复后的观感、真实拖动手感、听感、队列/音量弹层逐项人工检查；其他平台/窗口尺寸/大字号未覆盖。未做 GUI 自动操作，所有预览 host 已 Ctrl+C 收尾。
 - 全部证据位于 `.artifacts/m1-04/`；保留历史失败证据与工作区供审阅，M1-04 按入场动画缺口收尾，不提交/推送，不进入后续任务。
+
+
+## 2026-11-10 M1-05：音效/响度、缓存、持久设置与媒体中心（待审阅）
+
+- Rust Settings schemaVersion=1，保持参考版 themeMode/brandColor/audioEffects/volumeNormalization/preventScreenSleepOnPlayer/mediaCacheEnabled/mediaCacheMaxBytes/audioQuality 字段名；未知顶层/嵌套字段由 serde flatten 保留，移动端字段不丢失。
+- SettingsStore 互斥合并、临时文件+sync+原子替换、数值 clamp（含负数容量）；失败不发布。损坏文件改名 settings.json.corrupt-<时间> 后默认恢复并输出诊断；尚无 UI 通知。
+- core.settings.get/update/onChange→Stop 有导出文档；更新由 Rust 串行落盘，再应用播放器/缓存并通知镜像；外观启动恢复，TSX 不再持有权威偏好。
+- RealAudio 延迟创建设备时应用常驻效果，当前/预加载使用带 EntityRef 的逐曲响度；切歌保持 EQ/前级/声场/平衡/mono；软削波与 8ms fade 使用既有 DSP 固定保护，不新增设置字段。
+- 响度记录按 EntityRef 持久化 loudness.json，固定 -18 LUFS/峰值余量；只有完整或 ≥60秒/≥半首记录作为已知增益，完整优先、同级覆盖秒数更多优先。
+- 缓存根按任务为 <data>/media-cache/（区别 DATA 的 cache/media/）；键为 (EntityRef, quality) 的 JSON 编码，本地路径不生成缓存键；Controller 发布当前/实际下一首 pin，M1 仍只解析本地文件。
+- 修正访问时未更新 mtime 的 LRU 与 finalize 未校验完整性的缺口；容量、统计、清理、残片/失败删除沿用媒体缓存模块；清理只作用 objects/，测试证明原始本地文件保留。
+- Settings 增加播放与存储分组，共享 SettingsControls 包装 Switch/Slider/Select；十段 EQ、8 个内置与自定义预设、其他效果/响度/防息屏、缓存容量/用量/清理确认；文件夹入口跳转本地曲库页。
+- 媒体服务归 CoreBridge detached owner；原生事件 channel→引擎→Controller，favorite 不注册；媒体写入串行，仅曲目/状态/seek/模式/前后可用性变化触发，seek 使用已提交位置，不逐帧写系统信息。
+- 本地封面输入上限 8 MiB；防息屏仅设置开启且正在播放页可见、应用非 Background 时持有；AppKit 终止通知与 Core 销毁清理媒体信息和 assertion；关闭隐藏/Dock reopen 原委托逻辑保留。
+- 全部 Cargo/NSH 构建均设置两个 CARGO_PROFILE_{DEV,RELEASE}_BUILD_OVERRIDE_STRIP=false；所有启动/测试 HAIKU_DATA_DIR 位于 /tmp/haiku-m1-03-fixtures/m1-05-*，HAIKU_NO_KEYCHAIN=1。
+- cargo test --manifest-path native/Cargo.toml --workspace：最终 189 通过、0 失败、1 忽略（另原有 WebKit harness 通过）；cargo-test-workspace-final2.log。初轮 188 通过；媒体生命周期/clamp 收尾与补强 Controller 切歌/预加载测试后保留续测日志。
+- nsh check -v / nsh build -v：最终退出 0，无类型/导出文档/unknown classes 警告；nsh-check-complete.log、nsh-build-complete.log。
+- nsh test：初轮 10/11，新增测试拖动 Slider 外层未命中实际 thumb；修复一改用无障碍 thumb 标签并订阅已提交配置后 11/11；nsh-test{,-repair1}.log。最终代码续测仍 11/11（9 TSX+2 Rust），nsh-test-complete.log。
+- 新回归覆盖设置原子合并/未知字段/clamp、真实 DSP 映射与有限/限幅输出、Controller 切歌/预加载保持、响度信任与覆盖、缓存容量/LRU/pin/完整性/原文件保护；Headless 覆盖重开 Core 后外观持久化、EQ 与播放器配置一致、清理取消/确认。
+- 复用 M1-04 生成的无版权 120秒 FLAC/封面/歌词，复制到本任务 media/；两个真实预览分别扫描 2 首 errors=[]，低音量播放后由正常 Controller 命令暂停，无 GUI 自动操作。
+- 浅色截图 settings-playback-light.png / settings-storage-light.png 均已实际查看，内容在窗口内、Dock 完整；对应 nsh-run-{playback,storage}.log、capture-*.log、window-*.log。两份运行日志均含媒体中心“暮色归途”、has_artwork=true、playback_state 1→2。
+- 两个预览均 Ctrl+C 收尾；全部证据 .artifacts/m1-05/，原始失败与续测证据保留，不生成额外汇总 JSON/hash。
+- 警告：block 0.1.6 与 __eh_frame 为允许例外；仍有 huacnlee/cargo 的 ignoring configured target directory 提示，故严格“仅已知例外”未满足；未换工具链或修改依赖。
+- 未覆盖/待人工：媒体键与控制中心按钮、关闭隐藏后续播、Dock 恢复、Cmd+Q、真实防息屏/听感；其他平台与深色新分组视觉未验收；网络缓存真实写入/恢复留 M4，下载及其他设置/通知/日志留后续。
+- 未引入新的架构决策；目录差异按本任务具体要求执行，后续由审阅者统一 DATA 路径说明。未修改 README、Rex、参考版、NSH 或依赖源码；specs 仅改本 STATUS，保留审阅者未跟踪任务文件；不提交/不推送。

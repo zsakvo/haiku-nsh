@@ -21,7 +21,7 @@ pub struct MediaInfo {
 mod mac {
     use super::*;
     use cocoa::{
-        base::{id, nil, NO, YES},
+        base::{NO, YES, id, nil},
         foundation::{NSSize, NSString},
     };
     use objc::{class, msg_send, sel, sel_impl};
@@ -105,9 +105,13 @@ mod mac {
             hook!(nextTrackCommand, "next");
             hook!(previousTrackCommand, "previous");
             hook!(changePlaybackPositionCommand, "seek");
-            hook!(likeCommand, "favorite");
+            let like:id=msg_send![center,likeCommand];
+            let _:()=msg_send![like,setEnabled:NO];
             hook!(changeRepeatModeCommand, "repeat");
             hook!(changeShuffleModeCommand, "shuffle");
+            let observer=block::ConcreteBlock::new(move |_notification:id| {clear_main();let _=keep_awake_main(false);}).copy();
+            let notifications:id=msg_send![class!(NSNotificationCenter),defaultCenter];
+            let _:id=msg_send![notifications,addObserverForName:string("NSApplicationWillTerminateNotification") object:nil queue:nil usingBlock:&*observer];
         });
     }
     pub fn update(info: MediaInfo) -> bool {
@@ -123,7 +127,7 @@ mod mac {
                 let mut cache=ARTWORK.lock().unwrap();
                 if cache.as_ref().map(|(p,_)|p)!=info.artwork_path.as_ref(){
                     if let Some((_,previous))=cache.take(){let _:()=msg_send![previous as id,release];}
-                    if let Some(path)=info.artwork_path {
+                    if let Some(path)=info.artwork_path.filter(|p|std::fs::metadata(p).is_ok_and(|m|m.is_file()&&m.len()<=8*1024*1024)) {
                         let image:id=msg_send![class!(NSImage),alloc];
                         let image:id=msg_send![image,initWithContentsOfFile:string(&path)];
                         if image!=nil {
@@ -147,14 +151,21 @@ mod mac {
             true
         })
     }
+    unsafe fn clear_main() {
+        let center: id = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+        let _: () = msg_send![center,setNowPlayingInfo:nil];
+        if let Some((_, artwork)) = ARTWORK.lock().unwrap().take() {
+            let _: () = msg_send![artwork as id, release];
+        }
+        let _: () = msg_send![center,setPlaybackState:3usize];
+    }
     pub fn clear() {
-        dispatch::Queue::main().exec_sync(|| unsafe {
-            let center: id = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
-            let _: () = msg_send![center,setNowPlayingInfo:nil];
-            if let Some((_, artwork)) = ARTWORK.lock().unwrap().take() {
-                let _: () = msg_send![artwork as id, release];
-            }
-            let _: () = msg_send![center,setPlaybackState:3usize];
+        dispatch::Queue::main().exec_sync(|| unsafe { clear_main() });
+    }
+    pub fn shutdown_async() {
+        dispatch::Queue::main().exec_async(|| unsafe {
+            clear_main();
+            let _ = keep_awake_main(false);
         });
     }
     pub fn snapshot() -> serde_json::Value {
@@ -179,19 +190,24 @@ mod mac {
             serde_json::json!({"title":title,"playback_state":state,"has_info":info!=nil,"has_artwork":artwork!=nil})
         })
     }
-    pub fn keep_awake(enabled: bool) -> Result<bool, String> {
+    fn keep_awake_main(enabled: bool) -> Result<bool, String> {
+        if enabled {
+            unsafe {
+                install();
+            }
+        }
         let mut assertion = ASSERTION.lock().unwrap();
         if enabled && assertion.is_none() {
-            let result = dispatch::Queue::main().exec_sync(|| unsafe {
+            let result = unsafe {
                 let mut value = 0;
                 let status = IOPMAssertionCreateWithName(
                     string("PreventUserIdleDisplaySleep"),
                     255,
-                    string("Haiku GPUIX now playing"),
+                    string("Haiku NSH now playing"),
                     &mut value,
                 );
                 (status, value)
-            });
+            };
             if result.0 != 0 {
                 return Err(format!("IOPM assertion failed: {}", result.0));
             }
@@ -204,6 +220,9 @@ mod mac {
             }
         }
         Ok(assertion.is_some())
+    }
+    pub fn keep_awake(enabled: bool) -> Result<bool, String> {
+        dispatch::Queue::main().exec_sync(move || keep_awake_main(enabled))
     }
 }
 
@@ -243,4 +262,10 @@ pub fn media_snapshot() -> serde_json::Value {
     {
         serde_json::json!({"supported":false})
     }
+}
+
+/// Release the session and power assertion on the AppKit queue without blocking engine teardown.
+pub fn shutdown_async() {
+    #[cfg(target_os = "macos")]
+    mac::shutdown_async();
 }

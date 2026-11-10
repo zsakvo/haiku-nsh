@@ -18,7 +18,8 @@
     sources/<sourceId>/    # 实例：storage.json、credential.json(0600)
     sources.json           # 实例列表、启停、排序、显示名
   downloads/               # index.json
-  cache/media/  cache/images/  cache/palette/
+  media-cache/             # 媒体缓存（M1-05 接线，LRU + pin + 完整性标记）
+  cache/images/  cache/palette/
   logs/                    # app.jsonl、plugin.jsonl，按会话轮转
   backups/                 # 恢复前的自动安全备份，最多 3 份
 ```

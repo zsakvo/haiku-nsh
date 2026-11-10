@@ -269,7 +269,7 @@ pub struct AudioEffectsOptions {
 impl AudioEffectsOptions {
     /// 折算成引擎侧参数。长度容错、`mono` 折算、clamp 都在这里做完，
     /// 引擎拿到的就是一份已规整的配置（`EffectsSettings::resolved` 再兜一次底）。
-    fn into_settings(self) -> EffectsSettings {
+    pub fn into_settings(self) -> EffectsSettings {
         let mut band_gains_db = [0.0f32; effects::BAND_COUNT];
         for (slot, value) in band_gains_db.iter_mut().zip(self.band_gains_db.iter()) {
             *slot = *value;

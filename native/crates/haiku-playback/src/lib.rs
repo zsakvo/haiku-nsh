@@ -8,3 +8,5 @@ pub use backend::{
 };
 pub use controller::{Command, Controller, PlayerState, Session, Sleep, Status};
 pub use queue::{Mode, Queue};
+
+mod loudness_cache;

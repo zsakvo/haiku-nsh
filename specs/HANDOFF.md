@@ -23,6 +23,14 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M1-05 已验收并提交，M1 完成
+
+- M1-05：设置服务（`core.settings`，schemaVersion 1，保留参考版字段名与未知字段）、外观持久化、十段 EQ/效果/响度均衡、媒体缓存接线（`<data>/media-cache/`，DATA.md 已对齐）、设置“播放”“存储”分组、媒体中心/远程命令、防息屏。workspace 189 通过/1 忽略，nsh test 11/11，浅色截图已审阅。
+- 审阅决定：软削波与 8ms 渐入渐出作为固定保护、不提供开关；huacnlee/cargo 忽略 target-dir 提示列为已知例外。
+- 遗留：设置文件损坏时已备份，但 UI 通知未接（随 M5 通知/诊断一并处理）；设置页内容区左上有一处橙色细线，疑为 Sheet 进度/焦点残留，下次 UI 任务顺带查。
+- 待人工确认：媒体键与控制中心按钮、关闭隐藏后继续播放、Dock 恢复、Cmd+Q、防息屏、音效听感。
+- Codex 本周额度剩约 15%，下一步 M2（插件 SDK）或 M3（持久化）按额度安排。
+
 ## 2026-11-10 更新：M1-04 已验收并提交，下一步 M1-05
 
 - M1-04：Dock、SeekBar、正在播放覆盖层、本地歌词、封面配色完成；nsh test 10/10、workspace 测试通过、浅深 Dock + 设置 + 正在播放截图已审阅。
@@ -49,7 +57,7 @@ M1-04 底栏 PlayerDock、SeekBar、正在播放覆盖层、本地歌词、封�
 
 ## 已知事项
 
-- 允许的构建警告：`block 0.1.6` future-incompat、开发 host 的 `__eh_frame`。
+- 允许的构建警告：`block 0.1.6` future-incompat、开发 host 的 `__eh_frame`、huacnlee/cargo 忽略 target-dir 提示。
 - `haiku-macos` 三处 `clippy::mut_from_ref` 局部豁免，M6 复核。
 - 玻璃底栏需用 `WithinWindow` 混合模式并覆盖滚动内容，M6 验收；M1 用 NSH 半透明回退。
 - 截图前确认屏幕未锁定（锁屏时 `screencapture` 失败）。

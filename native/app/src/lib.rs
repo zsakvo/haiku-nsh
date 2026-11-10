@@ -10,6 +10,7 @@ mod player_dock;
 mod player_theme;
 mod presentation;
 mod seek_bar;
+mod settings;
 mod track_list;
 mod track_source;
 pub use core::{Core, CoreBridge};

@@ -46,12 +46,17 @@ unsafe impl Trace for Listeners {
 pub struct CoreBridge {
     pub(crate) controller: Controller,
     owner: Owner,
+    pub(crate) settings: Signal<haiku_store::settings::Settings>,
     pub position: Signal<f64>,
     pub buffered: Signal<f64>,
     pub state: Signal<PlayerState>,
 }
 impl CoreBridge {
-    fn new(controller: Controller, listeners: Listeners) -> Rc<Self> {
+    fn new(
+        controller: Controller,
+        listeners: Listeners,
+        settings: haiku_store::settings::Settings,
+    ) -> Rc<Self> {
         let owner = Owner::detached();
         let (position, buffered, state) = owner.run(|| {
             let position = signal(controller.progress().position);
@@ -102,7 +107,9 @@ impl CoreBridge {
             });
             (position, buffered, state)
         });
+        let settings = owner.run(|| signal(settings));
         Rc::new(Self {
+            settings,
             controller,
             owner,
             position,
@@ -115,6 +122,7 @@ impl Drop for CoreBridge {
     fn drop(&mut self) {
         self.owner.dispose();
         self.controller.shutdown();
+        crate::platform::clear_media();
     }
 }
 
@@ -122,6 +130,7 @@ impl Drop for CoreBridge {
 #[class]
 pub struct Core {
     player: Instance<PlayerService>,
+    settings: Instance<crate::settings::SettingsService>,
     library: Instance<crate::library::LibraryService>,
 }
 #[class]
@@ -132,10 +141,17 @@ impl Core {
         if let Some(core) = slot.get() {
             return Ok(core);
         }
-        let (controller, library) = background(async {
+        let (controller, library, settings) = background(async {
             let root = haiku_store::data_root();
             std::fs::create_dir_all(&root).map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
-            let (audio, events) = RealAudio::new();
+            let settings = Arc::new(
+                haiku_store::settings::SettingsStore::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?,
+            );
+            haiku_audio::media_cache::set_root(root.join("media-cache").display().to_string())
+                .map_err(|e| Error::new(ErrorCode::Io, e))?;
+            crate::settings::apply_cache(&settings.get());
+            let (audio, events) = RealAudio::configured(&root, settings.get());
             let library = haiku_library::service::Library::open(&root)
                 .map_err(|e| Error::new(ErrorCode::Io, e))?;
             let controller = Controller::start(
@@ -145,7 +161,7 @@ impl Core {
                 events,
                 Some(root.join("session.json")),
             )?;
-            Ok::<_, Error>((controller, library))
+            Ok::<_, Error>((controller, library, settings))
         })
         .await
         .map_err(|e| JsError::Error(e.to_string()))?
@@ -156,10 +172,15 @@ impl Core {
             return Ok(core);
         }
         let listeners = Listeners::default();
-        let bridge = CoreBridge::new(controller, listeners.clone());
+        let bridge = CoreBridge::new(controller, listeners.clone(), settings.get());
         crate::presentation::initialize(bridge.clone(), library.clone());
+        bridge
+            .owner
+            .run(|| crate::platform::initialize_media(bridge.clone()));
+        let settings = crate::settings::SettingsService::new(settings, bridge.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let core = Instance::new(Self {
+            settings,
             library,
             player: Instance::new(PlayerService {
                 bridge,
@@ -169,6 +190,11 @@ impl Core {
         });
         slot.set(Some(core.clone()));
         Ok(core)
+    }
+    /// Durable settings, effects and cache preferences; TSX is a subscribed mirror.
+    #[getter]
+    pub fn settings(&self) -> Instance<crate::settings::SettingsService> {
+        self.settings.clone()
     }
     /// The local playback/queue service; position stays in Rust.
     #[getter]
@@ -311,6 +337,10 @@ impl PlayerService {
     /// Flush the current session atomically.
     pub async fn flush(this: Instance<Self>) -> Result<(), JsError> {
         Self::send(this, Command::Flush).await
+    }
+    /// Current backend preferences, including the effects used by every new audio stream.
+    pub fn configuration(&self) -> JsonValue {
+        serde_json::to_value(self.bridge.controller.configuration()).unwrap()
     }
     /// Current low-frequency snapshot; contains no position/buffer fraction.
     pub fn snapshot(&self) -> JsonValue {

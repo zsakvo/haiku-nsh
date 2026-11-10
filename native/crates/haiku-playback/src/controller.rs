@@ -71,6 +71,7 @@ pub enum Command {
     Previous,
     Seek(f64),
     SetVolume(f64),
+    Configure(haiku_store::settings::Settings),
     SetMode(Mode),
     Append(Vec<Track>),
     PlayNext(Track),
@@ -207,6 +208,13 @@ impl Controller {
             .map_err(|_| cancelled())?;
         result.await.map_err(|_| cancelled())?
     }
+    /// Latest sampled position or seek destination, including a seek still queued in the audio thread.
+    pub fn position_snapshot(&self) -> f64 {
+        self.frozen.lock().unwrap().position
+    }
+    pub fn configuration(&self) -> haiku_store::settings::Settings {
+        self.backend.configuration()
+    }
     pub fn shutdown(&self) {
         let (reply, _) = oneshot::channel();
         let _ = self.commands.send(Request {
@@ -303,6 +311,12 @@ impl Actor {
         }
         self.state.current = self.queue.current().cloned();
         self.state.next_index = self.queue.peek_next(true);
+        self.backend.pin_tracks(
+            self.queue.current().cloned(),
+            self.state
+                .next_index
+                .and_then(|i| self.queue.tracks.get(i as usize).cloned()),
+        );
         self.state.index = self.queue.index;
         self.state.mode = self.queue.mode;
         if *self.states.borrow() != self.state {
@@ -403,8 +417,8 @@ impl Actor {
         let completed = self.completed.clone();
         self.open_task = Some(tokio::spawn(async move {
             let result = async {
-                let path = resolver.resolve(track).await?;
-                backend.open(path, generation).await?;
+                let path = resolver.resolve(track.clone()).await?;
+                backend.open_track(track, path, generation, false).await?;
                 Ok(())
             }
             .await;
@@ -433,7 +447,12 @@ impl Actor {
         self.prepare_task = Some(tokio::spawn(async move {
             let result = async {
                 backend
-                    .prepare(resolver.resolve(track).await?, generation)
+                    .open_track(
+                        track.clone(),
+                        resolver.resolve(track).await?,
+                        generation,
+                        true,
+                    )
                     .await
             }
             .await;
@@ -721,6 +740,11 @@ impl Actor {
                     self.backend.seek(position);
                     self.prepare_next();
                 }
+            }
+            Command::Configure(settings) => {
+                self.backend.configure(settings);
+                self.prepare_next();
+                return Ok(());
             }
             Command::SetVolume(volume) => {
                 if !volume.is_finite() {

@@ -6,9 +6,9 @@
 //! 根目录由 Dart 注入（`<AppSupport>/haiku_media_cache`）。
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Seek, SeekFrom};
 #[cfg(test)]
 use std::io::Write;
+use std::io::{self, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -203,7 +203,10 @@ pub fn touch(key: &str) {
 /// 尽量更新 atime/mtime 为现在（跨平台：rewrite open truncate no — 用 set_times if available）。
 fn filetime_touch(path: &Path) -> io::Result<()> {
     // 打开读写不截断即可更新 mtime（多数平台）。
-    let _ = OpenOptions::new().write(true).open(path)?;
+    OpenOptions::new()
+        .write(true)
+        .open(path)?
+        .set_times(std::fs::FileTimes::new().set_modified(SystemTime::now()))?;
     Ok(())
 }
 
@@ -258,7 +261,7 @@ pub fn clear() -> Result<(), String> {
     drop(g);
     let objects = objects_dir(&root);
     if objects.is_dir() {
-        let _ = fs::remove_dir_all(&objects);
+        fs::remove_dir_all(&objects).map_err(|e| e.to_string())?;
     }
     ensure_layout(&root).map_err(|e| e.to_string())?;
     Ok(())
@@ -311,7 +314,10 @@ pub(crate) fn is_complete_download(size: u64, total_len: Option<u64>) -> bool {
 }
 
 /// 下载完整：`.part` → 正式文件，跑 LRU。
-pub fn finalize(key: &str, _size: u64, _total_len: Option<u64>, _content_type: Option<String>) {
+pub fn finalize(key: &str, size: u64, total_len: Option<u64>, _content_type: Option<String>) {
+    if !is_complete_download(size, total_len) {
+        return;
+    }
     let Ok(g) = cache().lock() else {
         return;
     };
@@ -325,6 +331,9 @@ pub fn finalize(key: &str, _size: u64, _total_len: Option<u64>, _content_type: O
     let id = file_id(key);
     let part_path = objects_dir(&root).join(format!("{id}.part"));
     let final_path = objects_dir(&root).join(&id);
+    if part_path.metadata().map(|m| m.len()).ok() != Some(size) {
+        return;
+    }
     if part_path.is_file() {
         let _ = fs::rename(&part_path, &final_path);
     }
@@ -417,7 +426,7 @@ fn evict_to(root: &Path, max: u64, pinned_keys: &[Option<String>; 2]) -> io::Res
         let Some(v) = victim else {
             break;
         };
-        let _ = fs::remove_file(&v.path);
+        fs::remove_file(&v.path)?;
     }
     Ok(())
 }
@@ -440,8 +449,10 @@ mod tests {
         assert_ne!(file_id("a\x1fb"), file_id("a\x1fc"));
     }
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
     #[test]
     fn finalize_status_and_usage() {
+        let _guard = TEST_LOCK.lock().unwrap();
         let dir = env::temp_dir().join(format!("haiku_mcache_{}", now_ms()));
         let _ = fs::remove_dir_all(&dir);
         set_root(dir.display().to_string()).unwrap();
@@ -466,6 +477,55 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn capacity_lru_pins_integrity_and_local_safety() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let local = root.path().join("original.flac");
+        fs::write(&local, b"local original").unwrap();
+        let cache_root = root.path().join("media-cache");
+        set_root(cache_root.display().to_string()).unwrap();
+        set_enabled(true);
+        set_max_bytes(1);
+        assert_eq!(usage().max_bytes, MIN_MAX_BYTES);
+        set_max_bytes(u64::MAX);
+        assert_eq!(usage().max_bytes, MAX_MAX_BYTES);
+        for (i, key) in ["old", "current", "next", "recent"].iter().enumerate() {
+            let (mut file, _, _) = open_part_writer(key).unwrap();
+            file.write_all(b"abcd").unwrap();
+            drop(file);
+            finalize(key, 4, Some(4), None);
+            File::options()
+                .write(true)
+                .open(objects_dir(&cache_root).join(file_id(key)))
+                .unwrap()
+                .set_times(
+                    fs::FileTimes::new()
+                        .set_modified(UNIX_EPOCH + std::time::Duration::from_secs(i as u64 + 1)),
+                )
+                .unwrap();
+        }
+        touch("recent");
+        evict_to(
+            &cache_root,
+            12,
+            &[Some("current".into()), Some("next".into())],
+        )
+        .unwrap();
+        assert!(matches!(status("old"), CacheStatus::None));
+        assert!(matches!(status("current"), CacheStatus::Complete { .. }));
+        assert!(matches!(status("next"), CacheStatus::Complete { .. }));
+        let (mut f, _, _) = open_part_writer("broken").unwrap();
+        f.write_all(b"bad").unwrap();
+        drop(f);
+        finalize("broken", 3, None, None);
+        assert!(matches!(status("broken"), CacheStatus::Partial { .. }));
+        remove("broken");
+        assert!(matches!(status("broken"), CacheStatus::None));
+        clear().unwrap();
+        assert_eq!(fs::read(local).unwrap(), b"local original");
+        assert_eq!(usage().used_bytes, 0);
+    }
     #[test]
     fn unknown_length_download_is_not_complete() {
         assert!(!is_complete_download(1024, None));

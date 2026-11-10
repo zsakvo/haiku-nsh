@@ -1,0 +1,29 @@
+import { expect, open, test } from "nsh/test";
+const options = { platform: "macos" as const, width: 1200, height: 800 };
+test("durable appearance survives a new engine; EQ reaches player; cache clear requires confirmation", async () => {
+  const app = await open("./SettingsFixture.tsx", options);
+  await app.waitFor("id:settings-heading");
+  await app.press("role:radio[深色]");
+  await app.press("label:品牌色：青绿");
+  await app.press("读取接线配置");
+  await app.waitFor("text:persist:dark:teal;eq:0;dsp:0");
+  await app.press("role:button[播放]");
+  await app.waitFor("id:playback-settings");
+  await app.drag("label:31 Hz", { x: 20 });
+  await app.press("读取接线配置");
+  await app.waitUntil(() => app.texts().some((text) => /^persist:dark:teal;eq:(?!0;)([-\d.]+);dsp:\1$/.test(text)));
+  await app.press("role:button[存储]");
+  await app.press("清理缓存…");
+  await app.waitFor("text:清理媒体缓存？");
+  await app.press("取消");
+  await app.waitUntil(() => !app.shows("text:清理媒体缓存？"));
+  await app.press("清理缓存…");
+  await app.press("role:button[清理]");
+  await app.waitUntil(() => !app.shows("text:清理媒体缓存？"));
+  // Opening a fresh surface constructs a new Core and reads settings.json again.
+  const restarted = await open("./SettingsFixture.tsx", options);
+  await restarted.waitFor("id:settings-heading");
+  await restarted.press("读取接线配置");
+  await restarted.waitUntil(() => restarted.texts().some((text) => text.startsWith("persist:dark:teal;")));
+  expect(restarted.texts().some((text) => text.startsWith("persist:dark:teal;"))).toBe(true);
+});

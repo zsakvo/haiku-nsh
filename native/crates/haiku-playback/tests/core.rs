@@ -113,6 +113,8 @@ impl FakeClock {
 #[derive(Default)]
 struct Fake {
     calls: Mutex<Vec<(String, u64)>>,
+    settings: Mutex<haiku_store::settings::Settings>,
+    opened_settings: Mutex<Vec<haiku_store::settings::Settings>>,
     progress: Mutex<Progress>,
     gate: Mutex<Option<Arc<Notify>>>,
     errors: Mutex<bool>,
@@ -143,6 +145,10 @@ impl Fake {
 impl AudioBackend for Fake {
     fn open(&self, path: PathBuf, generation: u64) -> BoxFuture<'_, Result<(), Error>> {
         self.record(&format!("open:{}", path.display()), generation);
+        self.opened_settings
+            .lock()
+            .unwrap()
+            .push(self.settings.lock().unwrap().clone());
         Box::pin(async move {
             let gate = self.gate.lock().unwrap().clone();
             if let Some(gate) = gate {
@@ -169,7 +175,17 @@ impl AudioBackend for Fake {
     }
     fn prepare(&self, path: PathBuf, generation: u64) -> BoxFuture<'_, Result<(), Error>> {
         self.record(&format!("prepare:{}", path.display()), generation);
+        self.opened_settings
+            .lock()
+            .unwrap()
+            .push(self.settings.lock().unwrap().clone());
         Box::pin(async { Ok(()) })
+    }
+    fn configure(&self, settings: haiku_store::settings::Settings) {
+        *self.settings.lock().unwrap() = settings;
+    }
+    fn configuration(&self) -> haiku_store::settings::Settings {
+        self.settings.lock().unwrap().clone()
     }
     fn clear_next(&self) {
         self.record("clear_next", 0);
@@ -628,4 +644,25 @@ async fn paused_progress_is_frozen_position_not_in_low_frequency_state() {
     assert_eq!(h.player.state().volume, 1.0);
     h.command(Command::SetVolume(2.0)).await;
     assert_eq!(h.player.state().volume, 1.0);
+}
+
+#[tokio::test]
+async fn effects_configuration_survives_controller_next_and_preload() {
+    let h = Harness::new(None);
+    let mut s = haiku_store::settings::Settings::default();
+    s.audio_effects.enabled = true;
+    s.audio_effects.band_gains_db = [3.; 10];
+    s.audio_effects.balance = -0.4;
+    s.audio_effects.stereo_width = 1.4;
+    h.command(Command::Configure(s.clone())).await;
+    h.play(3).await;
+    h.settle().await;
+    h.command(Command::Next).await;
+    h.state(|p| p.index == 1 && p.status == Status::Playing)
+        .await;
+    h.settle().await;
+    assert_eq!(h.player.configuration(), s);
+    let opens = h.audio.opened_settings.lock().unwrap();
+    assert!(opens.len() >= 3);
+    assert!(opens.iter().all(|actual| actual == &s));
 }

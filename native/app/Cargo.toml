@@ -8,6 +8,7 @@ publish = false
 nsh-core = "0.4.0"
 nsh-base = "0.4.0"
 haiku-model.workspace = true
+haiku-audio.workspace = true
 haiku-store.workspace = true
 haiku-library.workspace = true
 haiku-lyrics.workspace = true

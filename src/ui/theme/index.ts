@@ -1,4 +1,4 @@
-import { effect, setColorScheme, signal } from "nsh";
+import { cleanup, effect, setColorScheme, signal } from "nsh";
 import { Core } from "haiku/native";
 import base from "./haiku.json";
 
@@ -45,12 +45,34 @@ export function brandTheme(brand: Brand) {
   }
   return { cssVars: { theme: base.cssVars.theme, light: palette(false), dark: palette(true) } };
 }
-export function createAppearance(initialMode: AppearanceMode = "system") {
-  const mode = signal<AppearanceMode>(initialMode);
+export function createAppearance(initialMode?: AppearanceMode) {
+  const mode = signal<AppearanceMode>(initialMode ?? "light");
   const brand = signal<Brand>("orange");
+  const error = signal("");
+  let core: Core | undefined;
+  let stop: (() => void) | undefined;
+  cleanup(() => stop?.());
+  function mirror(value: unknown) {
+    const s = value as { themeMode: AppearanceMode; brandColor: Brand };
+    mode.set(s.themeMode); brand.set(s.brandColor);
+  }
+  effect(() => { let alive = true;
+    Core.open().then(async (c) => { if (!alive) return;
+      if (initialMode) await c.settings.update({ themeMode: initialMode });
+      if (!alive) return;
+      core = c; mirror(c.settings.get());
+      stop = c.settings.onChange(mirror);
+    }).catch((e) => error.set(String(e)));
+    return () => { alive = false; };
+  });
+  async function update(patch: unknown) {
+    try { const c = core ?? await Core.open(); await c.settings.update(patch); error.set(""); }
+    catch (e) {error.set(`无法保存外观：${String(e)}`);}
+  }
   effect(() => setColorScheme(mode()));
   effect(() => {
     Core.applyTheme(JSON.stringify(brandTheme(brand()))).catch((error) => console.error("Theme update failed", error));
   });
-  return { mode, brand };
+  return { mode, brand, error, setMode: (themeMode: AppearanceMode) => update({ themeMode }),
+    setBrand: (brandColor: Brand) => update({ brandColor }) };
 }

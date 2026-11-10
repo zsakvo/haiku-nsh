@@ -1,3 +1,6 @@
+import { createSettings } from "../state/settings";
+import { PlaybackSettings } from "./PlaybackSettings";
+import { StorageSettings } from "./StorageSettings";
 import { Scroll, signal, Text, View } from "nsh";
 import { type createAppearance } from "../ui/theme";
 import { SidebarItem } from "../ui/Navigation";
@@ -17,8 +20,9 @@ const categories = [
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance> }) {
-  const selected = signal("外观");
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; onLibrary?: () => void }) {
+  const selected = signal(props.initialCategory ?? "外观");
+  const settings = createSettings();
   const query = signal("");
   return <Overlay open={props.open} onClose={props.onClose}>
     <ShellFrame>
@@ -43,7 +47,12 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <View class="w-full max-w-2xl flex-col" style={{ display: selected() === "外观" ? "flex" : "none" }}>
             <AppearanceOptions appearance={props.appearance} />
           </View>
-          <View class="flex-col" style={{ display: selected() === "外观" ? "none" : "flex" }}>
+          <If when={!!settings.value()}>
+            <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
+            <View class="w-full max-w-2xl" style={{ display: selected() === "存储" ? "flex" : "none" }}><StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} /></View>
+          </If>
+          <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
+          <View class="flex-col" style={{ display: ["外观", "播放", "存储"].includes(selected()) ? "none" : "flex" }}>
             <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
           </View>
         </Scroll>

@@ -1,11 +1,17 @@
 //! Keep NSH's delegate object and all its callbacks, overriding close only.
 use nsh_platform_macos::{
     objc2::{
+        MainThreadMarker,
         runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel},
-        sel, MainThreadMarker,
+        sel,
     },
     objc2_app_kit::{NSApplication, NSWindow},
 };
+
+static NATIVE_HOST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub fn native_host() -> bool {
+    NATIVE_HOST.load(std::sync::atomic::Ordering::Acquire)
+}
 
 unsafe extern "C" fn hide_on_close(_: *mut AnyObject, _: Sel, window: *mut NSWindow) -> Bool {
     assert!(MainThreadMarker::new().is_some());
@@ -74,6 +80,8 @@ pub fn install_async() {
     dispatch::Queue::main().exec_async(|| {
         if let Err(error) = install() {
             eprintln!("Haiku lifecycle: {error}");
+        } else {
+            NATIVE_HOST.store(true, std::sync::atomic::Ordering::Release);
         }
     });
 }
