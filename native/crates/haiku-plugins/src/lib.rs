@@ -1,7 +1,9 @@
 //! Generic plugin package/source host and the music SDK boundary.
 mod api;
+pub mod contract;
 mod descriptor;
 mod host;
+pub mod scraper;
 mod sdk;
 mod source;
 pub use api::*;

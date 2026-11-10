@@ -1,0 +1,1519 @@
+{
+  "connection": {
+    "baseUrl": "http://feiniu.fixture",
+    "username": "User",
+    "password": "fixture"
+  },
+  "routes": [
+    {
+      "path": "/music/api/v1/user/password-login",
+      "body": {
+        "code": 0,
+        "data": {
+          "userToken": "fixture-token"
+        }
+      },
+      "method": "POST"
+    },
+    {
+      "path": "/music/api/v1/track/transcode",
+      "body": {
+        "code": 0,
+        "data": {
+          "url": "/fixture-transcoded.mp3"
+        }
+      },
+      "method": "POST"
+    },
+    {
+      "path": "/music/api/v1/track/metadata",
+      "body": {
+        "code": 0,
+        "data": {
+          "track": {
+            "guid": "t1",
+            "title": "Fixture Song",
+            "artists": [
+              {
+                "guid": "a1",
+                "name": "Artist"
+              }
+            ],
+            "album": {
+              "guid": "al1",
+              "name": "Album"
+            },
+            "duration": 120,
+            "coverId": "cover1",
+            "audioSpec": {
+              "format": "flac",
+              "bitrate": 800000
+            }
+          },
+          "audioSpec": {
+            "format": "flac",
+            "bitrate": 800000
+          }
+        }
+      },
+      "query": {
+        "guid": "t1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/metadata",
+      "body": {
+        "code": 0,
+        "data": {
+          "track": {
+            "guid": "t2",
+            "title": "Second",
+            "artists": [
+              {
+                "guid": "a2",
+                "name": "Second Artist"
+              }
+            ],
+            "duration": 180
+          },
+          "audioSpec": {}
+        }
+      },
+      "query": {
+        "guid": "t2"
+      }
+    },
+    {
+      "path": "/music/api/v1/lyric/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "preferred": "l1",
+          "list": [
+            {
+              "guid": "l1",
+              "content": "[00:01]Fixture lyrics"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/track/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/search/track",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "q": "slow"
+      },
+      "delayMs": 500
+    },
+    {
+      "path": "/music/api/v1/search/track",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/track",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/track",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/track",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/track/album-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/album-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/album-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/album-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/track/artist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/artist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/artist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/artist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/track/playlist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/playlist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/playlist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/track/playlist-detail/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "t1",
+              "title": "Fixture Song",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ],
+              "album": {
+                "guid": "al1",
+                "name": "Album"
+              },
+              "duration": 120,
+              "coverId": "cover1",
+              "audioSpec": {
+                "format": "flac",
+                "bitrate": 800000
+              }
+            },
+            {
+              "guid": "t2",
+              "title": "Second",
+              "artists": [
+                {
+                  "guid": "a2",
+                  "name": "Second Artist"
+                }
+              ],
+              "duration": 180
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/album/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            },
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/album/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/album/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/album/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            },
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/search/album",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            },
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/album",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/album",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/album",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "al1",
+              "name": "Album",
+              "artists": [
+                {
+                  "guid": "a1",
+                  "name": "Artist"
+                }
+              ]
+            },
+            {
+              "guid": "al2",
+              "name": "Second Album"
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/artist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            },
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/artist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/artist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/artist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            },
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/search/artist",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            },
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/artist",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/artist",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/search/artist",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "a1",
+              "name": "Artist"
+            },
+            {
+              "guid": "a2",
+              "name": "Second Artist"
+            }
+          ],
+          "total": 2
+        }
+      }
+    },
+    {
+      "path": "/music/api/v1/playlist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "p1",
+              "name": "Playlist"
+            },
+            {
+              "guid": "p2",
+              "name": "Second Playlist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "-1"
+      }
+    },
+    {
+      "path": "/music/api/v1/playlist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "p2",
+              "name": "Second Playlist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "page": "2"
+      }
+    },
+    {
+      "path": "/music/api/v1/playlist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "p1",
+              "name": "Playlist"
+            }
+          ],
+          "total": 2
+        }
+      },
+      "query": {
+        "size": "1"
+      }
+    },
+    {
+      "path": "/music/api/v1/playlist/list",
+      "body": {
+        "code": 0,
+        "data": {
+          "list": [
+            {
+              "guid": "p1",
+              "name": "Playlist"
+            },
+            {
+              "guid": "p2",
+              "name": "Second Playlist"
+            }
+          ],
+          "total": 2
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "search.track",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 1
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "search.album",
+      "path": "search.album",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 1
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "search.artist",
+      "path": "search.artist",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 1
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "track.get",
+      "path": "track.get",
+      "args": [
+        "t1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "track.streams",
+      "path": "track.streams",
+      "args": [
+        "t1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "transcoded stream",
+      "path": "track.streams",
+      "args": [
+        "t1"
+      ],
+      "context": {
+        "format": "mp3",
+        "quality": "standard"
+      }
+    },
+    {
+      "name": "track.lyrics",
+      "path": "track.lyrics",
+      "args": [
+        "t1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "album.get",
+      "path": "album.get",
+      "args": [
+        "al1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "artist.get",
+      "path": "artist.get",
+      "args": [
+        "a1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "playlist.get",
+      "path": "playlist.get",
+      "args": [
+        "p1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "library track",
+      "path": "library.browse",
+      "args": [
+        "track"
+      ],
+      "context": {
+        "limit": 1
+      },
+      "schema": "page:track"
+    },
+    {
+      "name": "library album",
+      "path": "library.browse",
+      "args": [
+        "album"
+      ],
+      "context": {
+        "limit": 1
+      },
+      "schema": "page:album"
+    },
+    {
+      "name": "library artist",
+      "path": "library.browse",
+      "args": [
+        "artist"
+      ],
+      "context": {
+        "limit": 1
+      },
+      "schema": "page:artist"
+    },
+    {
+      "name": "library playlist",
+      "path": "library.browse",
+      "args": [
+        "playlist"
+      ],
+      "context": {
+        "limit": 1
+      },
+      "schema": "page:playlist"
+    },
+    {
+      "name": "HTTP 401 -> AUTH_EXPIRED",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 401,
+      "expectedCode": "AUTH_EXPIRED"
+    },
+    {
+      "name": "HTTP 404 -> NOT_FOUND",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 404,
+      "expectedCode": "NOT_FOUND"
+    },
+    {
+      "name": "HTTP 429 -> RATE_LIMITED",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 429,
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "HTTP 503 -> UPSTREAM_ERROR",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 503,
+      "expectedCode": "UPSTREAM_ERROR"
+    },
+    {
+      "name": "abort pending HTTP",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "slow",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "abortAfterMs": 20,
+      "expectedCode": "CANCELLED"
+    }
+  ]
+}

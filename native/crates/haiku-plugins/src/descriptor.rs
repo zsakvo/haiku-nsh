@@ -17,6 +17,8 @@ pub struct Descriptor {
     pub scraper: bool,
     pub capabilities: Vec<String>,
     pub auth_methods: Vec<String>,
+    #[serde(default)]
+    pub auth: Option<Value>,
     pub connection: Option<Value>,
     pub http: Option<Value>,
     pub library_cards: Vec<Value>,
@@ -129,6 +131,18 @@ pub async fn describe_package(root: &Path) -> Result<Descriptor> {
         scraper,
         capabilities,
         auth_methods,
+        auth: def.get("auth").cloned().map(|mut auth| {
+            fn strip_functions(value: &mut Value) {
+                if let Some(object) = value.as_object_mut() {
+                    object.retain(|_, value| value != "function");
+                    for child in object.values_mut() {
+                        strip_functions(child);
+                    }
+                }
+            }
+            strip_functions(&mut auth);
+            auth
+        }),
         connection,
         http: def.get("http").cloned(),
         library_cards: def["library"]["cards"]

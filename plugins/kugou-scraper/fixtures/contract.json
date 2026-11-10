@@ -1,0 +1,236 @@
+{
+  "routes": [
+    {
+      "path": "/api/v3/search/song",
+      "body": {
+        "data": {
+          "info": [
+            {
+              "hash": "ABCDEF",
+              "songname": "Fixture Song",
+              "singername": "Artist、Guest",
+              "album_name": "Album",
+              "duration": 120,
+              "trans_param": {
+                "union_cover": "http://img.invalid/{size}/album.jpg"
+              }
+            }
+          ]
+        }
+      },
+      "query": {
+        "keyword": "slow"
+      },
+      "delayMs": 500
+    },
+    {
+      "path": "/api/v3/search/song",
+      "body": {
+        "data": {
+          "info": [
+            {
+              "hash": "ABCDEF",
+              "songname": "Fixture Song",
+              "singername": "Artist、Guest",
+              "album_name": "Album",
+              "duration": 120,
+              "trans_param": {
+                "union_cover": "http://img.invalid/{size}/album.jpg"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/search",
+      "body": {
+        "candidates": [
+          {
+            "id": "fallback",
+            "accesskey": "fixture"
+          }
+        ]
+      },
+      "query": {
+        "hash": "fallback"
+      }
+    },
+    {
+      "path": "/search",
+      "body": {
+        "candidates": [
+          {
+            "id": "lyrics1",
+            "accesskey": "fixture"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/download",
+      "body": {},
+      "query": {
+        "id": "fallback",
+        "fmt": "krc"
+      },
+      "status": 404
+    },
+    {
+      "path": "/download",
+      "body": {
+        "content": "a3JjMTjb6kFqAkSXUCeAG96IqamOatLV+oZcUlFs9CqP",
+        "contenttype": 0
+      },
+      "query": {
+        "fmt": "krc"
+      }
+    },
+    {
+      "path": "/download",
+      "body": {
+        "content": "WzAwOjAxXUZhbGxiYWNr"
+      },
+      "query": {
+        "fmt": "lrc"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "scrape.search",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "scrape.lyrics",
+      "path": "scrape.lyrics",
+      "args": [
+        {
+          "id": "abcdef",
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ]
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "KRC falls back to LRC",
+      "path": "scrape.lyrics",
+      "args": [
+        {
+          "id": "fallback",
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ]
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "HTTP 401 -> AUTH_REQUIRED",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 401,
+      "expectedCode": "AUTH_REQUIRED"
+    },
+    {
+      "name": "HTTP 404 -> NOT_FOUND",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 404,
+      "expectedCode": "NOT_FOUND"
+    },
+    {
+      "name": "HTTP 429 -> RATE_LIMITED",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 429,
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "HTTP 503 -> UPSTREAM_ERROR",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 503,
+      "expectedCode": "UPSTREAM_ERROR"
+    },
+    {
+      "name": "abort pending HTTP",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "slow",
+          "artists": []
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "abortAfterMs": 20,
+      "expectedCode": "CANCELLED"
+    }
+  ]
+}

@@ -1945,6 +1945,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "haiku-plugin"
+version = "0.1.0"
+dependencies = [
+ "haiku-plugins",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "haiku-plugins"
 version = "0.1.0"
 dependencies = [

@@ -446,9 +446,16 @@ mod plugin_host_tests {
             let core = Core::open().await.unwrap();
             core.with(|value| {
                 let packages = value.plugins.packages().unwrap();
-                assert!(packages.iter().any(|p| p.descriptor.id == "subsonic.music"
-                    && p.descriptor.builtin
-                    && p.descriptor.kind == "library"));
+                for (id, kind) in [
+                    ("subsonic.music", "library"),
+                    ("feiniu.music", "library"),
+                    ("qq.scraper", "scraper"),
+                    ("kugou.scraper", "scraper"),
+                ] {
+                    assert!(packages.iter().any(|p| p.descriptor.id == id
+                        && p.descriptor.builtin
+                        && p.descriptor.kind == kind));
+                }
             });
             installed.set(true);
         });

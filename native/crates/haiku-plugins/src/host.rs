@@ -44,6 +44,8 @@ pub struct Host {
     pub(crate) sources: Mutex<BTreeMap<String, Arc<Source>>>,
     registry: Mutex<Registry>,
     transaction: tokio::sync::Mutex<()>,
+    errors: Mutex<BTreeMap<String, PluginError>>,
+    replay_base: Option<String>,
 }
 pub(crate) fn now() -> u64 {
     SystemTime::now()
@@ -63,9 +65,72 @@ pub(crate) fn valid_path(name: &str) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Serialize, Deserialize)]
+struct InstallJournal {
+    id: String,
+    existed: bool,
+    storage: Vec<(String, bool)>,
+    committed: bool,
+}
+fn recover_installs(root: &Path) -> Result<()> {
+    for entry in std::fs::read_dir(root.join("packages"))? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        if name.starts_with(".backup-") {
+            if let Some(journal) =
+                json_file::read::<InstallJournal>(&entry.path().join("journal.json"))?
+            {
+                valid_path(&journal.id)?;
+                if !journal.committed {
+                    let target = root.join("packages").join(&journal.id);
+                    let old = entry.path().join("package");
+                    if old.exists() {
+                        if target.exists() {
+                            std::fs::remove_dir_all(&target)?;
+                        }
+                        std::fs::rename(old, &target)?;
+                    } else if !journal.existed && target.exists() {
+                        std::fs::remove_dir_all(&target)?;
+                    }
+                    for (index, (id, existed)) in journal.storage.iter().enumerate() {
+                        valid_path(id)?;
+                        let target = root.join("sources").join(id).join("storage.json");
+                        let saved = entry.path().join(format!("storage-{index}"));
+                        // Copy leaves the journal restartable if recovery itself is interrupted.
+                        if *existed && saved.exists() {
+                            std::fs::copy(saved, target)?;
+                        } else if !existed && target.exists() {
+                            std::fs::remove_file(target)?;
+                        }
+                    }
+                }
+            }
+            std::fs::remove_dir_all(entry.path())?;
+        } else if name.starts_with(".stage-") {
+            std::fs::remove_dir_all(entry.path())?;
+        }
+    }
+    for entry in std::fs::read_dir(root.join("sources"))? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() && entry.file_name().to_string_lossy().starts_with(".login-")
+        {
+            std::fs::remove_dir_all(entry.path())?;
+        }
+    }
+    Ok(())
+}
 impl Host {
     /// Open an independent data root, installing the embedded builtin on first use.
     pub async fn open(data: &Path) -> Result<Arc<Self>> {
+        Self::open_with_replay(data, None).await
+    }
+    pub(crate) async fn open_with_replay(
+        data: &Path,
+        replay_base: Option<String>,
+    ) -> Result<Arc<Self>> {
         static OPEN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         static HOSTS: std::sync::OnceLock<Mutex<BTreeMap<PathBuf, std::sync::Weak<Host>>>> =
             std::sync::OnceLock::new();
@@ -84,6 +149,7 @@ impl Host {
         let root = data.join("plugins");
         std::fs::create_dir_all(root.join("packages"))?;
         std::fs::create_dir_all(root.join("sources"))?;
+        recover_installs(&root)?;
         let mut registry: Registry =
             json_file::read(&root.join("sources.json"))?.unwrap_or_default();
         if registry.version == 0 {
@@ -94,32 +160,74 @@ impl Host {
             sources: Mutex::new(BTreeMap::new()),
             registry: Mutex::new(registry),
             transaction: tokio::sync::Mutex::new(()),
+            errors: Mutex::default(),
+            replay_base,
         });
-        if !host
-            .root
-            .join("packages/subsonic.music/descriptor.json")
-            .exists()
-        {
-            let files = BTreeMap::from([(
-                "plugin.ts".into(),
-                include_bytes!("../../../../plugins/subsonic/plugin.ts").to_vec(),
-            )]);
-            host.install_files(files, true).await?;
+        for (id, source) in [
+            (
+                "subsonic.music",
+                include_bytes!("../../../../plugins/subsonic/plugin.ts").as_slice(),
+            ),
+            (
+                "feiniu.music",
+                include_bytes!("../../../../plugins/feiniu/plugin.ts").as_slice(),
+            ),
+            (
+                "qq.scraper",
+                include_bytes!("../../../../plugins/qq-scraper/plugin.ts").as_slice(),
+            ),
+            (
+                "kugou.scraper",
+                include_bytes!("../../../../plugins/kugou-scraper/plugin.ts").as_slice(),
+            ),
+        ] {
+            if !host
+                .root
+                .join("packages")
+                .join(id)
+                .join("descriptor.json")
+                .exists()
+            {
+                host.install_files(
+                    BTreeMap::from([("plugin.ts".into(), source.to_vec())]),
+                    true,
+                )
+                .await?;
+            }
         }
         let records = host.records();
         for record in records {
-            valid_path(&record.source_id)?;
-            if record.enabled {
-                let d = host.package(&record.plugin_id)?.descriptor;
-                let instance = Source::open(&host.root, &record, d).await?;
-                host.sources
-                    .lock()
-                    .unwrap()
-                    .insert(record.source_id, Arc::new(instance));
+            if !record.enabled {
+                continue;
+            }
+            let result = async {
+                valid_path(&record.source_id)?;
+                let descriptor = host.package(&record.plugin_id)?.descriptor;
+                Source::open(&host.root, &record, descriptor, host.replay_base.as_deref()).await
+            }
+            .await;
+            match result {
+                Ok(instance) => {
+                    host.sources
+                        .lock()
+                        .unwrap()
+                        .insert(record.source_id, Arc::new(instance));
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Source {} isolated during startup: {}",
+                        record.source_id,
+                        error.code
+                    );
+                    host.errors.lock().unwrap().insert(record.source_id, error);
+                }
             }
         }
         hosts.lock().unwrap().insert(data, Arc::downgrade(&host));
         Ok(host)
+    }
+    pub fn source_errors(&self) -> BTreeMap<String, PluginError> {
+        self.errors.lock().unwrap().clone()
     }
     pub fn packages(&self) -> Result<Vec<Package>> {
         let mut out = Vec::new();
@@ -129,8 +237,17 @@ impl Host {
             {
                 continue;
             }
-            let descriptor: Descriptor = json_file::read(&entry.path().join("descriptor.json"))?
-                .ok_or_else(|| PluginError::new("INVALID_PLUGIN", "Missing descriptor"))?;
+            let descriptor =
+                match json_file::read::<Descriptor>(&entry.path().join("descriptor.json")) {
+                    Ok(Some(descriptor)) => descriptor,
+                    _ => {
+                        log::warn!(
+                            "Skipping invalid plugin descriptor: {}",
+                            entry.file_name().to_string_lossy()
+                        );
+                        continue;
+                    }
+                };
             out.push(Package {
                 descriptor,
                 path: entry.path(),
@@ -313,6 +430,17 @@ impl Host {
         }
         let old = backup.path().join("package");
         let existed = target.exists();
+        let mut journal = InstallJournal {
+            id: descriptor.id.clone(),
+            existed,
+            storage: affected
+                .iter()
+                .zip(&storage_backups)
+                .map(|(s, (_, _, existed))| (s.record.source_id.clone(), *existed))
+                .collect(),
+            committed: false,
+        };
+        json_file::write(&backup.path().join("journal.json"), &journal)?;
         if existed {
             std::fs::rename(&target, &old)?;
         }
@@ -325,14 +453,37 @@ impl Host {
         let activate = async {
             let mut replacements = Vec::new();
             for source in &affected {
-                replacements
-                    .push(source::open_runtime(&self.root, &source.record, &descriptor).await?);
+                replacements.push(
+                    source::open_runtime(
+                        &self.root,
+                        &source.record,
+                        &descriptor,
+                        self.replay_base.as_deref(),
+                    )
+                    .await?,
+                );
             }
             Ok::<_, PluginError>(replacements)
         }
         .await;
         match activate {
             Ok(replacements) => {
+                journal.committed = true;
+                if let Err(error) = json_file::write(&backup.path().join("journal.json"), &journal)
+                {
+                    std::fs::remove_dir_all(&target)?;
+                    if existed {
+                        std::fs::rename(&old, &target)?;
+                    }
+                    for (path, saved, existed) in storage_backups {
+                        if existed {
+                            std::fs::rename(saved, path)?;
+                        } else if path.exists() {
+                            std::fs::remove_file(path)?;
+                        }
+                    }
+                    return Err(error.into());
+                }
                 for ((guard, source), vm) in guards.iter_mut().zip(&affected).zip(replacements) {
                     **guard = vm;
                     *source.descriptor.lock().unwrap() = descriptor.clone();
@@ -434,6 +585,7 @@ impl Host {
                 descriptor,
                 Value::Null,
                 Some(values.clone()),
+                self.replay_base.as_deref(),
             )
             .await?;
             source
@@ -474,6 +626,15 @@ impl Host {
         self.sources.lock().unwrap().insert(id, source.clone());
         Ok(source)
     }
+    /// Activate a public plugin whose handlers do not require a login.
+    pub async fn activate(self: &Arc<Self>, plugin: &str) -> Result<Arc<Source>> {
+        let mut draft = self.begin_login(plugin).await?;
+        if !draft.source.descriptor().auth_methods.is_empty() {
+            return Err(PluginError::new("AUTH_REQUIRED", "Use a login draft"));
+        }
+        draft.authenticated = true;
+        draft.commit().await
+    }
     pub async fn begin_login(self: &Arc<Self>, plugin: &str) -> Result<LoginDraft> {
         let descriptor = self.package(plugin)?.descriptor;
         if descriptor.kind == "library" {
@@ -499,12 +660,15 @@ impl Host {
             enabled: true,
             extra: BTreeMap::new(),
         };
-        let source = Arc::new(Source::open(&self.root, &record, descriptor).await?);
+        let source = Arc::new(
+            Source::open(&self.root, &record, descriptor, self.replay_base.as_deref()).await?,
+        );
         Ok(LoginDraft {
             host: self.clone(),
             source,
             dir: Some(dir),
             authenticated: false,
+            sms: Default::default(),
         })
     }
     pub(crate) async fn commit_login(&self, draft: &mut LoginDraft) -> Result<Arc<Source>> {
@@ -536,7 +700,9 @@ impl Host {
         record.source_id = id.clone();
         let descriptor = draft.source.descriptor.lock().unwrap().clone();
         let result = async {
-            let source = Arc::new(Source::open(&self.root, &record, descriptor).await?);
+            let source = Arc::new(
+                Source::open(&self.root, &record, descriptor, self.replay_base.as_deref()).await?,
+            );
             let mut next = self.registry.lock().unwrap().clone();
             if let Some(old) = next.sources.iter_mut().find(|s| s.source_id == id) {
                 record.added_at = old.added_at;
@@ -579,6 +745,7 @@ impl Host {
                     &self.root,
                     record,
                     self.package(&record.plugin_id)?.descriptor,
+                    self.replay_base.as_deref(),
                 )
                 .await?,
             ))

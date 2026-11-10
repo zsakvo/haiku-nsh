@@ -74,8 +74,9 @@ pub(crate) async fn open_runtime(
     root: &Path,
     record: &SourceRecord,
     descriptor: &Descriptor,
+    replay: Option<&str>,
 ) -> Result<Runtime> {
-    let vm = Runtime::with_options(descriptor::options(
+    let mut options = descriptor::options(
         &record.source_id,
         Some(
             root.join("sources")
@@ -83,7 +84,18 @@ pub(crate) async fn open_runtime(
                 .join("storage.json"),
         ),
         false,
-    ))?;
+    );
+    if let Some(base) = replay {
+        options.modules.insert(
+            "haiku".into(),
+            format!(
+                "globalThis.__haikuReplayBase={};\n{}",
+                serde_json::to_string(base)?,
+                sdk::MODULE
+            ),
+        );
+    }
+    let vm = Runtime::with_options(options)?;
     vm.load_package(&root.join("packages").join(&descriptor.id), "plugin.ts")
         .await?;
     vm.load_module("haiku-host-bridge.js", sdk::BRIDGE).await?;
@@ -94,6 +106,7 @@ impl Source {
         root: &Path,
         record: &SourceRecord,
         descriptor: Descriptor,
+        replay: Option<&str>,
     ) -> Result<Self> {
         let credentials: Credentials = haiku_store::json_file::read(
             &root
@@ -108,6 +121,7 @@ impl Source {
             descriptor,
             credentials.credential,
             credentials.connection,
+            replay,
         )
         .await
     }
@@ -117,10 +131,11 @@ impl Source {
         descriptor: Descriptor,
         credential: Value,
         connection: Option<BTreeMap<String, String>>,
+        replay: Option<&str>,
     ) -> Result<Self> {
         let directory = root.join("sources").join(&record.source_id);
         std::fs::create_dir_all(&directory)?;
-        let runtime = open_runtime(root, record, &descriptor).await?;
+        let runtime = open_runtime(root, record, &descriptor, replay).await?;
         Ok(Self {
             record: record.clone(),
             descriptor: Mutex::new(descriptor),
@@ -291,16 +306,20 @@ impl Source {
     pub async fn logout(&self) -> Result<()> {
         let _lock = self.refresh.lock().await;
         self.cancel_all();
-        if self
+        let remote = if self
             .descriptor()
             .capabilities
             .iter()
             .any(|p| p == "auth.logout")
         {
             self.call_raw("auth.logout", vec![], json!({}), None)
-                .await?;
-        }
-        self.set_credential(Value::Null, false)
+                .await
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
+        self.set_credential(Value::Null, false)?;
+        remote
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -320,6 +339,7 @@ pub struct LoginDraft {
     pub(crate) source: Arc<Source>,
     pub(crate) dir: Option<tempfile::TempDir>,
     pub(crate) authenticated: bool,
+    pub(crate) sms: tokio::sync::Mutex<Option<(Value, tokio::time::Instant)>>,
 }
 impl Drop for LoginDraft {
     fn drop(&mut self) {
@@ -365,16 +385,43 @@ impl LoginDraft {
         self.accept(value).await
     }
     pub async fn sms_send(&self, phone: &str, cancel: Option<&Cancellation>) -> Result<Value> {
-        self.source
+        let mut session = self.sms.lock().await;
+        if let Some((_, until)) = &*session {
+            if *until > tokio::time::Instant::now() {
+                let mut error = PluginError::new("RATE_LIMITED", "SMS cooldown is active");
+                error.details = Some(
+                    json!({"retryAfter": (*until - tokio::time::Instant::now()).as_secs_f64()}),
+                );
+                return Err(error);
+            }
+        }
+        let value = self
+            .source
             .call_raw("auth.sms.send", vec![json!(phone)], json!({}), cancel)
-            .await
+            .await?;
+        let state = value
+            .get("state")
+            .cloned()
+            .ok_or_else(|| PluginError::new("PARSE_ERROR", "SMS state missing"))?;
+        let cooldown = value["cooldown"].as_f64().unwrap_or(60.).clamp(0., 86400.);
+        *session = Some((
+            state,
+            tokio::time::Instant::now() + Duration::from_secs_f64(cooldown),
+        ));
+        Ok(json!({"cooldown":cooldown}))
     }
     pub async fn sms_verify(
         &mut self,
-        state: Value,
         code: &str,
         cancel: Option<&Cancellation>,
     ) -> Result<LoginResult> {
+        let state = self
+            .sms
+            .lock()
+            .await
+            .as_ref()
+            .map(|s| s.0.clone())
+            .ok_or_else(|| PluginError::new("AUTH_REQUIRED", "Send an SMS first"))?;
         let value = self
             .source
             .call_raw(
@@ -384,7 +431,9 @@ impl LoginDraft {
                 cancel,
             )
             .await?;
-        self.accept(value).await
+        let login = self.accept(value).await?;
+        *self.sms.lock().await = None;
+        Ok(login)
     }
     /// The caller supplies a page from its isolated web session; no webview is created here.
     pub async fn web_done(
@@ -428,15 +477,29 @@ impl LoginDraft {
     pub async fn qrcode_poll(&mut self, session: &mut QrSession) -> Result<Value> {
         tokio::select! {biased;_=session.cancel.cancelled()=>return Err(PluginError::new("CANCELLED","QR cancelled")),_=tokio::time::sleep_until(session.deadline)=>return Ok(json!({"status":"expired"})),_=tokio::time::sleep_until(session.next)=>{}}
         session.next = tokio::time::Instant::now() + Duration::from_secs(2);
-        let value = self
-            .source
-            .call_raw(
-                "auth.qrcode.poll",
-                vec![session.state.clone()],
-                json!({}),
-                Some(&session.cancel),
-            )
-            .await?;
+        let poll_cancel = Cancellation::default();
+        let source = self.source.clone();
+        let call = source.call_raw(
+            "auth.qrcode.poll",
+            vec![session.state.clone()],
+            json!({}),
+            Some(&poll_cancel),
+        );
+        tokio::pin!(call);
+        let value = tokio::select! {
+            biased;
+            _ = session.cancel.cancelled() => {
+                poll_cancel.cancel();
+                let _ = call.await;
+                return Err(PluginError::new("CANCELLED", "QR cancelled"));
+            }
+            _ = tokio::time::sleep_until(session.deadline) => {
+                poll_cancel.cancel();
+                let _ = call.await;
+                return Ok(json!({"status":"expired"}));
+            }
+            result = &mut call => result?,
+        };
         if value["status"] == "done" {
             self.accept(value.clone()).await?;
         }

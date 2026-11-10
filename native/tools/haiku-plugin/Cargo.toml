@@ -1,0 +1,11 @@
+[package]
+name = "haiku-plugin"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+haiku-plugins = { path = "../../crates/haiku-plugins" }
+serde_json.workspace = true
+tokio.workspace = true
+tempfile.workspace = true

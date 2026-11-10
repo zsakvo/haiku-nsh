@@ -23,6 +23,11 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M2-03 已验收并提交
+
+- M2-02 遗留补齐；feiniu（237 行）、qq-scraper、kugou-scraper v2；刮削编排（`haiku-plugins::scraper`）；`native/tools/haiku-plugin` CLI（new/check/test）；契约套件 `haiku-plugins::contract`（JSON 报告到 stdout，摘要到 stderr）。workspace 221 通过；四个内置插件与三个模板契约全部通过；nsh test 13/13。
+- 遗留并入 M2-04 第 0 步：feiniu 缺 FNID/中继/access-code 远程连接（参考版有，属功能缺口）；jsrt 未注册 timers/全局 setTimeout；契约套件未遍历 detail.tracks 分页、replay 未拦截裸 fetch、--record/--live 只有基础实现。
+
 ## 2026-11-10 更新：M2-02 已验收并提交
 
 - haiku-plugins 宿主（描述符、安装事务、sources.json 兼容参考版、认证状态机、AuthExpired 单飞刷新、SourceApi）、`haiku` SDK、`sdk/haiku.d.ts`、`plugins/subsonic/plugin.ts`（297 行，id `subsonic.music`）。workspace 210 通过，tsc 通过，nsh test 13/13。

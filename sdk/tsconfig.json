@@ -1,1 +1,22 @@
-{"compilerOptions":{"strict":true,"noEmit":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM","DOM.Iterable"]},"files":["haiku.d.ts","all-capabilities.ts","../plugins/subsonic/plugin.ts"]}
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ]
+  },
+  "files": [
+    "haiku.d.ts",
+    "all-capabilities.ts",
+    "../plugins/subsonic/plugin.ts",
+    "../plugins/feiniu/plugin.ts",
+    "../plugins/qq-scraper/plugin.ts",
+    "../plugins/kugou-scraper/plugin.ts"
+  ]
+}

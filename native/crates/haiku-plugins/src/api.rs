@@ -39,7 +39,7 @@ impl SearchKind {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Entity {
-    pub reference: EntityRef,
+    pub reference: Option<EntityRef>,
     pub title: String,
     pub cover: Option<String>,
     pub artists: Vec<Artist>,
@@ -50,6 +50,12 @@ pub struct Entity {
     pub year: Option<u32>,
     pub track_count: Option<u32>,
     pub extra: Option<Value>,
+    pub creator: Option<String>,
+    pub host: Option<String>,
+    pub episode_count: Option<u32>,
+    pub subtitle: Option<String>,
+    pub quality: Option<Vec<String>>,
+    pub explicit: Option<bool>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Detail {
@@ -112,14 +118,27 @@ pub struct ScrapeQuery {
     pub album: Option<String>,
     pub duration: Option<f64>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Link {
+    pub reference: EntityRef,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Entry {
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub cover: Option<String>,
+    pub to: Link,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Shelf {
     pub id: String,
     pub title: String,
     pub kind: String,
     pub items: Vec<Entity>,
+    pub entries: Vec<Entry>,
+    pub more: Option<Link>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Home {
     pub shelves: Vec<Shelf>,
     pub next: Option<String>,
@@ -157,16 +176,23 @@ impl SourceApi {
     fn entity(&self, kind: &str, value: Value) -> Option<Entity> {
         let id = value["id"].as_str();
         let title = value[if kind == "artist" { "name" } else { "title" }].as_str();
-        let (Some(id), Some(title)) = (id, title) else {
-            self.warn(format!("Dropped {kind}: missing id/title"));
+        let Some(title) = title.filter(|s| !s.trim().is_empty()) else {
+            self.warn(format!("Dropped {kind}: missing title/name"));
             return None;
         };
+        if kind != "artist" && id.is_none_or(|id| id.is_empty()) {
+            self.warn(format!("Dropped {kind}: missing id"));
+            return None;
+        }
+        if kind == "track" && self.track_value(value.clone()).is_none() {
+            return None;
+        }
         Some(Entity {
-            reference: EntityRef {
+            reference: id.filter(|s| !s.is_empty()).map(|id| EntityRef {
                 source: self.source.record.source_id.clone(),
                 kind: kind.into(),
                 id: id.into(),
-            },
+            }),
             title: title.into(),
             cover: self.cover(value["cover"].as_str()),
             artists: serde_json::from_value(value["artists"].clone()).unwrap_or_default(),
@@ -177,6 +203,14 @@ impl SourceApi {
             year: value["year"].as_u64().and_then(|n| n.try_into().ok()),
             track_count: value["trackCount"].as_u64().and_then(|n| n.try_into().ok()),
             extra: value.get("extra").cloned(),
+            creator: value["creator"].as_str().map(str::to_owned),
+            host: value["host"].as_str().map(str::to_owned),
+            episode_count: value["episodeCount"]
+                .as_u64()
+                .and_then(|n| n.try_into().ok()),
+            subtitle: value["subtitle"].as_str().map(str::to_owned),
+            quality: serde_json::from_value(value["quality"].clone()).ok(),
+            explicit: value["explicit"].as_bool(),
         })
     }
     fn track_value(&self, mut value: Value) -> Option<Track> {
@@ -492,27 +526,109 @@ impl SourceApi {
             .as_array()
             .ok_or_else(|| PluginError::new("PARSE_ERROR", "Expected shelves"))?
         {
-            let kind = shelf["type"].as_str().unwrap_or("tracks");
-            let items = shelf["items"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .cloned()
-                        .filter_map(|v| self.entity(kind.trim_end_matches('s'), v))
-                        .collect()
-                })
-                .unwrap_or_default();
+            let (Some(id), Some(title), Some(kind), Some(raw)) = (
+                shelf["id"].as_str(),
+                shelf["title"].as_str(),
+                shelf["type"].as_str(),
+                shelf["items"].as_array(),
+            ) else {
+                self.warn("Dropped shelf: missing id/title/type/items".into());
+                continue;
+            };
+            if id.is_empty()
+                || title.is_empty()
+                || ![
+                    "tracks",
+                    "albums",
+                    "playlists",
+                    "toplists",
+                    "programs",
+                    "entries",
+                ]
+                .contains(&kind)
+            {
+                self.warn("Dropped shelf: invalid id/title/type".into());
+                continue;
+            }
+            let (mut items, mut entries) = (Vec::new(), Vec::new());
+            for item in raw {
+                if kind == "entries" {
+                    if let (Some(title), Some(to)) = (
+                        item["title"].as_str().filter(|s| !s.is_empty()),
+                        self.link(&item["to"]),
+                    ) {
+                        entries.push(Entry {
+                            title: title.into(),
+                            to,
+                            subtitle: item["subtitle"].as_str().map(str::to_owned),
+                            cover: self.cover(item["cover"].as_str()),
+                        });
+                    } else {
+                        self.warn("Dropped entry: missing title or invalid link".into());
+                    }
+                } else if let Some(entity) = self.entity(kind.trim_end_matches('s'), item.clone()) {
+                    items.push(entity);
+                }
+            }
+            let more = if shelf["more"].is_null() {
+                None
+            } else {
+                let link = self.link(&shelf["more"]);
+                if link.is_none() {
+                    self.warn("Dropped invalid shelf.more".into());
+                }
+                link
+            };
             shelves.push(Shelf {
-                id: shelf["id"].as_str().unwrap_or("").into(),
-                title: shelf["title"].as_str().unwrap_or("").into(),
+                id: id.into(),
+                title: title.into(),
                 kind: kind.into(),
                 items,
+                entries,
+                more,
             });
         }
         Ok(Home {
             shelves,
             next: value["next"].as_str().map(str::to_owned),
         })
+    }
+    fn link(&self, value: &Value) -> Option<Link> {
+        let object = value.as_object()?;
+        if object.len() != 1 {
+            return None;
+        }
+        let (kind, id) = object.iter().next()?;
+        if !["playlist", "album", "toplist", "radio", "category"].contains(&kind.as_str()) {
+            return None;
+        }
+        Some(Link {
+            reference: EntityRef {
+                source: self.source.record.source_id.clone(),
+                kind: kind.clone(),
+                id: id.as_str().filter(|s| !s.is_empty())?.into(),
+            },
+        })
+    }
+    /// Fetch all pages of any typed endpoint, with the SDK's hard 100-page bound.
+    pub async fn collect_all<T, F, Fut>(mut fetch: F) -> Result<Vec<T>>
+    where
+        F: FnMut(Option<String>) -> Fut,
+        Fut: std::future::Future<Output = Result<Page<T>>>,
+    {
+        let mut cursor = None;
+        let mut seen = std::collections::BTreeSet::new();
+        let mut items = Vec::new();
+        for _ in 0..100 {
+            let page = fetch(cursor).await?;
+            items.extend(page.items);
+            match page.next {
+                None => return Ok(items),
+                Some(next) if seen.insert(next.clone()) => cursor = Some(next),
+                Some(_) => return Err(PluginError::new("INVALID_PAGINATION", "Repeated cursor")),
+            }
+        }
+        Err(PluginError::new("PAGE_LIMIT", "More than 100 pages"))
     }
     pub async fn scrape(
         &self,

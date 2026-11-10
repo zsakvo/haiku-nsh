@@ -20,15 +20,15 @@
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
-| F02 插件包与来源生命周期 | M2-01 已验收；M2-02 宿主核心与 subsonic.music 已实现，修订待审阅 | `haiku-jsrt`、`haiku-plugins`、`plugins/subsonic`、`sdk/haiku.d.ts`、`native/app/src/core.rs` | workspace 210 通过/1 忽略；修订 plugins 6/6、tsc、nsh test 13/13；`.artifacts/m2-02/` | SourceApi 部分模型/首页链接、完整列表聚合与坏包隔离/崩溃恢复经审阅接受留 M2-03；UI/CLI 留后续 |
-| F03 来源认证与用户内容 | 认证宿主核心与用户内容调用接口已实现，修订待审阅 | `haiku-plugins/src/{source,host,api}.rs`、`sdk/haiku.d.ts` | 单飞刷新、重放、凭据权限、QR 节奏/过期/取消、失败登录清理、连接 verify 回滚通过 | SMS cooldown/状态托管、QR 到期抢占、认证展示元数据与部分认证/cookie 回归经审阅接受留 M2-03；webview/UI 留 M2-03 |
+| F02 插件包与来源生命周期 | M2-01/02 已验收；M2-03 遗留、四内置包、契约与离线 CLI 已实现，待审阅 | `haiku-plugins/src/{api,host,contract}.rs`、`native/tools/haiku-plugin`、`plugins/` | workspace 221 通过/1 忽略；四插件契约 60/60；三模板 new/check/test；tsc、nsh check/build/test 13/13；`.artifacts/m2-03/` | 详情契约自动翻页、所有认证方式逐包契约枚举、联网录制增强与裸 fetch 拦截未完成；UI/GUIDE 留 M2-04 |
+| F03 来源认证与用户内容 | M2-03 认证宿主遗留已补齐，待审阅 | `haiku-plugins/src/{source,descriptor,api}.rs`、`sdk/haiku.d.ts` | SMS state/cooldown、QR 进行中 HTTP 到期 abort/重新 start、认证元数据、cookie 重载、password/cookie/SMS/web/logout、refresh 再失败回归通过 | webview、来源面板、qq.music 实际登录留 M2-04；真实上游未验证 |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
 | F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
-| F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/service.rs`、`native/app/src/{library,track_source,track_list}.rs`、`src/pages/{LibraryPage,TrackEditor}.tsx` | M1-03 本机实现与自动化验收通过，真实扫描/播放日志、浅深截图已保存，待审阅 | 刮削留 M4；原生双击/选择器交互与听感待人工确认；额外 cargo target-dir 警告见下节 |
+| F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
 | F11 喜欢、歌单与远端收藏 | 未实现 | | | |
 | F12 历史与听歌统计 | 未实现 | | | |
 | F13 下载与媒体缓存 | 部分实现（媒体缓存） | `haiku-audio::media_cache`、`haiku-playback::backend`、`src/shell/StorageSettings.tsx` | M1-05：容量/LRU/pin/完整性/失败删除/原文件保护测试通过；清理确认 Headless 与浅色截图通过 | 网络缓存真实写入/恢复留 M4，下载留 M5；缓存路径按任务使用 media-cache/ |
@@ -471,3 +471,36 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - tsc 沿用参考版已有 TypeScript 7.0.2；Rust 测试隔离 HAIKU_DATA_DIR=/tmp/haiku-m1-03-fixtures/m2-02-review-data、HAIKU_NO_KEYCHAIN=1。
 - 证据：.artifacts/m2-02/{cargo-test-plugins-review,tsc-review,nsh-test-review}.log；警告仅既有 block、target-dir、__eh_frame。
 - 上节列出的模型/聚合/认证状态/元数据/回归/坏包隔离与崩溃恢复遗留已获审阅者接受，纳入 M2-03 第 0 步，本轮未扩展；未提交 git。
+
+## 2026-11-10 M2-03：遗留、刮削宿主、三插件、离线契约与 CLI（待审阅）
+
+- 全部操作在主仓库 /Users/zsakvo/Project/GPUI/haiku-nsh；未提交/推送，未改 UI/TSX 导出、参考版、NSH、Rex；保留审阅者未跟踪任务文件。
+- SourceApi：home 六类 Shelf、Entry/Link/more 校验并丢弃坏条目；creator/host/episodeCount/subtitle/quality/explicit 透传；无 id Artist 保留，reference=None 表示不可点击。
+- 新增 SourceApi::collect_all，适用于任一类型化分页调用，最多 100 页；重复游标和超限明确报错。
+- SMS state/cooldown 由 LoginDraft 保存，sms_verify 改为仅接受 code；QR 到期 abort 进行中 HTTP，原草稿可重新 start；logout 即使远端失败也清本地凭据。
+- 描述符 auth 保存 QR variants、password fields、web url/userAgent、SMS 存在性；旧描述符兼容缺少 auth 字段。
+- 回归覆盖 cookie 罐实例重载、password/cookie/SMS/web 登录、logout 清凭据、refresh 再失败→needs_login；来源启动失败存入 source_errors，不阻断其他来源，包列表跳过坏描述符。
+- 安装备份新增原子 journal；未提交事务在下次启动恢复旧包/storage，已提交事务清理备份；清理残留 stage/login；测试模拟安装中断残留，未实际杀进程/断电。
+- 新插件及 id：plugins/feiniu/plugin.ts（237 行，feiniu.music）；plugins/qq-scraper/plugin.ts（81 行，qq.scraper）；plugins/kugou-scraper/plugin.ts（88 行，kugou.scraper）。
+- 飞牛：直连 connection、password-login SHA-256/deviceId、token 刷新、track/album/artist 搜索、album/artist/playlist 详情、原始/转码 streams、歌词与四类 library 浏览；暂未移植 FNID/中继/access-code。
+- QQ：匿名搜索、年份/轨号、专辑封面、base64 LRC/翻译；酷狗：匿名搜索、封面模板、KRC XOR+zlib、LRC 回退；两者仅 scrape.search/lyrics。
+- Core::open 首次安装四内置包，app 同进程测试逐一验证 id/类别/builtin；sourceId 仍沿用 M2-02 参考版规范。
+- 刮削编排放 haiku-plugins/src/scraper.rs：参考 normalizeMatch、计数 bigram Dice、durationFit；有艺术家权重 0.5/0.3/0.2，无艺术家 0.8/0.2；自动 ≥0.86 且领先 ≥0.08，≥0.55 待审。
+- Scraper 共享 4 permit、单源 8 秒 timeout 后 abort；按规范化标题/首位艺术家/时长跨源合并，记录 sourceCount；局部错误隔离，全失败报错。
+- contract::run_contract / validate_schema：真实 runtime、隔离数据目录；能力覆盖、内容 schema、native id/get 往返、列表分页不重/终止/游标序列化、401/404/429/503、取消；另有 refresh+重放契约。
+- 离线 SDK HTTP 经本地 fixture replay，未匹配路径失败；四插件 fixtures/contract.json 手写上游响应，无真实上游访问；酷狗覆盖 KRC 与 LRC 回退。
+- 报告 JSON schemaVersion=1、pluginId、passed、cases[{name,passed,durationMs,error}]，ContractReport::summary 提供人类摘要；CLI JSON 写 stdout、摘要写 stderr。
+- CLI native/tools/haiku-plugin：new <dir> --template provider|library|scraper；check <dir> 调 tsc 并打印描述符；test <dir> [--live|--record]；模板含 plugin.ts/tsconfig/fixtures/README，已有目标拒绝覆盖。
+- HAIKU_TSC 可指定可执行文件或 tsc.js，缺失时明确提示；HAIKU_SDK_PATH 可覆盖声明文件。验收只读使用参考项目 TypeScript 7.0.2，无应用 npm 运行时依赖。
+- 新增工作区工具 haiku-plugin，依赖现有 haiku-plugins/serde_json/tokio/tempfile；haiku-plugins 将 reqwest 0.12.28 从 dev 改为普通依赖；无新增第三方包/版本。
+- cargo test --manifest-path native/Cargo.toml --workspace：最终 221 通过/0 失败/1 忽略，plugins 16/16；cargo-test-workspace-repair2.log。
+- 首轮为 QR future 借用错误；repair1 两夹具误用全局 setTimeout；repair2 改为 pending Promise/本地慢 HTTP 后通过；失败日志保留，未超过两轮修复，未重复 workspace 构建。
+- 三模板各 new/check/test 一次均通过：provider 5/5、library 5/5、scraper 4/4；cli-{new,check,test}-{provider,library,scraper}.log，生成物在 templates/。
+- 四内置包各 check/test 一次均通过：subsonic 20/20、feiniu 21/21、qq-scraper 9/9、kugou-scraper 10/10；cli-{check,test}-<name>.log。
+- tsc --noEmit -p sdk/tsconfig.json 四插件检查通过（tsc.log）；nsh check -v / build -v 通过；nsh test -v 13/13（含四内置包 app 断言）；nsh-{check,build,test}.log。
+- Rust 验收隔离 HAIKU_DATA_DIR=/tmp/haiku-m1-03-fixtures/m2-03-data、HAIKU_NO_KEYCHAIN=1；CLI 使用 m2-03-cli-data；警告仅 block、target-dir、__eh_frame 既有例外。
+- 未完成/偏离：契约自动翻页目前覆盖 page:* 列表，detail.tracks 尚未自动翻页；认证由宿主回归/独立 refresh 契约覆盖，未把所有认证方式逐包自动枚举。
+- 未完成/未覆盖：replay 钩子覆盖 ctx.http，直接裸 fetch 尚未拦截；--live/--record 为基础实现，尚需区分故障注入场景、补响应序列/query/cookie/header 录制；未联网验证、未执行真实录制。
+- 飞牛 FNID/中继/access-code、真实服务器与需鉴权封面展示未验证；记录器当前写 fixtures/recorded.json，复杂真实认证录制不能视为完整可用。
+- 发现 stdlib 默认 loader 未注册 timers/global setTimeout；本轮不改 jsrt，测试不依赖它；是否补运行时注册与上述契约/联网增强，交审阅者决定后续任务。
+- 全部证据 .artifacts/m2-03/；未留一次性诊断脚本或额外汇总 JSON/hash；本节范围外 UI/webview/qq.music/GUIDE 留 M2-04。

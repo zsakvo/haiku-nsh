@@ -26,7 +26,7 @@ function makeContext(raw){
    let body=options.body;
    if(options.json!==undefined){body=JSON.stringify(options.json);headers.set('content-type','application/json');}
    if(options.form){body=new URLSearchParams(options.form).toString();headers.set('content-type','application/x-www-form-urlencoded');}
-   const start=Date.now();const response=await raw.http(url.toString(),{method,body,headers,timeout:options.timeout??defaults.timeout??15000});
+   const start=Date.now();const target=globalThis.__haikuReplayBase?globalThis.__haikuReplayBase+'/?target='+encodeURIComponent(url.toString()):url.toString();const response=await raw.http(target,{method,body,headers,timeout:options.timeout??defaults.timeout??15000});
    const safe=new URL(url.toString());safe.username='';safe.password='';for(const key of safe.searchParams.keys())if(/token|cookie|password|secret|api.?key|^t$|^s$|^u$/i.test(key))safe.searchParams.set(key,'[REDACTED]');
    ctx.log.debug({method,url:safe.toString(),status:response.status,elapsedMs:Date.now()-start});
    if(defaults.cookies){let jar=raw.storage.get(cookieKey)||[];for(const line of response.headers.getSetCookie()){

@@ -18,5 +18,4 @@ semver = "=1.0.27"
 zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 log.workspace = true
 
-[dev-dependencies]
 reqwest.workspace = true

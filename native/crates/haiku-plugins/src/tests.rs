@@ -375,18 +375,26 @@ impl Server {
                     .unwrap();
                 log.lock().unwrap().push(text.clone());
                 let code = state.load(Ordering::Acquire);
-                let body = if code == 200 {
+                let body = if method == "cookieGet" {
+                    json!({"persisted":text.contains("session=persisted")}).to_string()
+                } else if code == 200 {
                     replies[method].to_string()
                 } else {
                     "{}".into()
                 };
                 let slow = text.contains("query=slow");
+                let sets_cookie = method == "cookieSet";
                 std::thread::spawn(move || {
                     if slow {
                         std::thread::sleep(Duration::from_millis(500));
                     }
+                    let cookie = if sets_cookie {
+                        "Set-Cookie: session=persisted; Path=/\r\n"
+                    } else {
+                        ""
+                    };
                     let header = format!(
-                        "HTTP/1.1 {code} Result\r\nContent-Length: {}\r\nRetry-After: 30\r\nConnection: close\r\n\r\n",
+                        "HTTP/1.1 {code} Result\r\nContent-Length: {}\r\nRetry-After: 30\r\n{cookie}Connection: close\r\n\r\n",
                         body.len()
                     );
                     let _ = stream.write_all(header.as_bytes());
@@ -447,10 +455,10 @@ async fn subsonic_fixture_verify_search_details_streams_paging_errors_cancel() {
         .unwrap();
     assert_eq!(page.items[0].title, "Fixture Song");
     assert_eq!(page.next.as_deref(), Some("1"));
-    let encoded = page.items[0].reference.encode();
+    let encoded = page.items[0].reference.as_ref().unwrap().encode();
     assert_eq!(
         haiku_model::EntityRef::decode(&encoded).unwrap(),
-        page.items[0].reference
+        page.items[0].reference.clone().unwrap()
     );
     assert!(page.items[0].cover.as_ref().unwrap().contains("size=512"));
     for kind in [SearchKind::Album, SearchKind::Artist] {
@@ -639,4 +647,369 @@ async fn subsonic_fixture_verify_search_details_streams_paging_errors_cancel() {
             .any(|r| r.contains("t=") && r.contains("s=") && !r.contains("secret"))
     );
     server.stop().await;
+}
+
+#[tokio::test]
+async fn sdk_models_home_links_and_complete_lists() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    install(&host, "models.test", r#"auth:{password:{submit:async()=>({credential:{ok:true}})},user:async()=>null},
+      search:{artist:async()=>({items:[{name:'Anonymous'},{id:'a',name:'Named'}]})},
+      playlist:{get:async()=>({info:{id:'p',title:'Playlist',creator:'Owner'},tracks:{items:[]}})},
+      program:{get:async()=>({info:{id:'p',title:'Program',host:'Host',episodeCount:3},tracks:{items:[]}})},
+      toplist:{get:async()=>({info:{id:'t',title:'Top',subtitle:'Weekly'},tracks:{items:[]}})},
+      home:async()=>({shelves:[
+        {id:'tracks',title:'Tracks',type:'tracks',items:[{id:'t',title:'Track',artists:[]},{id:'bad'}],more:{album:'a'}},
+        ...['albums','playlists','toplists','programs'].map(type=>({id:type,title:type,type,items:[{id:'e',title:'Entity'}]})),
+        {id:'entries',title:'Entries',type:'entries',items:[{title:'Go',cover:'cover/{size}',to:{radio:'r'}},{title:'Bad',to:{radio:1}}],more:{bad:'x'}},
+        {id:'bad',title:'Bad',type:'unknown',items:[]},{title:'Missing id'}
+      ]})"#).await;
+    let mut login = host.begin_login("models.test").await.unwrap();
+    login.password(BTreeMap::new(), None).await.unwrap();
+    let api = SourceApi::new(login.commit().await.unwrap());
+    let artists = api
+        .search(SearchKind::Artist, "", PageArgs::default(), None)
+        .await
+        .unwrap();
+    assert!(artists.items[0].reference.is_none());
+    assert!(artists.items[1].reference.is_some());
+    for (kind, expected) in [
+        ("playlist", "Owner"),
+        ("program", "Host"),
+        ("toplist", "Weekly"),
+    ] {
+        let info = api
+            .detail(kind, "id", PageArgs::default(), None)
+            .await
+            .unwrap()
+            .info
+            .unwrap();
+        assert_eq!(
+            info.creator.or(info.host).or(info.subtitle).as_deref(),
+            Some(expected)
+        );
+        if kind == "program" {
+            assert_eq!(info.episode_count, Some(3));
+        }
+    }
+    let home = api.home(None, false, None).await.unwrap();
+    assert_eq!(home.shelves.len(), 6);
+    assert_eq!(home.shelves[0].items.len(), 1);
+    assert_eq!(
+        home.shelves[0].more.as_ref().unwrap().reference.kind,
+        "album"
+    );
+    assert_eq!(home.shelves[5].entries.len(), 1);
+    assert_eq!(home.shelves[5].entries[0].to.reference.kind, "radio");
+    assert_eq!(
+        home.shelves[5].entries[0].cover.as_deref(),
+        Some("cover/512")
+    );
+    assert!(home.shelves[5].more.is_none());
+    assert_eq!(api.take_warnings().len(), 5);
+    let all = SourceApi::collect_all(|cursor| async move {
+        let n = cursor.as_deref().unwrap_or("0").parse::<u32>().unwrap();
+        Ok(Page {
+            items: vec![n],
+            next: (n < 2).then(|| (n + 1).to_string()),
+            total: None,
+        })
+    })
+    .await
+    .unwrap();
+    assert_eq!(all, vec![0, 1, 2]);
+    let mut count = 0;
+    let error = SourceApi::collect_all(|_| {
+        count += 1;
+        let n = count;
+        async move {
+            Ok(Page::<()> {
+                items: vec![],
+                next: Some(n.to_string()),
+                total: None,
+            })
+        }
+    })
+    .await
+    .unwrap_err();
+    assert_eq!(count, 100);
+    assert_eq!(error.code, "PAGE_LIMIT");
+}
+
+#[tokio::test]
+async fn auth_metadata_sms_cooldown_web_logout_refresh_failure_and_qr_deadline() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let server = Server::start();
+    install(&host, "sessions.test", r#"auth:{
+      user:async()=>null,
+      password:{fields:{password:{type:'secret',label:'Password'}},submit:async()=>({credential:{token:'password'}})},
+      cookie:{submit:async(cookie)=>({credential:{token:cookie}})},
+      sms:{send:async(phone)=>({state:{phone},cooldown:0.02}),verify:async(state,code)=>{if(state.phone!=='456'||code!=='ok')throw new Error('bad SMS');return {credential:{token:'sms'}};}},
+      web:{url:'https://login.invalid',userAgent:'Fixture',done:async(page)=>page.url.endsWith('/done')?{credential:{token:'web'}}:null},
+      qrcode:{variants:{qr:'QR'},start:async()=>({state:{},expiresIn:2.04}),poll:async(_,ctx)=>{await ctx.http.get('SLOW_FIXTURE/search3?query=slow').response();return {status:'done',credential:{token:'late'}};}},
+      refresh:async()=>({token:'still expired'}),logout:async()=>{}
+    },track:{streams:async()=>{throw new AuthExpired();}}"#.replace("SLOW_FIXTURE", &server.url).as_str()).await;
+    let descriptor = host.package("sessions.test").unwrap().descriptor;
+    let auth = descriptor.auth.unwrap();
+    assert_eq!(auth["qrcode"]["variants"]["qr"], "QR");
+    assert_eq!(auth["password"]["fields"]["password"]["type"], "secret");
+    assert_eq!(auth["web"]["url"], "https://login.invalid");
+    assert_eq!(auth["web"]["userAgent"], "Fixture");
+    assert!(auth["sms"].is_object());
+    let mut draft = host.begin_login("sessions.test").await.unwrap();
+    draft.password(BTreeMap::new(), None).await.unwrap();
+    draft.cookie("cookie", None).await.unwrap();
+    assert!(draft.sms_verify("ok", None).await.is_err());
+    draft.sms_send("123", None).await.unwrap();
+    assert_eq!(
+        draft.sms_send("456", None).await.unwrap_err().code,
+        "RATE_LIMITED"
+    );
+    tokio::time::sleep(Duration::from_millis(25)).await;
+    draft.sms_send("456", None).await.unwrap();
+    assert_eq!(
+        draft.sms_verify("ok", None).await.unwrap().credential["token"],
+        "sms"
+    );
+    assert!(
+        draft
+            .web_done(json!({"url":"https://login.invalid/wait"}), None)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        draft
+            .web_done(json!({"url":"https://login.invalid/done"}), None)
+            .await
+            .unwrap()
+            .unwrap()
+            .credential["token"],
+        "web"
+    );
+    let source = draft.commit().await.unwrap();
+    assert_eq!(
+        source
+            .invoke("track.streams", vec![json!("t")], json!({}), None)
+            .await
+            .unwrap_err()
+            .code,
+        "AUTH_EXPIRED"
+    );
+    assert!(source.needs_login());
+    source.logout().await.unwrap();
+    let saved: Value = json_file::read(
+        &dir.path()
+            .join("plugins/sources/sessions.test/credential.json"),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(saved["credential"].is_null());
+    let mut draft = host.begin_login("sessions.test").await.unwrap();
+    let mut qr = draft
+        .qrcode_start("qr", Cancellation::default())
+        .await
+        .unwrap();
+    let start = Instant::now();
+    assert_eq!(
+        draft.qrcode_poll(&mut qr).await.unwrap()["status"],
+        "expired"
+    );
+    assert!(start.elapsed() < Duration::from_millis(2600));
+    assert!(!draft.authenticated);
+    let cancel = Cancellation::default();
+    let mut restarted = draft.qrcode_start("qr", cancel.clone()).await.unwrap();
+    cancel.cancel();
+    assert_eq!(
+        draft.qrcode_poll(&mut restarted).await.unwrap_err().code,
+        "CANCELLED"
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn startup_isolates_bad_descriptors_and_recovers_interrupted_install() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    for id in ["healthy.test", "broken.test"] {
+        install(&host, id, "auth:{user:async()=>null,password:{submit:async()=>({credential:{ok:true}})}},track:{streams:async()=>[]}").await;
+        let mut draft = host.begin_login(id).await.unwrap();
+        draft.password(BTreeMap::new(), None).await.unwrap();
+        draft.commit().await.unwrap();
+    }
+    let root = dir.path().join("plugins");
+    let backup = root.join("packages/.backup-crashed");
+    std::fs::create_dir_all(&backup).unwrap();
+    std::fs::rename(root.join("packages/healthy.test"), backup.join("package")).unwrap();
+    std::fs::create_dir_all(root.join("packages/healthy.test")).unwrap();
+    std::fs::write(
+        root.join("packages/healthy.test/plugin.ts"),
+        "broken candidate",
+    )
+    .unwrap();
+    json_file::write(&backup.join("storage-0"), &json!({"keep":42})).unwrap();
+    json_file::write(
+        &root.join("sources/healthy.test/storage.json"),
+        &json!({"keep":-1}),
+    )
+    .unwrap();
+    json_file::write(&backup.join("journal.json"), &json!({"id":"healthy.test","existed":true,"storage":[["healthy.test",true]],"committed":false})).unwrap();
+    std::fs::create_dir(root.join("packages/.stage-crashed")).unwrap();
+    std::fs::create_dir(root.join("sources/.login-abandoned")).unwrap();
+    std::fs::write(
+        root.join("packages/broken.test/descriptor.json"),
+        "bad json",
+    )
+    .unwrap();
+    drop(host);
+    let host = Host::open(dir.path()).await.unwrap();
+    assert!(host.source("healthy.test").is_ok());
+    assert!(host.source("broken.test").is_err());
+    assert!(host.source_errors().contains_key("broken.test"));
+    assert_eq!(
+        host.packages()
+            .unwrap()
+            .iter()
+            .filter(|p| p.descriptor.id == "healthy.test")
+            .count(),
+        1
+    );
+    assert_eq!(
+        json_file::read::<Value>(&root.join("sources/healthy.test/storage.json"))
+            .unwrap()
+            .unwrap()["keep"],
+        42
+    );
+    assert!(!backup.exists());
+    assert!(!root.join("packages/.stage-crashed").exists());
+    assert!(!root.join("sources/.login-abandoned").exists());
+}
+
+#[tokio::test]
+async fn persistent_cookie_jar_survives_source_reload() {
+    let server = Server::start();
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    install(&host, "cookies.test", &format!(r#"http:{{cookies:true}},auth:{{user:async()=>null,cookie:{{submit:async(cookie,ctx)=>{{await ctx.http.get('{}/cookieSet').response();return {{credential:{{cookie}}}};}}}}}},track:{{get:async(id,ctx)=>ctx.http.get('{}/cookieGet').json(),streams:async()=>[]}}"#, server.url, server.url)).await;
+    let mut draft = host.begin_login("cookies.test").await.unwrap();
+    draft.cookie("session", None).await.unwrap();
+    draft.commit().await.unwrap();
+    host.set_enabled("cookies.test", false).await.unwrap();
+    host.set_enabled("cookies.test", true).await.unwrap();
+    assert_eq!(
+        host.source("cookies.test")
+            .unwrap()
+            .invoke("track.get", vec![json!("t")], json!({}), None)
+            .await
+            .unwrap()["persisted"],
+        true
+    );
+    server.stop().await;
+}
+
+#[tokio::test]
+async fn builtin_offline_contracts_validate_capabilities_ids_pages_errors_and_abort() {
+    for name in ["subsonic", "feiniu", "qq-scraper", "kugou-scraper"] {
+        let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../plugins")
+            .join(name);
+        let report = crate::contract::run_contract(&package, crate::contract::ContractMode::Replay)
+            .await
+            .unwrap();
+        assert!(
+            report.passed,
+            "{}\n{}",
+            report.summary(),
+            serde_json::to_string_pretty(&report).unwrap()
+        );
+        let encoded = serde_json::to_string(&report).unwrap();
+        let roundtrip: crate::contract::ContractReport = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(roundtrip.schema_version, 1);
+        assert!(roundtrip.passed);
+    }
+}
+
+#[test]
+fn contract_schema_rejects_missing_required_fields_and_nonserializable_cursors() {
+    use crate::contract::validate_schema;
+    assert!(validate_schema("page:track", &json!({"items":[{"id":"t","title":"Title"}]})).is_err());
+    assert!(validate_schema("page:album", &json!({"items":[],"next":{}})).is_err());
+    assert!(
+        validate_schema(
+            "candidates",
+            &json!([{"id":"x","title":"Title","artists":[]}])
+        )
+        .is_ok()
+    );
+    assert!(validate_schema("streams", &json!([{"url":"bad"}])).is_err());
+}
+
+#[tokio::test]
+async fn scrape_orchestration_merges_sources_scores_and_aborts_timeouts() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let query = crate::ScrapeQuery {
+        title: "Fixture".into(),
+        artists: vec!["Artist".into()],
+        album: None,
+        duration: Some(120.),
+    };
+    let mut sources = Vec::new();
+    for id in ["scraper.a", "scraper.b"] {
+        install(&host, id, "scrape:{search:async()=>[{id:'native',title:'Fixture',artists:['Artist'],duration:120}]}").await;
+        sources.push(host.activate(id).await.unwrap());
+    }
+    let report = crate::scraper::Scraper::default()
+        .search(query.clone(), sources, Cancellation::default())
+        .await
+        .unwrap();
+    assert_eq!(report.candidates.len(), 1);
+    assert_eq!(report.candidates[0].source_count, 2);
+    assert_eq!(report.candidates[0].score, 1.);
+    assert_eq!(report.verdict, crate::scraper::Verdict::Auto);
+    install(
+        &host,
+        "scraper.slow",
+        "scrape:{search:async()=>{await new Promise(()=>{});return [];}}",
+    )
+    .await;
+    let started = Instant::now();
+    let error = crate::scraper::Scraper::default()
+        .search(
+            query,
+            vec![host.activate("scraper.slow").await.unwrap()],
+            Cancellation::default(),
+        )
+        .await
+        .unwrap_err();
+    assert!(error.message.contains("TIMEOUT"));
+    assert!(started.elapsed() >= Duration::from_secs(8));
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[tokio::test]
+async fn contract_runs_auth_expired_refresh_and_replay() {
+    let package = tempfile::tempdir().unwrap();
+    std::fs::create_dir(package.path().join("fixtures")).unwrap();
+    std::fs::write(package.path().join("plugin.ts"), r#"
+      import {definePlugin,AuthExpired} from 'haiku';
+      export default definePlugin({id:'contract.auth',name:'Refresh',version:'1.0.0',
+        auth:{user:async()=>null,refresh:async(ctx)=>({token:'fresh'})},
+        track:{streams:async(id,ctx)=>{if(ctx.credential?.token!=='fresh')throw new AuthExpired();return [{url:'https://example.invalid/stream'}];}}
+      });"#).unwrap();
+    json_file::write(
+        &package.path().join("fixtures/contract.json"),
+        &json!({"cases":[{"name":"refresh and replay","path":"track.streams","args":["id"]}]}),
+    )
+    .unwrap();
+    let report =
+        crate::contract::run_contract(package.path(), crate::contract::ContractMode::Replay)
+            .await
+            .unwrap();
+    assert!(
+        report.passed,
+        "{}",
+        serde_json::to_string_pretty(&report).unwrap()
+    );
 }

@@ -1,0 +1,193 @@
+{
+  "routes": [
+    {
+      "path": "/soso/fcgi-bin/client_search_cp",
+      "body": {
+        "data": {
+          "song": {
+            "list": [
+              {
+                "mid": "mid1",
+                "title": "Fixture Song",
+                "singer": [
+                  {
+                    "name": "Artist"
+                  }
+                ],
+                "album": {
+                  "mid": "album1",
+                  "name": "Album"
+                },
+                "interval": 120,
+                "time_public": "2001-01-01",
+                "index_album": 2,
+                "index_cd": 1
+              }
+            ]
+          }
+        }
+      },
+      "query": {
+        "w": "slow"
+      },
+      "delayMs": 500
+    },
+    {
+      "path": "/soso/fcgi-bin/client_search_cp",
+      "body": {
+        "data": {
+          "song": {
+            "list": [
+              {
+                "mid": "mid1",
+                "title": "Fixture Song",
+                "singer": [
+                  {
+                    "name": "Artist"
+                  }
+                ],
+                "album": {
+                  "mid": "album1",
+                  "name": "Album"
+                },
+                "interval": 120,
+                "time_public": "2001-01-01",
+                "index_album": 2,
+                "index_cd": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/lyric/fcgi-bin/fcg_query_lyric_new.fcg",
+      "body": {
+        "retcode": 0,
+        "lyric": "WzAwOjAxXUZpeHR1cmUgbHlyaWNz",
+        "trans": "57+76K+R"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "scrape.search",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "scrape.lyrics",
+      "path": "scrape.lyrics",
+      "args": [
+        {
+          "id": "mid1",
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ]
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "HTTP 401 -> AUTH_REQUIRED",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 401,
+      "expectedCode": "AUTH_REQUIRED"
+    },
+    {
+      "name": "HTTP 404 -> NOT_FOUND",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 404,
+      "expectedCode": "NOT_FOUND"
+    },
+    {
+      "name": "HTTP 429 -> RATE_LIMITED",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 429,
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "HTTP 503 -> UPSTREAM_ERROR",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "Fixture Song",
+          "artists": [
+            "Artist"
+          ],
+          "duration": 120
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 503,
+      "expectedCode": "UPSTREAM_ERROR"
+    },
+    {
+      "name": "abort pending HTTP",
+      "path": "scrape.search",
+      "args": [
+        {
+          "title": "slow",
+          "artists": []
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "abortAfterMs": 20,
+      "expectedCode": "CANCELLED"
+    }
+  ]
+}

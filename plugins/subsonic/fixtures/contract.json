@@ -1,0 +1,466 @@
+{
+  "connection": {
+    "baseUrl": "http://subsonic.fixture",
+    "username": "User",
+    "password": "fixture"
+  },
+  "routes": [
+    {
+      "path": "/rest/search3",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "searchResult3": {
+            "song": [
+              {
+                "id": "song:1/字",
+                "title": "Fixture Song",
+                "artist": "Artist",
+                "artistId": "artist1",
+                "album": "Album",
+                "albumId": "album1",
+                "coverArt": "cover1",
+                "duration": 123,
+                "suffix": "flac",
+                "bitRate": 800
+              }
+            ],
+            "album": [
+              {
+                "id": "album1",
+                "name": "Album",
+                "artist": "Artist"
+              }
+            ],
+            "artist": [
+              {
+                "id": "artist1",
+                "name": "Artist"
+              }
+            ]
+          }
+        }
+      },
+      "query": {
+        "query": "slow"
+      },
+      "delayMs": 500
+    },
+    {
+      "path": "/rest/ping",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "version": "1.16.1",
+          "openSubsonic": true
+        }
+      }
+    },
+    {
+      "path": "/rest/search3",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "searchResult3": {
+            "song": [
+              {
+                "id": "song:1/字",
+                "title": "Fixture Song",
+                "artist": "Artist",
+                "artistId": "artist1",
+                "album": "Album",
+                "albumId": "album1",
+                "coverArt": "cover1",
+                "duration": 123,
+                "suffix": "flac",
+                "bitRate": 800
+              }
+            ],
+            "album": [
+              {
+                "id": "album1",
+                "name": "Album",
+                "artist": "Artist"
+              }
+            ],
+            "artist": [
+              {
+                "id": "artist1",
+                "name": "Artist"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getSong",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "song": {
+            "id": "song:1/字",
+            "title": "Fixture Song",
+            "artist": "Artist",
+            "suffix": "flac",
+            "bitRate": 800
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getAlbum",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "album": {
+            "id": "album1",
+            "name": "Album",
+            "song": [
+              {
+                "id": "song1",
+                "title": "One",
+                "artist": "Artist"
+              },
+              {
+                "id": "song2",
+                "title": "Two",
+                "artist": "Artist"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getArtist",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "artist": {
+            "id": "artist1",
+            "name": "Artist",
+            "album": [
+              {
+                "id": "album1",
+                "name": "Album"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getPlaylist",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "playlist": {
+            "id": "playlist1",
+            "name": "Playlist",
+            "owner": "User",
+            "entry": [
+              {
+                "id": "song1",
+                "title": "One"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getAlbumList2",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "albumList2": {
+            "album": [
+              {
+                "id": "album1",
+                "name": "Album"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getArtists",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "artists": {
+            "index": [
+              {
+                "artist": [
+                  {
+                    "id": "artist1",
+                    "name": "Artist"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getPlaylists",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "playlists": {
+            "playlist": [
+              {
+                "id": "playlist1",
+                "name": "Playlist",
+                "owner": "User"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/rest/getLyricsBySongId",
+      "body": {
+        "subsonic-response": {
+          "status": "ok",
+          "lyricsList": {
+            "structuredLyrics": [
+              {
+                "synced": true,
+                "line": [
+                  {
+                    "start": 1230,
+                    "value": "Fixture lyrics"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "name": "search.track",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "search.album",
+      "path": "search.album",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "search.artist",
+      "path": "search.artist",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "track.get",
+      "path": "track.get",
+      "args": [
+        "song:1/字"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "track.streams",
+      "path": "track.streams",
+      "args": [
+        "song:1/字"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "track.lyrics",
+      "path": "track.lyrics",
+      "args": [
+        "song:1/字"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "album.get",
+      "path": "album.get",
+      "args": [
+        "album1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "artist.get",
+      "path": "artist.get",
+      "args": [
+        "artist1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "artist.albums",
+      "path": "artist.albums",
+      "args": [
+        "artist1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "playlist.get",
+      "path": "playlist.get",
+      "args": [
+        "playlist1"
+      ],
+      "context": {
+        "limit": 20
+      }
+    },
+    {
+      "name": "library albums",
+      "path": "library.browse",
+      "args": [
+        "albums"
+      ],
+      "context": {
+        "limit": 20
+      },
+      "schema": "page:album"
+    },
+    {
+      "name": "library artists",
+      "path": "library.browse",
+      "args": [
+        "artists"
+      ],
+      "context": {
+        "limit": 20
+      },
+      "schema": "page:artist"
+    },
+    {
+      "name": "library playlists",
+      "path": "library.browse",
+      "args": [
+        "playlists"
+      ],
+      "context": {
+        "limit": 20
+      },
+      "schema": "page:playlist"
+    },
+    {
+      "name": "HTTP 401 -> AUTH_EXPIRED",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 401,
+      "expectedCode": "AUTH_EXPIRED"
+    },
+    {
+      "name": "HTTP 404 -> NOT_FOUND",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 404,
+      "expectedCode": "NOT_FOUND"
+    },
+    {
+      "name": "HTTP 429 -> RATE_LIMITED",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 429,
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "HTTP 503 -> UPSTREAM_ERROR",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "fixture",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "status": 503,
+      "expectedCode": "UPSTREAM_ERROR"
+    },
+    {
+      "name": "abort pending HTTP",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "slow",
+          "limit": 20
+        }
+      ],
+      "context": {
+        "limit": 20
+      },
+      "abortAfterMs": 20,
+      "expectedCode": "CANCELLED"
+    }
+  ]
+}

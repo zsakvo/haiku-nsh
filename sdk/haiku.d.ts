@@ -539,3 +539,15 @@ declare module 'haiku' {
     constructor(input?: string | ErrorFields);
   }
 }
+
+declare module 'buffer' {
+  /** Construct a binary buffer from encoded text or bytes. */
+  export const Buffer: {
+    from(data: string | Uint8Array, encoding?: string): import('crypto').Buffer;
+  };
+}
+
+declare module 'zlib' {
+  /** Inflate a zlib-compressed byte sequence. */
+  export function inflateSync(data: Uint8Array): Uint8Array;
+}
