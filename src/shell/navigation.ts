@@ -16,11 +16,13 @@ export const destinations = [
   { id: "downloads", label: "下载", icon: "download", group: "工具", title: "让音乐随时相伴", description: "下载管理将在下载功能接入后提供。" },
 ] as const satisfies readonly { id: string; label: string; icon: IconName; group: string; title: string; description: string }[];
 export type PageKind = typeof destinations[number]["id"];
-export type Route = { [K in PageKind]: { kind: K } }[PageKind]
+export type Route = { [K in Exclude<PageKind,"categories"|"radio">]: { kind: K } }[Exclude<PageKind,"categories"|"radio">]
+  | { kind: "categories"; source?: string; category?: string }
+  | { kind: "radio"; source?: string }
   | { kind: "source"; source: string }
   | { kind: "playlist" | "album" | "artist" | "chart" | "program"; ref: EntityRef };
 export function routeKey(route: Route): string {
-  return "ref" in route ? `${route.kind}:${route.ref}` : route.kind === "source" ? `source:${route.source}` : route.kind;
+  return "ref" in route ? `${route.kind}:${route.ref}` : route.kind === "source" ? `source:${route.source}` : route.kind === "categories" ? JSON.stringify([route.kind,route.source,route.category]) : route.kind === "radio" ? JSON.stringify([route.kind,route.source]) : route.kind;
 }
 export function createNavigation(initial: Route = { kind: "home" }) {
   const history = signal<Route[]>([initial]);

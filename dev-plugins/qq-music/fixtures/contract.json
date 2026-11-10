@@ -1414,6 +1414,7 @@
     {
       "name": "categories.list",
       "path": "categories.list",
+      "expectedJson": {"sorts":[{"id":"hot","title":"热门"}]},
       "args": [],
       "context": {
         "limit": 1

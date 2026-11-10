@@ -46,7 +46,8 @@ function makeContext(raw){
 }
 export async function invoke(payload,raw){
  const ctx=makeContext(raw);let owner=globalThis.__haikuDefinition;const parts=payload.path.split('.');for(const key of parts.slice(0,-1))owner=owner?.[key];const fn=owner?.[parts.at(-1)];if(typeof fn!=='function')throw new Unsupported(payload.path);
- const result=await fn.call(owner,...payload.args,ctx);return result===undefined?null:result;}
+ const args=payload.path==='radio.next'&&payload.args.length===0?[undefined]:payload.args;
+ const result=await fn.call(owner,...args,ctx);return result===undefined?null:result;}
 "#;
 pub(crate) const BRIDGE: &str = r#"
 export {invoke} from 'haiku';

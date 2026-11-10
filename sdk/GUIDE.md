@@ -94,10 +94,10 @@ export default definePlugin({
 | `artist.tracks/albums` | ID、ctx.limit/cursor → 对应实体 Page |
 | `toplist.list` | 返回 Toplist[]，其 ID 能被 toplist.get 使用 |
 | `home` | ctx.cursor/refresh → shelves、next；type 仅 tracks/albums/playlists/toplists/programs/entries |
-| `categories.list/playlists` | 返回分组与分类 ID；分类 ID → Playlist Page，可接受 ctx.sort |
+| `categories.list/playlists` | 返回 groups 与可选 sorts: {id,title}[]；未提供 sorts 时宿主隐藏排序；分类 ID → Playlist Page，ctx.sort 使用声明的 id |
 | `me.playlists/likedTracks` | 当前用户的 Playlist/Track Page，未登录抛 AuthRequired |
 | `library.cards/browse` | 声明库入口、实体类型；按卡片 ID 返回实体 Page |
-| `radio.channels/next` | 电台列表；电台 ID 与 ctx.history/count → Track[] |
+| `radio.channels/next` | 电台列表；next(channelId: string | undefined, ctx) → Track[]，undefined 为私人 FM，普通频道 ID 必须非空；ctx.history/count 用于续歌 |
 | `scrape.search/lyrics` | title、artists、album/duration → 元数据候选；候选 → Lyrics 或 null |
 
 Shelf 的 `more` 与 Entry 的 `to` 使用 SDK Link（playlist/album/toplist/radio/category）。

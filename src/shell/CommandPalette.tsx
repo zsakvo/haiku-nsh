@@ -31,7 +31,10 @@ export function CommandPalette(props: { open: boolean; items: CommandItem[]; cor
     if(!q)return navigation;
     return [...navigation,...groups().flatMap(g=>[
       ...g.playlists.slice(0,3).map(p=>({id:JSON.stringify(["playlist",g.source,p.reference.id]),label:`歌单 · ${p.title}`,group:g.title})),
-      ...g.tracks.slice(0,3).map(t=>({id:JSON.stringify(["track",g.source,t.id]),label:`播放 ${t.title}`,group:g.title})),
+      ...g.tracks.slice(0,3).map(t=>{
+        const artists=(t.artists??[]).map((a:string|{name:string})=>typeof a==="string"?a:a.name).filter(Boolean).join("、");
+        return {id:JSON.stringify(["track",g.source,t.id]),label:artists?`${t.title} · ${artists}`:t.title,group:g.title};
+      }),
       ...g.errors.map((message,i)=>({id:JSON.stringify(["error",g.source,i]),label:message,group:g.title,disabled:true})),
     ]),{id:"search-all",label:"在搜索页查看全部",group:"搜索"}];
   }

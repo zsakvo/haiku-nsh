@@ -13,6 +13,7 @@ import { LibraryPage } from "../pages/LibraryPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { StatsPage } from "../pages/StatsPage";
 import { SourceLibraryPage } from "../pages/SourceLibraryPage";
+import { HomePage, CategoriesPage, RadioPage } from "../pages/DiscoveryPages";
 import { SearchPage } from "../pages/SearchPage";
 import type { SearchRequest } from "../state/search";
 import { SourceDetailPage } from "../pages/SourceDetailPage";
@@ -131,8 +132,11 @@ export function AppShell(props: {
         </Menu>
       </ShellToolbar>
       <View class="flex-1 min-h-0">
-        {destinations.filter((page) => !["search", "library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
+          <HomePage core={core()!} active={nav.current().kind==="home"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
+          <CategoriesPage core={core()!} active={nav.current().kind==="categories"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
+          <RadioPage core={core()!} active={nav.current().kind==="radio"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <SearchPage core={core()!} active={nav.current().kind==="search"} snapshot={plugins.value()} request={searchRequest()} navigate={nav.navigate} settings={showSettings} />
           <HistoryPage core={core()!} active={nav.current().kind === "history"} navigate={nav.navigate} />
           <StatsPage core={core()!} active={nav.current().kind === "statistics"} />

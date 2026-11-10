@@ -253,6 +253,7 @@ export default definePlugin({
     async list(ctx) {
       const data = await createProtocol(ctx).getDiscoverCategories();
       return {
+        sorts: [{ id: 'hot', title: '热门' }],
         groups: data.groups.map((group: Data) => ({
           title: group.name,
           items: group.categories.map((item: Data) => ({ id: String(item.id), title: item.name })),
@@ -270,6 +271,7 @@ export default definePlugin({
         await protocol.getRecommendedPlaylists({
           ...pageArgs(ctx),
           category: category.name,
+          sort: ctx.sort,
         }),
         'playlists',
         playlist,

@@ -17,6 +17,7 @@ function tracks(ctx: Context & PageArgs) {
     : { items: [track("1", ctx)], next: "opaque:page/二", total: 2 };
 }
 let failAlbum = false;
+let homeOffline=false, homeFailOnce=false, radioBatch=0;
 let searches: string[] = [];
 async function searching(keyword: string, ctx: Context) {
   searches.push(keyword);
@@ -33,6 +34,31 @@ function guard() {
 export default definePlugin({
   id: "network.fixture", name: "回声音乐库", version: "1.0.0",
   connection: { fields: { url: field.url("服务器") }, identity: ["url"], async verify() { return {}; } },
+  async home(ctx) {
+    if(homeOffline||homeFailOnce){homeFailOnce=false;throw new Upstream("推荐来源暂时离线");}
+    return {shelves:[
+      {id:"entries",title:"发现入口",type:"entries",items:ctx.refresh?[]:[{title:"华语分类",to:{category:"cn"}},{title:"林间频道",to:{radio:"forest"}}]},
+      {id:"tracks",title:"今日推荐",type:"tracks",items:[track("1",ctx),track("2",ctx)]},
+      {id:"playlists",title:"精选歌单",type:"playlists",items:[playlist(ctx),{...playlist(ctx),id:"playlist/晨",title:"晨间轻听"}],more:{category:"cn"}},
+      {id:"albums",title:"新专辑",type:"albums",items:[album(ctx)]},
+      {id:"toplists",title:"排行榜",type:"toplists",items:[{id:"chart",title:"回声榜",cover:album(ctx).cover}]},
+      {id:"programs",title:"声音节目",type:"programs",items:[{id:"program/1",title:"林间来信",cover:album(ctx).cover}]},
+      {id:"empty",title:"空货架",type:"tracks",items:[]},
+    ]};
+  },
+  categories:{
+    async list(){return {groups:[{title:"语种",items:[{id:"cn",title:"华语"},{id:"en",title:"欧美"},{id:"jp",title:"日语"}]},{title:"心情",items:[{id:"quiet",title:"安静"},{id:"happy",title:"愉悦"}]},{title:"场景",items:[{id:"night",title:"夜晚"},{id:"travel",title:"旅行"}]}],sorts:[{id:"hot",title:"热门"},{id:"new",title:"最新"}]};},
+    async playlists(id,ctx){if(ctx.cursor&&ctx.cursor!=="category:第二页")throw new Error("bad cursor");return {items:Array.from({length:ctx.cursor?2:4},(_,i)=>({...playlist(ctx),id:`playlist/category/${i+(ctx.cursor?4:0)}`,title:`${ctx.sort==="new"?"最新":"热门"}精选 ${i+1+(ctx.cursor?4:0)}`})),next:ctx.cursor?undefined:"category:第二页"};},
+  },
+  radio:{
+    async channels(){return [{id:"forest",title:"林间频道"},{id:"night",title:"深夜频道"},{id:"jazz",title:"爵士漫步"}];},
+    async next(channelId,ctx){
+      if(channelId!==undefined&&!channelId)throw new Error("empty radio id");
+      const start=radioBatch++*4;
+      return [...(ctx.history.length?[ctx.history[0]]:[]),...Array.from({length:4},(_,i)=>({...track(`radio/${start+i}`,ctx),title:`${channelId===undefined?"私人 FM":"林间频道"} · ${start+i+1}`}))];
+    },
+  },
+  program:{async get(id,ctx){return {info:{id,title:"林间来信"},tracks:tracks(ctx)};}},
   search: {
     async track({keyword,cursor},ctx) {
       await searching(keyword,ctx);if(keyword === "空结果")return {items:[]};
@@ -48,7 +74,7 @@ export default definePlugin({
       ctx.log.info(`streams ${id} quality=${ctx.quality}`);
       return [{url:`${ctx.connection!.url}/song.flac`,format:"flac",quality:ctx.quality,expiresAt:Math.floor(Date.now()/1000)+3600}];
     },
-    async get(id, ctx) { if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
+    async get(id, ctx) { if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
   },
   album: { async get(id, ctx) { guard(); return {info:album(ctx),tracks:tracks(ctx)}; } },
   artist: {

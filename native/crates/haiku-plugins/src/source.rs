@@ -243,6 +243,9 @@ impl Source {
         extra: Value,
         cancel: Option<&Cancellation>,
     ) -> Result<Value> {
+        if path == "radio.next" && !(args.is_empty() || (args.len() == 1 && args[0].as_str().is_some_and(|s| !s.trim().is_empty()))) {
+            return Err(PluginError::new("INVALID_ARGUMENT", "Radio channel must be a nonempty string or omitted for private FM"));
+        }
         if cancel.is_some_and(Cancellation::is_cancelled) {
             return Err(PluginError::new("CANCELLED", "Call cancelled"));
         }

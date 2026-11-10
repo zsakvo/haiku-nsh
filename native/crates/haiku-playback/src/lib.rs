@@ -6,7 +6,7 @@ pub use backend::{
     AudioBackend, AudioEvent, AudioEventKind, Clock, LocalResolver, Progress, RealAudio,
     SystemClock, TrackResolver,
 };
-pub use controller::{Command, Controller, PlayerState, Session, Sleep, Status};
+pub use controller::{Command, Controller, PlayerState, Session, Sleep, Status, RadioProvider, RadioState};
 pub use queue::{Mode, Queue};
 
 mod loudness_cache;

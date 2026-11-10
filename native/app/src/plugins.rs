@@ -29,6 +29,7 @@ struct Login {
 #[class]
 pub struct PluginService {
     host: Arc<Host>,
+    home: crate::discovery::HomeCache,
     listeners: Listeners,
     event_listeners: Listeners,
     alive: Rc<std::cell::Cell<bool>>,
@@ -45,6 +46,7 @@ impl PluginService {
         host: Arc<Host>,
         logs: haiku_store::logs::Logs,
         collections: haiku_store::collections::Collections,
+        home_root: std::path::PathBuf,
     ) -> Instance<Self> {
         let event_listeners = Listeners::default();
         let listeners = event_listeners.clone();
@@ -105,6 +107,7 @@ impl PluginService {
             });
         });
         Instance::new(Self {
+            home: crate::discovery::HomeCache::new(home_root),
             host,
             listeners: Listeners::default(),
             event_listeners,
@@ -180,6 +183,26 @@ impl Drop for PluginService {
 }
 #[class]
 impl PluginService {
+    /// First-page home; refresh=false serves a fresh disk hit immediately. Refresh=true fetches and preserves radio entries.
+    pub async fn home(this: Instance<Self>, source: String, refresh: bool) -> Result<JsonValue, String> {
+        let host=Self::host(&this);let cache=this.with(|s|s.home.clone());
+        background(async move { cache.home(host,source,refresh).await }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    }
+    /// Category groups with optional provider-declared sorts.
+    pub async fn categories(this: Instance<Self>, source: String) -> Result<JsonValue,String> {
+        let host=Self::host(&this);
+        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).categories(None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    }
+    /// One opaque cursor page of playlists for a category and optional declared sort.
+    pub async fn category_playlists(this: Instance<Self>, source:String, id:String, sort:Option<String>, cursor:Option<String>) -> Result<JsonValue,String> {
+        let host=Self::host(&this);
+        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).category_playlists(&id,haiku_plugins::PageArgs{cursor,limit:40},sort.as_deref(),None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    }
+    /// Ordinary nonempty radio channel IDs; private FM is selected separately.
+    pub async fn radio_channels(this: Instance<Self>, source:String) -> Result<JsonValue,String> {
+        let host=Self::host(&this);
+        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).radio_channels(None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    }
     /// Search one enabled source and SDK kind; the cursor is opaque, tracks remain playable.
     pub async fn search(
         this: Instance<Self>,

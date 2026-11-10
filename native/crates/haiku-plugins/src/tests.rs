@@ -1070,3 +1070,20 @@ async fn qq_music_v2_offline_contract() {
         serde_json::to_string_pretty(&report).unwrap()
     );
 }
+
+#[tokio::test]
+async fn discovery_contract_sorts_and_private_fm_undefined() {
+    let dir=tempfile::tempdir().unwrap();let host=Host::open(dir.path()).await.unwrap();
+    install(&host,"discovery.test",r#"categories:{list:async()=>({groups:[],sorts:[{id:'hot',title:'热门'},{id:'new',title:'最新'}]}),playlists:async()=>({items:[]})},radio:{channels:async()=>[{id:'r',title:'Radio'}],next:async(id,ctx)=>{if(!ctx||!Array.isArray(ctx.history))throw new Error('context misplaced');return [{id:id===undefined?'private':id,title:typeof id,artists:[]}];}}"#).await;
+    let api=SourceApi::new(host.activate("discovery.test").await.unwrap());
+    assert_eq!(api.categories(None).await.unwrap().sorts.unwrap()[1].id,"new");
+    assert_eq!(api.radio_next(None,&[],10,None).await.unwrap()[0].title,"undefined");
+    assert_eq!(api.radio_next(Some("r"),&[],10,None).await.unwrap()[0].title,"string");
+    assert!(api.radio_next(Some(""),&[],10,None).await.is_err());
+    let source=host.source("discovery.test").unwrap();
+    assert!(source.invoke("radio.next",vec![Value::Null],json!({}),None).await.is_err());
+    for value in [json!({"groups":[],"sorts":null}),json!({"groups":[],"sorts":[{"id":"","title":"Bad"}]}),json!({"groups":[],"sorts":[{"id":"x","title":"A"},{"id":"x","title":"B"}]})] {
+        assert!(contract::validate_schema("categories",&value).is_err());
+    }
+    assert!(contract::validate_schema("categories",&json!({"groups":[]})).is_ok());
+}

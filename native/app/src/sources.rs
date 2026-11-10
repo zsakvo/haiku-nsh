@@ -39,6 +39,21 @@ impl TrackResolver for SourceResolver {
         })
     }
 }
+pub struct SourceRadio { pub host: Arc<Host>, pub source: String, pub channel: Option<String> }
+impl std::fmt::Debug for SourceRadio {
+    fn fmt(&self, f:&mut std::fmt::Formatter<'_>)->std::fmt::Result { f.debug_struct("SourceRadio").field("source",&self.source).field("channel",&self.channel).finish() }
+}
+impl haiku_playback::RadioProvider for SourceRadio {
+    fn next(&self, history: Vec<Track>, count:u32)->BoxFuture<'_,Result<Vec<Track>,Error>> {
+        Box::pin(async move {
+            struct Cancel(haiku_plugins::Cancellation);
+            impl Drop for Cancel {fn drop(&mut self){self.0.cancel();}}
+            let cancel=Cancel(Default::default());
+            SourceApi::new(self.host.source(&self.source).map_err(playback_error)?)
+                .radio_next(self.channel.as_deref(),&history,count,Some(&cancel.0)).await.map_err(playback_error)
+        })
+    }
+}
 fn playback_error(e: haiku_plugins::PluginError) -> Error {
     let mut error = Error::new(
         if e.code == "PLAYBACK_EXPIRED" {

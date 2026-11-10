@@ -15,7 +15,7 @@ export default definePlugin({
  album: { async get() { return detail(album); } }, artist: { async get() { return detail(artist); }, async tracks() { return page(song); }, async albums() { return page(album); } }, playlist: { async get() { return detail(playlist); } }, toplist: { async list() { return [toplist]; }, async get() { return detail(toplist); } }, program: { async get() { return detail(program); } },
  radio: { async channels() { return [{ id: 'r', title: 'Radio' }]; }, async next() { return [song]; } },
  async home() { return { shelves: [{ id: 's', title: 'Songs', type: 'tracks', items: [song] }, { id: 'e', title: 'Entries', type: 'entries', items: [{ title: 'Entry', to: { album: 'a' } }] }] }; },
- categories: { async list() { return { groups: [{ title: 'Group', items: [{ id: 'c', title: 'Category' }] }] }; }, async playlists() { return page(playlist); } }, me: { async playlists() { return page(playlist); }, async likedTracks() { return page(song); } },
+ categories: { async list() { return { sorts: [{id:'hot',title:'热门'},{id:'new',title:'最新'}], groups: [{ title: 'Group', items: [{ id: 'c', title: 'Category' }] }] }; }, async playlists() { return page(playlist); } }, me: { async playlists() { return page(playlist); }, async likedTracks() { return page(song); } },
  library: { cards: [{ id: 'songs', label: 'Songs', entity: 'track' }], async browse() { return page(song); } },
  scrape: { async search() { return [{ id: 's', title: 'Title', artists: ['Artist'] }]; }, async lyrics() { return null; } },
 });

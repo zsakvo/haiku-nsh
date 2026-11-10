@@ -275,12 +275,12 @@ type Entry = { title; subtitle?; cover?; to: Link };
 type Link  = { playlist: string } | { album: string } | { toplist: string } | { radio: string } | { category: string };
 
 categories: {
-  list(ctx): Promise<{ groups: { title: string; items: { id; title; cover? }[] }[] }>;
+  list(ctx): Promise<{ groups: { title: string; items: { id; title; cover? }[] }[]; sorts?: { id: string; title: string }[] }>;  // 无 sorts 时不显示排序
   playlists(id, ctx & PageArgs & { sort?: string }): Promise<Page<Playlist>>;
 };
 radio: {
   channels?(ctx): Promise<{ id; title; cover? }[]>;
-  next(channelId, ctx & { history: Track[]; count: number }): Promise<Track[]>;   // 持续续歌
+  next(channelId: string | undefined, ctx & { history: Track[]; count: number }): Promise<Track[]>;   // 持续续歌；undefined = 私人 FM（同参考版）
 };
 ```
 

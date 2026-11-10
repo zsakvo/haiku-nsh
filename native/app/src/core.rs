@@ -352,6 +352,7 @@ impl Core {
                 plugins,
                 plugin_logs,
                 bridge.collections.clone(),
+                bridge._root.path.join("cache/home"),
             ),
             settings,
             library,
@@ -501,6 +502,14 @@ impl PlayerService {
 }
 #[class]
 impl PlayerService {
+    /// Start a continuous queue for one source; omitted channel selects private FM.
+    pub async fn start_radio(this: Instance<Self>, source:String, channel:Option<String>) -> Result<(),JsError> {
+        let host=this.with(|p|p.bridge.source_host.clone());
+        let provider=host.source(&source).map_err(|e|JsError::Error(e.to_string()))?;
+        if !provider.descriptor().capabilities.iter().any(|c|c=="radio.next") {return Err(JsError::Error("来源不支持电台".into()));}
+        let radio=Arc::new(crate::sources::SourceRadio{host,source:source.clone(),channel:channel.clone()});
+        Self::send(this,Command::StartRadio(source,channel,radio)).await
+    }
     /// Replace the queue with SDK tracks (plus source/localPath), and play at index.
     pub async fn play(
         this: Instance<Self>,

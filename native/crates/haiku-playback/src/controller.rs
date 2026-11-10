@@ -48,6 +48,7 @@ pub struct PlayerState {
     pub volume: f64,
     pub sleep: Sleep,
     pub error: Option<Error>,
+    pub radio: Option<RadioState>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,8 +61,20 @@ pub struct Session {
     #[serde(default)]
     pub session_tag: Option<String>,
 }
+/// Provider adapter is injected by the app; playback never depends on the plugin host.
+pub trait RadioProvider: Send + Sync + std::fmt::Debug {
+    fn next(&self, history: Vec<Track>, count: u32) -> futures::future::BoxFuture<'_, Result<Vec<Track>, Error>>;
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct RadioState { pub source: String, pub channel: Option<String>, pub loading: bool, pub error: Option<String> }
+struct RadioSession {
+    token: u64, provider: Arc<dyn RadioProvider>, seen: std::collections::BTreeSet<String>,
+    history: Vec<Track>, task: Option<JoinHandle<()>>, blocked: bool, waiting: bool,
+}
 #[derive(Clone, Debug)]
 pub enum Command {
+    StartRadio(String, Option<String>, Arc<dyn RadioProvider>),
     Play(Vec<Track>, i32),
     Toggle,
     Pause,
@@ -93,6 +106,7 @@ struct Request {
     reply: oneshot::Sender<Result<(), Error>>,
 }
 enum Completion {
+    Radio(u64, Result<Vec<Track>, Error>),
     Open(u64, Result<(), Error>),
     Prepare(u64, Result<(), Error>),
 }
@@ -157,6 +171,7 @@ impl Controller {
             volume,
             sleep: Sleep::default(),
             error: None,
+            radio: None,
         };
         let (states, state) = watch::channel(initial.clone());
         let buffered = queue
@@ -215,6 +230,9 @@ impl Controller {
             retry_due: None,
             retry_key: String::new(),
             healthy: None,
+            radio: None,
+            radio_sequence: 0,
+            radio_tag: None,
         };
         tokio::spawn(actor.run(requests, events, completions));
         Ok(Self {
@@ -305,6 +323,9 @@ struct Actor {
     retry_due: Option<u64>,
     retry_key: String,
     healthy: Option<(u64, u64, f64)>,
+    radio: Option<RadioSession>,
+    radio_sequence: u64,
+    radio_tag: Option<String>,
 }
 impl Actor {
     async fn run(
@@ -329,8 +350,10 @@ impl Actor {
                 Some(done) = completions.recv() => self.completion(done),
                 _ = tick.tick() => { if let Err(e) = self.tick() { self.state.error = Some(e); self.publish(false); } },
             }
+            self.refill_radio();
             self.notify_observers();
         }
+        self.cancel_radio();
         self.cancel_open();
         self.invalidate_prepared();
         self.backend.stop();
@@ -417,7 +440,7 @@ impl Actor {
                 mode: self.queue.mode,
                 volume: self.state.volume,
                 position: self.position(),
-                session_tag: None,
+                session_tag: self.radio_tag.clone(),
             };
             haiku_store::json_file::write(path, &session)
                 .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
@@ -539,6 +562,7 @@ impl Actor {
         self.retry_due = None;
         self.healthy = None;
         if self.queue.current().is_none() {
+            if self.radio.is_some() {self.cancel_radio();self.state.status=Status::Paused;self.publish(false);}
             return;
         }
         self.sample();
@@ -572,6 +596,44 @@ impl Actor {
             self.start_current(self.position());
         }
     }
+    fn cancel_radio(&mut self) {
+        if let Some(mut radio)=self.radio.take() { if let Some(task)=radio.task.take() { task.abort(); } }
+        self.state.radio=None;
+    }
+    fn refill_radio(&mut self) {
+        let Some(radio)=self.radio.as_mut() else {return};
+        if let Some(track)=self.queue.current() {
+            let key=track.entity_ref().encode();
+            if !radio.history.iter().any(|t| t.entity_ref().encode()==key) {radio.history.push(track.clone());}
+        }
+        // Include manually inserted songs in the seen set as well.
+        radio.seen.extend(self.queue.tracks.iter().map(|t|t.entity_ref().encode()));
+        let remaining=self.queue.tracks.len().saturating_sub(self.queue.index.max(0) as usize);
+        if radio.blocked || radio.task.is_some() || remaining>3 {return;}
+        let provider=radio.provider.clone();let history=radio.history.clone();let token=radio.token;let completed=self.completed.clone();
+        radio.task=Some(tokio::spawn(async move {let result=provider.next(history,10).await;let _=completed.send(Completion::Radio(token,result));}));
+        if let Some(state)=self.state.radio.as_mut() {state.loading=true;state.error=None;}
+        self.publish(false);
+    }
+    fn radio_completion(&mut self, token:u64, result:Result<Vec<Track>,Error>) {
+        let Some(radio)=self.radio.as_mut().filter(|r|r.token==token) else {return};
+        radio.task=None;
+        let waiting=radio.waiting;radio.waiting=false;
+        let result=result.and_then(|tracks| {
+            let tracks:Vec<_>=tracks.into_iter().filter(|t|radio.seen.insert(t.entity_ref().encode())).take(10).collect();
+            if tracks.is_empty() {Err(Error::new(ErrorCode::PlaybackError,"电台暂时没有新曲目，请重新选择频道重试"))} else {Ok(tracks)}
+        });
+        if let Some(state)=self.state.radio.as_mut() {state.loading=false;}
+        match result {
+            Ok(tracks)=> {
+                let empty=self.queue.tracks.is_empty();let start=self.queue.tracks.len() as i32;
+                self.queue.append(tracks);self.publish(true);
+                if empty || waiting {let _=self.queue.jump(if empty {0}else{start});self.start_current(0.);} else {self.prepare_next();}
+                let _=self.persist(true);
+            }
+            Err(error)=>{radio.blocked=true;if let Some(state)=self.state.radio.as_mut(){state.error=Some(error.to_string());}self.publish(false);}
+        }
+    }
     fn next(&mut self, natural: bool) {
         if natural && self.state.sleep.after_track {
             self.pause();
@@ -585,6 +647,7 @@ impl Actor {
         } else if self.queue.next(natural).is_some() {
             self.start_current(0.0);
         } else {
+            if let Some(radio)=self.radio.as_mut() { radio.waiting=true; }
             self.stop(false);
         }
     }
@@ -642,6 +705,7 @@ impl Actor {
     }
     fn completion(&mut self, done: Completion) {
         match done {
+            Completion::Radio(token,result)=>self.radio_completion(token,result),
             Completion::Open(generation, result)
                 if generation == self.state.generation && self.state.status == Status::Loading =>
             {
@@ -828,7 +892,19 @@ impl Actor {
     fn command(&mut self, command: Command) -> Result<(), Error> {
         let mut immediate = true;
         match command {
+            Command::StartRadio(source,channel,provider)=> {
+                if channel.as_ref().is_some_and(|id|id.trim().is_empty()) {return Err(Error::new(ErrorCode::InvalidArgument,"频道 ID 不得为空"));}
+                self.cancel_radio();self.stop(true);self.radio_sequence+=1;
+                self.queue.set_mode(Mode::Sequential);
+                self.radio_tag=Some(format!("radio:{source}"));
+                self.state.status=Status::Loading;
+                self.state.radio=Some(RadioState{source,channel,loading:false,error:None});
+                self.radio=Some(RadioSession{token:self.radio_sequence,provider,seen:Default::default(),history:vec![],task:None,blocked:false,waiting:false});
+                self.publish(true);self.refill_radio();
+            }
             Command::Play(tracks, index) => {
+                self.cancel_radio();
+                self.radio_tag=None;
                 self.failed = 0;
                 self.retry_count = 0;
                 self.queue.replace(tracks, index);
@@ -844,8 +920,8 @@ impl Actor {
             }
             Command::Pause => self.pause(),
             Command::Resume => self.resume(),
-            Command::Stop => self.stop(false),
-            Command::Clear => self.stop(true),
+            Command::Stop => {self.cancel_radio();self.stop(false);},
+            Command::Clear => {self.cancel_radio();self.radio_tag=None;self.stop(true);},
             Command::Next => {
                 self.failed = 0;
                 self.next(false);
@@ -901,6 +977,7 @@ impl Actor {
                 self.backend.set_volume(self.state.volume);
             }
             Command::SetMode(mode) => {
+                self.cancel_radio();
                 self.queue.set_mode(mode);
                 self.publish(false);
                 self.prepare_next();
@@ -918,6 +995,7 @@ impl Actor {
                 immediate = false;
             }
             Command::ReplaceAfterCurrent(tracks) => {
+                self.cancel_radio();
                 self.queue.replace_after_current(tracks);
                 self.publish(true);
                 self.prepare_next();
@@ -998,6 +1076,7 @@ impl Actor {
             Command::Tick => return self.tick(),
             Command::Flush => self.sample(),
             Command::Shutdown => {
+                self.cancel_radio();
                 self.sample();
                 self.pause();
             }

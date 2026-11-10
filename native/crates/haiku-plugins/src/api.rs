@@ -99,6 +99,10 @@ pub struct CategoryGroup {
     pub items: Vec<Category>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CategorySort { pub id: String, pub title: String }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Categories { pub groups: Vec<CategoryGroup>, pub sorts: Option<Vec<CategorySort>> }
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScrapeCandidate {
     pub id: String,
@@ -463,11 +467,12 @@ impl SourceApi {
             .filter_map(|v| self.entity("toplist", v))
             .collect())
     }
-    pub async fn categories(&self, cancel: Option<&Cancellation>) -> Result<Vec<CategoryGroup>> {
+    pub async fn categories(&self, cancel: Option<&Cancellation>) -> Result<Categories> {
         let value = self
             .invoke("categories.list", vec![], json!({}), cancel)
             .await?;
-        Ok(serde_json::from_value(value["groups"].clone())?)
+        crate::contract::validate_schema("categories", &value)?;
+        Ok(serde_json::from_value(value)?)
     }
     pub async fn category_playlists(
         &self,
@@ -512,14 +517,13 @@ impl SourceApi {
         self.tracks(value)
     }
     pub async fn radio_channels(&self, cancel: Option<&Cancellation>) -> Result<Vec<Category>> {
-        Ok(serde_json::from_value(
-            self.invoke("radio.channels", vec![], json!({}), cancel)
-                .await?,
-        )?)
+        let value = self.invoke("radio.channels", vec![], json!({}), cancel).await?;
+        crate::contract::validate_schema("list:radio", &value)?;
+        Ok(serde_json::from_value(value)?)
     }
     pub async fn radio_next(
         &self,
-        id: &str,
+        id: Option<&str>,
         history: &[Track],
         count: u32,
         cancel: Option<&Cancellation>,
@@ -527,7 +531,7 @@ impl SourceApi {
         let value = self
             .invoke(
                 "radio.next",
-                vec![json!(id)],
+                id.map(|v| vec![json!(v)]).unwrap_or_default(),
                 json!({"history":history,"count":count}),
                 cancel,
             )

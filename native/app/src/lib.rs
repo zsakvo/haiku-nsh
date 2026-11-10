@@ -14,6 +14,7 @@ mod player_dock;
 mod player_theme;
 mod plugins;
 mod sources;
+mod discovery;
 mod network_fixture;
 mod plugin_tools;
 mod presentation;

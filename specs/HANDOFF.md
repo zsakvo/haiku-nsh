@@ -34,6 +34,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 进行中：M4-03 实现完成，验收被环境阻塞（未提交）
+
+- Codex 已完成推荐/分类/电台与 M4-02 小项；插件契约两项由审阅者决定并写入 PLUGIN_SDK.md §5.2：`categories.list` 可选 `sorts`，`radio.next(channelId?: string)` 中 undefined 为私人 FM。workspace 247 通过，check/build 通过。
+- `nsh test` 卡在 Player.test.tsx 的 persistent dock 用例（点歌词跳到 0:10 后停住）。审阅者在干净工作树 `/tmp/haiku-nsh-baseline`（4b000a2）上同样卡住 15 分钟，说明不是 M4-03 回归。当时（02:30）屏幕已锁定（IOConsoleLocked=true），怀疑锁屏下真实音频/渲染不推进；截图也无法在锁屏下拍。
+- 解锁后：先在基线工作树重跑 `nsh test Player.test.tsx` 确认能通过，再让 Codex 完成完整 nsh test、五张截图与 STATUS，然后审阅提交。
+
 ## 2026-11-10 更新：M4-02 已验收并提交
 
 - 搜索页（五种实体、来源筛选、即时查询 + 显式提交才写历史、加载更多）、命令面板多来源预览（280ms 防抖、起播用该来源完整第一页）；导出 `core.sources.search`、`core.sources.searchPreview`。旧响应按 (source, kind, query) + 递增版本丢弃。

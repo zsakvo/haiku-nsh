@@ -429,7 +429,7 @@ declare module 'haiku' {
     };
     radio?: {
       channels?(ctx: Context): Promise<{ id: string; title: string; cover?: Image }[]>;
-      next(id: string, ctx: Context & { history: Track[]; count: number }): Promise<Track[]>;
+      next(channelId: string | undefined, ctx: Context & { history: Track[]; count: number }): Promise<Track[]>;
     };
     home?(ctx: Context & { cursor?: Cursor; refresh: boolean }): Promise<{
       shelves: Shelf[];
@@ -437,6 +437,7 @@ declare module 'haiku' {
     }>;
     categories?: {
       list(ctx: Context): Promise<{
+        sorts?: { id: string; title: string }[];
         groups: {
           title: string;
           items: { id: string; title: string; cover?: Image }[];

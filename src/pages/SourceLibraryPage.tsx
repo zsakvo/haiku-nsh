@@ -26,7 +26,7 @@ export function SourceLibraryPage(props: { core: Core; source: string; title?: s
   }
   return <View testID="page-source-library" class="flex-1 min-h-0 pb-28"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <Scroll testID="source-library-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-4 pb-4">
+    <Scroll testID="source-library-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-3 pb-4">
       <Text role="header" class="text-xl font-semibold text-foreground">{props.title || "来源音乐库"}</Text>
       <If when={data.loading() && !groups().length}><View class="h-40 bg-muted rounded-(--radius-panel)" accessibilityLabel="正在加载音乐库" /></If>
       <If when={!!data.error() || !!error()}>
@@ -36,7 +36,7 @@ export function SourceLibraryPage(props: { core: Core; source: string; title?: s
           <Button label="去设置…" size="sm" onPress={props.settings} />
         </View>
       </If>
-      <Each of={groups()} key={(g) => g.card.id}>{(group) => <View class="gap-3">
+      <Each of={groups()} key={(g) => g.card.id}>{(group) => <View class="gap-2">
         <Text role="header" class="text-lg font-semibold text-foreground">{group().card.label}</Text>
         <If when={group().card.entity === "track"}><View class="h-64"><SourceTracks core={props.core} tracks={group().page.items} active={props.active} /></View></If>
         <If when={group().card.entity !== "track"}><SourceGrid items={group().page.items} navigate={props.navigate} /></If>

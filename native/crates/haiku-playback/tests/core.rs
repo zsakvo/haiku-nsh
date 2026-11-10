@@ -666,3 +666,40 @@ async fn effects_configuration_survives_controller_next_and_preload() {
     assert!(opens.len() >= 3);
     assert!(opens.iter().all(|actual| actual == &s));
 }
+
+#[derive(Debug,Default)]
+struct RadioMock { calls:Mutex<Vec<Vec<String>>>, gate:Mutex<Option<Arc<Notify>>> }
+impl RadioProvider for RadioMock {
+    fn next(&self,history:Vec<Track>,count:u32)->BoxFuture<'_,Result<Vec<Track>,Error>> {
+        let batch={let mut calls=self.calls.lock().unwrap();let n=calls.len();calls.push(history.iter().map(|t|t.id.clone()).collect());n};
+        let gate=self.gate.lock().unwrap().take();
+        Box::pin(async move {
+            assert_eq!(count,10);
+            if let Some(gate)=gate {gate.notified().await;}
+            let mut result=history.into_iter().take(1).collect::<Vec<_>>();
+            result.extend((batch*5..batch*5+5).map(|i|Track::local(format!("/radio/{i}.flac"))));
+            result.push(Track::local("/radio/4.flac"));Ok(result)
+        })
+    }
+}
+#[tokio::test]
+async fn radio_refills_near_end_deduplicates_and_stops_after_queue_replacement() {
+    let dir=tempfile::tempdir().unwrap();let path=dir.path().join("session.json");
+    let h=Harness::new(Some(path.clone()));let radio=Arc::new(RadioMock::default());
+    h.command(Command::StartRadio("fixture".into(),None,radio.clone())).await;
+    h.state(|s|s.status==Status::Playing&&s.tracks.len()==5).await;
+    assert_eq!(radio.calls.lock().unwrap().len(),1);
+    h.command(Command::Flush).await;
+    let session:Session=haiku_store::json_file::read(&path).unwrap().unwrap();assert!(session.session_tag.is_some());
+    h.command(Command::Jump(2)).await;
+    let state=h.state(|s|s.tracks.len()==10).await;
+    assert_eq!(state.tracks.iter().map(|t|t.id.clone()).collect::<std::collections::BTreeSet<_>>().len(),10);
+    assert!(radio.calls.lock().unwrap()[1].contains(&"/radio/2.flac".into()));
+    // A pending refill must neither append to nor restart the replacement queue.
+    let gate=Arc::new(Notify::new());*radio.gate.lock().unwrap()=Some(gate.clone());
+    h.command(Command::Jump(7)).await;
+    tokio::time::timeout(Duration::from_secs(2),async {while radio.calls.lock().unwrap().len()<3 {tokio::task::yield_now().await;}}).await.unwrap();
+    h.command(Command::Play(tracks(1),0)).await;gate.notify_one();h.settle().await;
+    assert!(h.player.state().radio.is_none());assert_eq!(h.player.state().tracks.len(),1);
+    h.command(Command::Next).await;h.settle().await;assert_eq!(radio.calls.lock().unwrap().len(),3);
+}

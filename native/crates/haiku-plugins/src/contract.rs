@@ -429,6 +429,14 @@ pub fn validate_schema(schema: &str, value: &Value) -> Result<()> {
             }
             validate_schema("list:category", &group["items"])?;
         }
+        if let Some(sorts) = value.get("sorts") {
+            let sorts = sorts.as_array().ok_or_else(|| invalid("Categories.sorts must be an array"))?;
+            let mut ids = std::collections::BTreeSet::new();
+            for sort in sorts {
+                let id = sort["id"].as_str().filter(|v| !v.trim().is_empty()).ok_or_else(|| invalid("Sort missing id"))?;
+                if !ids.insert(id) || sort["title"].as_str().is_none_or(|v| v.trim().is_empty()) { return Err(invalid("Sort must have a unique id and title")); }
+            }
+        }
         return Ok(());
     }
     if let Some(kind) = schema.strip_prefix("page:") {

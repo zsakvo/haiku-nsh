@@ -53,8 +53,10 @@ pub(crate) fn parameters(capabilities: &[String]) -> BTreeMap<String, Value> {
         let mut fields = Vec::new();
         if path.starts_with("search.") {
             fields.push(json!({"key":"keyword","label":"关键词","target":"object","index":0,"default":""}));
+        } else if path == "radio.next" {
+            fields.push(json!({"key":"input","label":"频道参数（[] 为私人 FM）","target":"args","type":"json","default":"[]"}));
         } else if path.ends_with(".get") || path.ends_with(".streams") || path.ends_with(".lyrics") && path == "track.lyrics"
-            || path == "categories.playlists" || path == "library.browse" || path == "radio.next" {
+            || path == "categories.playlists" || path == "library.browse" {
             fields.push(json!({"key":"id","label":"原始 ID","target":"arg","index":0,"default":""}));
         } else if path.starts_with("scrape.") {
             fields.push(json!({"key":"query","label":if path == "scrape.search" {"刮削查询"} else {"候选元数据"},"target":"arg","index":0,"type":"json",
