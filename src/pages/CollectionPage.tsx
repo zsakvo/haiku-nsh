@@ -23,6 +23,13 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const deleting = signal(false);
   const error = signal("");
   const collection = () => mirror.collections().find((p) => p.id === props.id);
+  effect(() => {
+    const item = collection();
+    if (props.active && item && props.id !== "__liked__") {
+      props.core.history.recordPlaylist({ kind: "local", sourceId: "local", id: item.id,
+        title: item.title, trackCount: item.trackCount });
+    }
+  });
   const liked = props.id === "__liked__";
   const query = () => ({ id: props.id, search: search(), source: filter() });
   const source = resource(() => service.query(query()));

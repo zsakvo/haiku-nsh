@@ -8,6 +8,9 @@ use std::{
 
 /// A reusable Rust source; pages keep only its engine-local handle.
 pub trait TrackDataSource {
+    fn group(&self, _id: &str) -> Option<String> {
+        None
+    }
     fn collection_id(&self) -> Option<String> {
         None
     }

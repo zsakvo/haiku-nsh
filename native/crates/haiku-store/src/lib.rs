@@ -6,3 +6,7 @@ pub use data_root::data_root;
 pub mod json_file;
 
 pub mod settings;
+mod document;
+pub mod history;
+pub mod stats;
+pub mod logs;

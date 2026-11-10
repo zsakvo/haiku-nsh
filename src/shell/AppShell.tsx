@@ -10,6 +10,10 @@ import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
 import { LibraryPage } from "../pages/LibraryPage";
+import { HistoryPage } from "../pages/HistoryPage";
+import { StatsPage } from "../pages/StatsPage";
+import { NotificationCenter } from "./Diagnostics";
+import { Button } from "../ui/Button";
 import { createCoreState } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
@@ -19,11 +23,13 @@ export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
+  initialNotifications?: boolean; initialLogs?: boolean;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
   const nav = createNavigation(props.initialRoute);
   const core = createCoreState();
   const nowPlaying = signal(props.initialNowPlaying ?? false);
+  const notifications = signal(props.initialNotifications ?? false);
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
   const showSettings = () => { nowPlaying.set(false); overlay.set("settings"); };
   const showCommands = () => { nowPlaying.set(false); overlay.set("command"); };
@@ -100,10 +106,12 @@ export function AppShell(props: {
       </View>
     </ShellSidebar>
     <WindowPanel>
-      <ShellToolbar />
+      <ShellToolbar><Button label="通知" size="sm" variant="ghost" onPress={() => notifications.set(true)} /></ShellToolbar>
       <View class="flex-1 min-h-0">
-        {destinations.filter((page) => !["library", "favorites", "playlists"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
+          <HistoryPage core={core()!} active={nav.current().kind === "history"} navigate={nav.navigate} />
+          <StatsPage core={core()!} active={nav.current().kind === "statistics"} />
           <CollectionPage core={core()!} id="__liked__" active={nav.current().kind === "favorites"} onDeleted={() => nav.navigate({ kind: "favorites" })} />
           <CollectionsBrowser core={core()!} active={nav.current().kind === "playlists"} navigate={nav.navigate} />
           <Each of={nav.history().filter((route, index, routes) => route.kind === "playlist"
@@ -130,8 +138,9 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} onLibrary={() => nav.navigate({kind: "library"})} />
     <If when={!!core()}>
+      <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
       <NowPlaying open={nowPlaying()} onOpenChange={(event) => nowPlaying.set(event.open)} />
       <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {
         nowPlaying.set(event.open);

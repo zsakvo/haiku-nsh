@@ -67,6 +67,9 @@ impl Core {
 pub struct CoreBridge {
     pub(crate) controller: Controller,
     pub(crate) collections: haiku_store::collections::Collections,
+    pub(crate) history: haiku_store::history::History,
+    pub(crate) stats: haiku_store::stats::Stats,
+    pub(crate) logs: haiku_store::logs::Logs,
     pub(crate) collections_revision: Signal<u64>,
     owner: Owner,
     _root: DataRoot,
@@ -82,6 +85,9 @@ impl CoreBridge {
         listeners: Listeners,
         settings: haiku_store::settings::Settings,
         collections: haiku_store::collections::Collections,
+        history: haiku_store::history::History,
+        stats: haiku_store::stats::Stats,
+        logs: haiku_store::logs::Logs,
         root: DataRoot,
     ) -> Rc<Self> {
         let owner = Owner::detached();
@@ -137,12 +143,21 @@ impl CoreBridge {
         let settings = owner.run(|| signal(settings));
         let collections_revision = owner.run(|| signal(collections.revision()));
         let exit_store = collections.clone();
-        let exit = crate::exit::register(move || exit_store.flush());
+        let exit_history = history.clone();
+        let exit_stats = stats.clone();
+        let exit = crate::exit::register(move || {
+            exit_stats.flush()?;
+            exit_history.flush()?;
+            exit_store.flush()
+        });
         crate::platform::install_exit_hook();
         Rc::new(Self {
             _root: root,
             _exit: exit,
             collections,
+            history,
+            stats,
+            logs,
             collections_revision,
             settings,
             controller,
@@ -159,6 +174,8 @@ impl Drop for CoreBridge {
         if let Err(e) = self.collections.flush() {
             log::error!("Collections exit flush: {e}");
         }
+        let _ = self.history.flush();
+        let _ = self.stats.flush();
         self.controller.shutdown();
         crate::platform::clear_media();
     }
@@ -167,6 +184,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    activity: Instance<crate::activity::ActivityService>,
     collections: Instance<crate::collections::CollectionsService>,
     plugins: Instance<crate::plugins::PluginService>,
     player: Instance<PlayerService>,
@@ -189,35 +207,106 @@ impl Core {
             });
         global::<Option<DataRoot>>().set(Some(selected.clone()));
         let root = selected.path.clone();
-        let (controller, library, settings, plugins, collections) = background(async move {
-            std::fs::create_dir_all(&root).map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
-            let settings = Arc::new(
-                haiku_store::settings::SettingsStore::open(&root)
-                    .map_err(|e| Error::new(ErrorCode::Io, e))?,
-            );
-            haiku_audio::media_cache::set_root(root.join("media-cache").display().to_string())
-                .map_err(|e| Error::new(ErrorCode::Io, e))?;
-            crate::settings::apply_cache(&settings.get());
-            let (audio, events) = RealAudio::configured(&root, settings.get());
-            let library = haiku_library::service::Library::open(&root)
-                .map_err(|e| Error::new(ErrorCode::Io, e))?;
-            let controller = Controller::start(
-                audio,
-                Arc::new(LocalResolver),
-                Arc::new(SystemClock::default()),
-                events,
-                Some(root.join("session.json")),
-            )?;
-            let plugins = haiku_plugins::Host::open(&root)
-                .await
-                .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
-            let collections = haiku_store::collections::Collections::open(&root)
-                .map_err(|e| Error::new(ErrorCode::Io, e))?;
-            Ok::<_, Error>((controller, library, settings, plugins, collections))
-        })
-        .await
-        .map_err(|e| JsError::Error(e.to_string()))?
-        .map_err(js_error)?;
+        let (controller, library, settings, plugins, collections, history, stats, logs) =
+            background(async move {
+                std::fs::create_dir_all(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
+                let settings = Arc::new(
+                    haiku_store::settings::SettingsStore::open(&root)
+                        .map_err(|e| Error::new(ErrorCode::Io, e))?,
+                );
+                haiku_audio::media_cache::set_root(root.join("media-cache").display().to_string())
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                crate::settings::apply_cache(&settings.get());
+                let (audio, events) = RealAudio::configured(&root, settings.get());
+                let library = haiku_library::service::Library::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                let controller = Controller::start(
+                    audio,
+                    Arc::new(LocalResolver),
+                    Arc::new(SystemClock::default()),
+                    events,
+                    Some(root.join("session.json")),
+                )?;
+                let plugins = haiku_plugins::Host::open(&root)
+                    .await
+                    .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
+                let collections = haiku_store::collections::Collections::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                let history = haiku_store::history::History::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                let stats = haiku_store::stats::Stats::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                let logs = haiku_store::logs::Logs::open(&root)
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
+                for warning in [
+                    settings.recovery_warning(),
+                    history.recovery(),
+                    stats.recovery(),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    let _ = logs.add(
+                        "app",
+                        "warn",
+                        "storage",
+                        None,
+                        "数据文件损坏，已备份原文件",
+                        Some(&warning),
+                    );
+                    logs.notify("warning", "数据文件损坏，已备份原文件", Some(&warning));
+                }
+                let (h, s, l) = (history.clone(), stats.clone(), logs.clone());
+                let seen = std::sync::Mutex::new((None::<(String, u64)>, None::<String>));
+                controller.observe(move |state, progress, mono| {
+                    let (epoch, offset) = haiku_store::stats::wall_time();
+                    let playing =
+                        state.status == Status::Playing && !state.buffering && !progress.buffering;
+                    let mut seen = seen.lock().unwrap();
+                    if playing {
+                        if let Some(track) = &state.current {
+                            let key = (track.entity_ref().encode(), state.generation);
+                            if seen.0.as_ref() != Some(&key) {
+                                h.record_track(track, epoch);
+                                seen.0 = Some(key);
+                            }
+                        }
+                    }
+                    if let Some(error) = &state.error {
+                        if seen.1.as_ref() != Some(&error.message) {
+                            let _ = l.add("app", "error", "player", None, &error.message, None);
+                            l.notify("error", "播放失败", Some(&error.message));
+                            seen.1 = Some(error.message.clone());
+                        }
+                    } else {
+                        seen.1 = None;
+                    }
+                    s.sample(
+                        state.current.as_ref(),
+                        state.generation,
+                        state.timeline_revision,
+                        playing,
+                        progress.position,
+                        mono,
+                        epoch,
+                        offset,
+                    );
+                });
+                Ok::<_, Error>((
+                    controller,
+                    library,
+                    settings,
+                    plugins,
+                    collections,
+                    history,
+                    stats,
+                    logs,
+                ))
+            })
+            .await
+            .map_err(|e| JsError::Error(e.to_string()))?
+            .map_err(js_error)?;
         // Check again: concurrent open calls may have initialized while this one awaited.
         if let Some(core) = slot.get() {
             controller.shutdown();
@@ -229,6 +318,9 @@ impl Core {
             listeners.clone(),
             settings.get(),
             collections,
+            history,
+            stats,
+            logs,
             selected,
         );
         crate::presentation::initialize(bridge.clone(), library.clone());
@@ -239,9 +331,12 @@ impl Core {
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
+        let activity = crate::activity::ActivityService::new(bridge.clone());
+        let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            activity,
             collections,
-            plugins: crate::plugins::PluginService::new(plugins),
+            plugins: crate::plugins::PluginService::new(plugins, plugin_logs),
             settings,
             library,
             player: Instance::new(PlayerService {
@@ -294,13 +389,39 @@ impl Core {
     pub fn collections(&self) -> Instance<crate::collections::CollectionsService> {
         self.collections.clone()
     }
+    /// Local playback, playlist browsing and search history.
+    #[getter]
+    pub fn history(&self) -> Instance<crate::activity::ActivityService> {
+        self.activity.clone()
+    }
+    /// Locally measured listening segments and aggregates; no remote upload.
+    #[getter]
+    pub fn stats(&self) -> Instance<crate::activity::ActivityService> {
+        self.activity.clone()
+    }
+    /// Redacted application/plugin diagnostics, filtering and export.
+    #[getter]
+    pub fn logs(&self) -> Instance<crate::activity::ActivityService> {
+        self.activity.clone()
+    }
+    /// Background results and recoverable errors.
+    #[getter]
+    pub fn notifications(&self) -> Instance<crate::activity::ActivityService> {
+        self.activity.clone()
+    }
     /// Flush pending collections and playback, releasing the cached Core for a later open.
     pub async fn close(this: Instance<Self>) -> Result<(), String> {
         let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));
         let store = bridge.collections.clone();
-        blocking(move || store.flush())
-            .await
-            .map_err(|e| e.to_string())??;
+        let history = bridge.history.clone();
+        let stats = bridge.stats.clone();
+        blocking(move || {
+            stats.flush()?;
+            history.flush()?;
+            store.flush()
+        })
+        .await
+        .map_err(|e| e.to_string())??;
         bridge
             .controller
             .execute(Command::Flush)
@@ -539,9 +660,10 @@ mod tests {
                 // The Core registers its exit barrier before native media is available
                 // (Headless never installs a system media session).
                 crate::exit::flush_all().unwrap();
-                let restored =
-                    haiku_store::collections::Collections::open(std::path::Path::new(&c.data_dir()))
-                        .unwrap();
+                let restored = haiku_store::collections::Collections::open(std::path::Path::new(
+                    &c.data_dir(),
+                ))
+                .unwrap();
                 assert!(restored.list().iter().any(|p| p.title == "Only mine"));
                 (c.data_dir(), count)
             });

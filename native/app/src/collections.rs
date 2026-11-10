@@ -582,6 +582,8 @@ pub(crate) fn like_button(dark: bool) -> impl IntoElement {
         .app_class("hover:opacity-80 active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .on_press(move || {if let Some(track)=track.get_untracked(){if let Err(e)=store.set_liked(&track,None){log::error!("Like: {e}");}}})
         .child(view().tooltip(crate::player_controls::hint("喜欢 / 取消喜欢"))
-            .child(image(nsh_core::element::ImageSrc::svg_markup(include_str!("../../../assets/icons/heart.svg"))).size_5()
+            .child(image(move || nsh_core::element::ImageSrc::svg_markup(if liked.get() {
+                include_str!("../../../assets/icons/heart-filled.svg")
+            } else { include_str!("../../../assets/icons/heart.svg") })).size_5()
                 .tint_color(move ||if liked.get(){nsh_base::theme().primary}else if dark{nsh_base::theme().color("now-playing-foreground").unwrap()}else{nsh_base::theme().foreground})))
 }

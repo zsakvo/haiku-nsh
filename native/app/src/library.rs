@@ -185,10 +185,38 @@ impl LibraryService {
     /// Rebuild the index. Progress is delivered while this Promise is pending.
     pub async fn scan(this: Instance<Self>) -> Result<JsonValue, JsError> {
         let library = this.with(|s| s.bridge.library.clone());
-        let report = blocking(move || library.scan())
+        let logs = this.with(|s| s.bridge.player.logs.clone());
+        let result = blocking(move || library.scan())
             .await
-            .map_err(|e| error(e.to_string()))?
-            .map_err(error)?;
+            .map_err(|e| error(e.to_string()))?;
+        let detail = match &result {
+            Ok(report) => format!("{} 首歌曲，跳过 {} 项", report.count, report.skipped),
+            Err(error) => error.clone(),
+        };
+        let success = result.is_ok();
+        blocking(move || {
+            let message = if success {
+                "本地扫描完成"
+            } else {
+                "本地扫描失败"
+            };
+            let _ = logs.add(
+                "app",
+                if success { "info" } else { "error" },
+                "library",
+                Some("scan"),
+                message,
+                Some(&detail),
+            );
+            logs.notify(
+                if success { "success" } else { "error" },
+                message,
+                Some(&detail),
+            );
+        })
+        .await
+        .map_err(|e| error(e.to_string()))?;
+        let report = result.map_err(error)?;
         Ok(value(&report))
     }
     /// Cooperatively cancel traversal/tag reads, retaining the last complete index.

@@ -38,7 +38,7 @@ pub struct PluginService {
     cancellations: Arc<Mutex<BTreeMap<String, Cancellation>>>,
 }
 impl PluginService {
-    pub(crate) fn new(host: Arc<Host>) -> Instance<Self> {
+    pub(crate) fn new(host: Arc<Host>, logs: haiku_store::logs::Logs) -> Instance<Self> {
         let event_listeners = Listeners::default();
         let listeners = event_listeners.clone();
         let alive = Rc::new(std::cell::Cell::new(true));
@@ -52,6 +52,35 @@ impl PluginService {
                     loop {
                         match events.try_recv() {
                             Ok(event) => {
+                                if event["type"].as_str() == Some("log")
+                                    || event.get("level").is_some()
+                                {
+                                    let logs = logs.clone();
+                                    let entry = event.clone();
+                                    spawn(async move {
+                                        let _ = blocking(move || {
+                                            if entry["level"] == "error" {
+                                                logs.notify(
+                                                    "error",
+                                                    "插件执行失败",
+                                                    entry["message"].as_str(),
+                                                );
+                                            }
+                                            logs.add(
+                                                "plugin",
+                                                entry["level"].as_str().unwrap_or("info"),
+                                                entry["sourceId"]
+                                                    .as_str()
+                                                    .or_else(|| entry["pluginId"].as_str())
+                                                    .unwrap_or("plugin"),
+                                                None,
+                                                entry["message"].as_str().unwrap_or("插件事件"),
+                                                Some(&entry.to_string()),
+                                            )
+                                        })
+                                        .await;
+                                    });
+                                }
                                 let callbacks: Vec<_> =
                                     listeners.0.borrow().values().cloned().collect();
                                 for callback in callbacks {

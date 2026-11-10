@@ -102,7 +102,9 @@ pub struct Controller {
     state: watch::Receiver<PlayerState>,
     frozen: Arc<Mutex<Progress>>,
     backend: Arc<dyn AudioBackend>,
+    observers: Arc<Mutex<Vec<Arc<Observer>>>>,
 }
+type Observer = dyn Fn(&PlayerState, Progress, u64) + Send + Sync;
 impl Controller {
     /// Call from a Tokio worker. Initialization reads disk but never starts audio.
     pub fn start(
@@ -171,7 +173,9 @@ impl Controller {
         }));
         let (commands, requests) = mpsc::unbounded_channel();
         let (completed, completions) = mpsc::unbounded_channel();
+        let observers = Arc::new(Mutex::new(vec![]));
         let actor = Actor {
+            observers: observers.clone(),
             queue,
             state: initial,
             states,
@@ -199,7 +203,12 @@ impl Controller {
             state,
             frozen,
             backend,
+            observers,
         })
+    }
+    /// Domain consumers receive actor transitions and progress ticks using the actor's clock.
+    pub fn observe(&self, observer: impl Fn(&PlayerState, Progress, u64) + Send + Sync + 'static) {
+        self.observers.lock().unwrap().push(Arc::new(observer));
     }
     pub async fn execute(&self, command: Command) -> Result<(), Error> {
         let (reply, result) = oneshot::channel();
@@ -251,6 +260,7 @@ struct Prepared {
     key: String,
 }
 struct Actor {
+    observers: Arc<Mutex<Vec<Arc<Observer>>>>,
     queue: Queue,
     state: PlayerState,
     states: watch::Sender<PlayerState>,
@@ -287,7 +297,7 @@ impl Actor {
                         let shutdown = matches!(request.command, Command::Shutdown);
                         let result = self.command(request.command);
                         let _ = request.reply.send(result);
-                        if shutdown { break; }
+                        if shutdown { self.notify_observers(); break; }
                     }
                     None => { let _ = self.persist(true); break; }
                 },
@@ -295,10 +305,24 @@ impl Actor {
                 Some(done) = completions.recv() => self.completion(done),
                 _ = tick.tick() => { if let Err(e) = self.tick() { self.state.error = Some(e); self.publish(false); } },
             }
+            self.notify_observers();
         }
         self.cancel_open();
         self.invalidate_prepared();
         self.backend.stop();
+    }
+    fn notify_observers(&self) {
+        let audio = self.backend.progress();
+        let progress =
+            if self.state.status == Status::Playing && audio.generation == self.state.generation {
+                audio
+            } else {
+                *self.frozen.lock().unwrap()
+            };
+        let observers = self.observers.lock().unwrap().clone();
+        for observer in observers {
+            observer(&self.state, progress, self.clock.now_ms());
+        }
     }
     fn generation(&mut self) -> u64 {
         self.sequence = self.sequence.checked_add(1).expect("generation exhausted");

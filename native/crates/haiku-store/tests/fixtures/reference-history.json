@@ -1,0 +1,36 @@
+{
+  "tracks": [
+    {
+      "id": "reference:track/雪",
+      "sourceId": "subsonic.music:test",
+      "provider": "Subsonic",
+      "title": "Reference Song",
+      "artists": [
+        "Reference Artist"
+      ],
+      "album": "Reference Album",
+      "cover": "https://fixture.invalid/cover",
+      "coverHeaders": {
+        "Authorization": "fixture-only"
+      },
+      "duration": 60,
+      "playedAt": 1794268800
+    }
+  ],
+  "playlists": [
+    {
+      "kind": "plugin",
+      "sourceId": "subsonic.music:test",
+      "id": "remote:1",
+      "title": "Reference Playlist",
+      "cover": "https://fixture.invalid/cover",
+      "coverHeaders": {
+        "Authorization": "fixture-only"
+      },
+      "playedAt": 1794303784
+    }
+  ],
+  "searches": [
+    "reference"
+  ]
+}

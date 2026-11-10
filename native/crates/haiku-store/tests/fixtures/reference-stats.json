@@ -1,0 +1,27 @@
+{
+  "events": [
+    {
+      "id": "reference:track/雪",
+      "sourceId": "subsonic.music:test",
+      "provider": "Subsonic",
+      "title": "Reference Song",
+      "artists": [
+        "Reference Artist"
+      ],
+      "album": "Reference Album",
+      "cover": "https://fixture.invalid/cover",
+      "coverHeaders": {
+        "Authorization": "fixture-only"
+      },
+      "duration": 60,
+      "playedAt": 1794268800,
+      "tzOffsetMin": 480,
+      "eventId": "9180970a36f6e0aeb799e3e894884c78ea421de4",
+      "listenedSec": 5
+    }
+  ],
+  "deviceId": "1a09e377-eceb-4f9b-977d-e6beebca8143",
+  "watermark": 0,
+  "revision": 0,
+  "accountId": ""
+}

@@ -504,22 +504,40 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                                 )
                                 .child(commands(props, at, cx)),
                         );
-                    context_menu()
-                        .popup_class(POPUP)
-                        .on_open_change(move |event: &nsh_base::MenuEvent| {
-                            if matches!(event, nsh_base::MenuEvent::OpenChange(true, _)) {
-                                if let Some(s) = source(props) {
-                                    if !id_at(props, at).is_some_and(|id| {
-                                        s.selected.with_untracked(|set| set.contains(&id))
-                                    }) {
-                                        s.select(at.index(), false, false);
-                                        selection(props, cx);
+                    view()
+                        .child(when(
+                            move || {
+                                id_at(props, at)
+                                    .and_then(|id| source(props)?.provider.group(&id))
+                                    .is_some()
+                            },
+                            move || {
+                                text(move || {
+                                    id_at(props, at)
+                                        .and_then(|id| source(props)?.provider.group(&id))
+                                        .unwrap_or_default()
+                                })
+                                .app_class("px-3 pt-3 pb-1 text-xs text-muted-foreground")
+                            },
+                        ))
+                        .child(
+                            context_menu()
+                                .popup_class(POPUP)
+                                .on_open_change(move |event: &nsh_base::MenuEvent| {
+                                    if matches!(event, nsh_base::MenuEvent::OpenChange(true, _)) {
+                                        if let Some(s) = source(props) {
+                                            if !id_at(props, at).is_some_and(|id| {
+                                                s.selected.with_untracked(|set| set.contains(&id))
+                                            }) {
+                                                s.select(at.index(), false, false);
+                                                selection(props, cx);
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                        })
-                        .trigger(row)
-                        .child(commands(props, at, cx))
+                                })
+                                .trigger(row)
+                                .child(commands(props, at, cx)),
+                        )
                 },
             )
             .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())

@@ -3,6 +3,7 @@ use nsh_core::prelude::*;
 mod core;
 mod exit;
 mod collections;
+mod activity;
 mod library;
 mod lyrics_view;
 mod now_playing;

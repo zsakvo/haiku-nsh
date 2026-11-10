@@ -142,10 +142,12 @@ fn clamp_unsigned_fields(raw: &mut Value) {
 pub struct SettingsStore {
     path: PathBuf,
     value: Mutex<Settings>,
+    recovery: Option<String>,
 }
 impl SettingsStore {
     pub fn open(root: &Path) -> Result<Self, String> {
         let path = root.join("settings.json");
+        let mut recovery = None;
         let mut value = match crate::json_file::read::<Value>(&path).and_then(|raw| {
             raw.map(|mut raw| {
                 clamp_unsigned_fields(&mut raw);
@@ -162,6 +164,7 @@ impl SettingsStore {
                 std::fs::rename(&path, path.with_extension(format!("json.corrupt-{suffix}")))
                     .map_err(|e| e.to_string())?;
                 eprintln!("settings.json corrupt: {error}; original backed up");
+                recovery = Some(format!("settings.json 损坏，原文件已备份：{error}"));
                 Settings::default()
             }
         };
@@ -169,7 +172,11 @@ impl SettingsStore {
         Ok(Self {
             path,
             value: Mutex::new(value),
+            recovery,
         })
+    }
+    pub fn recovery_warning(&self) -> Option<String> {
+        self.recovery.clone()
     }
     pub fn get(&self) -> Settings {
         self.value.lock().unwrap_or_else(|e| e.into_inner()).clone()
