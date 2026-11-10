@@ -92,7 +92,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       </List>
       <If when={!playlists().length}><EmptyState title="还没有浏览歌单" description="打开歌单后，会在这里留下记录。" /></If>
     </If>
-    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 p-5 gap-4">
+    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 max-w-full self-center mt-24 p-5 gap-4">
       <Text class="text-lg font-semibold text-foreground">清空历史？</Text>
       <Text class="text-sm text-muted-foreground">仅清空当前分类的记录，音乐文件会保留。</Text>
       <View class="flex-row justify-end gap-2">

@@ -30,11 +30,11 @@
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
 | F11 喜欢、歌单与远端收藏 | 部分实现（本地） | `haiku-store::collections`、`native/app/src/collections.rs`、collections 页面与菜单 | M3-01：workspace 232 通过/1 忽略；新增 collections Headless 流程通过；参考版 Loro fixture 可读 | 全套 nsh test 未通过；最终截图、首次媒体会话前退出冲刷与媒体命令实机验证未完成 |
-| F12 历史与听歌统计 | 未实现 | | | |
+| F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
 | F13 下载与媒体缓存 | 部分实现（媒体缓存） | `haiku-audio::media_cache`、`haiku-playback::backend`、`src/shell/StorageSettings.tsx` | M1-05：容量/LRU/pin/完整性/失败删除/原文件保护测试通过；清理确认 Headless 与浅色截图通过 | 网络缓存真实写入/恢复留 M4，下载留 M5；缓存路径按任务使用 media-cache/ |
 | F14 Haiku 账号 | 未实现 | | | |
 | F15 同步与备份 | 未实现 | | | |
-| F16 设置、通知与日志 | 部分实现（外观/播放/存储设置） | `haiku-store::settings`、`native/app/src/settings.rs`、`src/state/settings.ts`、`src/shell/Settings.tsx` | M1-05：原子合并、未知字段保留、clamp、跨 Core 重启恢复通过；core.settings 文档与 Stop 订阅齐全 | 其他设置分组、通知与持久日志留后续；损坏设置目前备份并输出诊断，尚无 UI 通知 |
+| F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
 
 ## 2026-11-09 实施文档
 
@@ -593,3 +593,25 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - run-playlist-media-revision.log 再次记录 favorite:true/favorite_enabled:true、Song Alpha、paused、has_artwork:true。
 - 未完成：展开“加入歌单”子菜单的真实窗口截图；行为已由 Headless 覆盖，未使用 GUI 自动化补图。
 - 待人工：控制中心 favorite、真实 Cmd+Q、展开菜单外观；远端在线刷新仍按计划留 M4，无新增业务架构决策。
+
+## 2026-11-10 M3-02：历史、本地统计、日志与通知收尾
+
+- 基于已有提交 8b045ac 补齐接线与本机证据；本次不提交，未修改 Rex、参考项目、NSH 或依赖源码。
+- 复核 history/stats/logs 存储与 Controller 驱动：历史 500/歌单 100/搜索 30、有效连续播放 ≥5 秒、事件上限 5000、app/plugin 各 1000 条、detail 8000 字符、脱敏与会话轮转。
+- API：core.history 的 list/query/setQuery/playSource/recordPlaylist/search/remove/clear；core.stats 的 aggregate/clearStats；core.logs 的 page/copyText/exportLogs/clearLogs；core.notifications 的 notices/clearNotice；onChange 均返回 Stop。
+- 补齐历史来源筛选的歌单来源；参考 JSON fixture 读取通过，沿用 sourceId/playedAt/listenedSec/tzOffsetMin/eventId、coverHeaders 与未知 trackCount 省略语义，新增 schemaVersion。
+- 通知入口改为顶栏“更多 → 通知中心…”，原生“视图”菜单也可打开；与设置/命令面板互斥。设置“其他”已有日志查看器和关于；损坏设置告警接入日志/通知。
+- 图表使用有界 TSX View，聚合留 Rust；热图改为周一到周日的 12 周网格，补星期、强度图例与数值 tooltip；24 小时柱底统一对齐。fixture 为 56 次模拟聆听，分布于 28 天和多个小时。
+- Dock/正在播放共用的 like_button 已由原提交支持实心/描边切换，本次截图确认；通知及三处清空确认采用现有 self-center/mt-24 弹窗位置。
+- Activity.test.tsx 移至 src/pages/fixtures/；共享 fixture 保持在 src/pages/fixtures/ActivityFixture.tsx。根目录四个 Preview 和 ActivityFixture 保留三行薄入口，新增 DockLikedPreview.tsx。
+- 归位限制实测：NSH 0.4.0 对嵌套 TSX 入口未加载根 nsh.json，导致真实 host 缺 haiku/native、Headless 缺 fs 权限；恢复根薄入口、测试引用 ../../../ActivityFixture.tsx 后解决，未复制第二份配置。
+- 验收 1：cargo test --manifest-path native/Cargo.toml --workspace，238 通过、1 忽略；证据 .artifacts/m3-02/cargo-test-workspace.log。
+- 验收 2：nsh check、nsh build -v 通过；nsh test 最终 21/21（8 Rust、13 Headless）；日志 nsh-check.log、nsh-build.log、nsh-test-repair2.log 均在 .artifacts/m3-02/。
+- 首轮 nsh test 的 Activity 因嵌套入口权限失败；修复后 Activity 通过，但既存 NowPlaying 布局测试异步 measure 丢失首帧超时。第二种修复仅 cfg(test) 改读 on_layout payload，保持 top=0/bottom=688 断言；最后全绿。前两轮日志保留为 nsh-test.log、nsh-test-repair1.log。
+- 验收 3：五个根预览分别 nsh run --target macos -v，均为独立临时 Core、浅色；日志 nsh-run-{history-repair1,stats,logs,notifications,dock-liked}.log；真实截图已查看。
+- 五张截图：history-light.png、stats-light.png（小时分布/热图）、logs-light.png（可见脱敏）、notifications-light.png、dock-liked-light.png，均在 .artifacts/m3-02/。
+- 捕获前检查屏幕未锁定，仅 CGWindow/CGSession 只读查询及 screencapture；证据 screen-lock.log、capture-*.log。各预览截图后 Ctrl+C 停止，其退出 1 为人为结束，不作构建失败。
+- 正常入口构建/最终测试与预览只出现已允许的 block 0.1.6 / __eh_frame 提示；最初嵌套入口的 unknown classes 与模块错误随根入口恢复消失，原失败日志 nsh-run-history.log 保留。
+- 最后小时标签高度、弹窗定位是纯样式调整，经真实 host 热更新/截图检查；未重复 check/build/test。未新增探针、GUI 自动化、release/clippy、汇总 JSON 或 hash 清单。
+- 偏离/未覆盖：参考目录 ~/Project/GPUI/haiku 在本机不存在，改只读 ~/Project/haiku-gpuix 核对对应行为；热图当前显示最近 12 周，不提供全年选择；远程/M4/M5 内容未做。
+- 待人工确认：真实鼠标/键盘交互、原生保存选择器与实际剪贴板、长期真实播放统计；关于页如实标明应用许可证未声明，需审阅者确定许可证。

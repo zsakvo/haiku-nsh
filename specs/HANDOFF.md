@@ -14,12 +14,12 @@
 ## 环境
 
 - macOS arm64，Xcode；`nsh 0.4.0`（`curl -fsSL https://nsh.dev/install.sh | sh`）；cargo 用 huacnlee/cargo（`curl -fsSL https://huacnlee.github.io/cargo/install.sh | sh`，会替换 `~/.cargo/bin/cargo`，原版留为 `cargo.rustup`）。
-- 参考项目（只读）：本机为 `~/Project/GPUI/haiku`（业务与行为依据，旧机器路径 `~/Project/haiku-gpuix` 已失效）；原 Flutter 版 `~/Project/Flutter/haiku`。
+- 参考项目（只读）：本机为 `~/Project/haiku-gpuix`（业务与行为依据；`~/Project/GPUI/haiku` 在本机不存在）；原 Flutter 版 `~/Project/Flutter/haiku`。
 - 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交，**截至 `9a52e44` 均未推送**。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
 
 ## 当前进度（2026-11-10 交接时）
 
-- M0、M1、M2 完成；M3-01 已提交（`9a52e44`）。**M3-02 进行中，未验收、未提交**（任务 `specs/tasks/M3-02-history-stats-logs.md`）。
+- M0–M3 完成（M3-02 见下方更新）。原记录：M3-01 已提交（`9a52e44`）；M3-02 当时进行中（任务 `specs/tasks/M3-02-history-stats-logs.md`）。
 - 交接时 Codex 仍在执行 M3-02（约 34 分钟，处于自查阶段），周额度剩约 11%。已有改动：`haiku-store::{history,stats,logs,document}`、`tests/activity.rs` 与参考版 `history.json`/`stats.json` fixture、`native/app/src/activity.rs`、Core/plugins/controller/track_list 等接线、`src/pages/{HistoryPage,StatsPage}.tsx`、`src/shell/Diagnostics.tsx`、`assets/icons/heart-filled.svg`、根目录 `{History,Stats,Logs,Notifications}Preview.tsx`、`Activity*.tsx`。旧机器 `.artifacts/m3-02/` 已有 workspace/nsh 日志（含 repair1/2）及 history、statistics、liked-dock 截图；日志查看器、通知中心截图尚未见到。
 - **新机器接手 M3-02**：未提交改动不会随 git 走。二选一：(a) 在旧机器等 Codex 完成、审阅、提交并推送后再拉取；(b) 直接在新机器让 Codex 按任务文件从头/续做（先 `git status` 看有无残留）。审阅要点：workspace 与 `nsh test` 全绿、5 张浅色截图（历史、统计含热图与小时分布、日志查看器、通知中心、Dock 实心爱心）、与参考版 JSON 兼容、通知入口位置、图表实现方式、STATUS F12/F16 与 ≤40 行小节；根目录 Preview 文件是否应归位到 `src/` 下需审阅。
 - M3-02 通过后：提交 “M3-02: history, local stats, logs and notifications”，HANDOFF 记 M3 完成，再按 `specs/MILESTONES.md` 拆 M4（推荐/分类/搜索/详情页、网络播放、在线歌词、在线歌单历史写入、远端收藏刷新）。
@@ -33,6 +33,16 @@
 | M0 | `77bb293` `f0c9c5c` `d70465f` `b03c3d5` | 骨架；自建 `haiku-jsrt`（基于 NSH 的 quickjs-jit，取代 CJRT，D11）；迁移参考版 Rust 核心到各领域 crate；平台验证 S1–S7（S8 多窗口不可行 → 设置改为覆盖层，D18）；S4/S5 经用户人工确认 |
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
+
+## 2026-11-10 更新：M3-02 已验收并提交，M3 完成
+
+- 本机由 Codex 补齐并重新生成证据：workspace 238 通过/1 忽略，nsh test 21/21；五张浅色截图（历史、统计含 12 周热图与 24 小时分布、日志查看器含脱敏、通知中心、Dock 实心爱心）已审阅。
+- 通知入口：顶栏“更多 → 通知中心…”及原生“视图”菜单；日志查看器在设置“其他”。图表为有界 TSX View，聚合在 Rust。参考版 history/stats JSON fixture 可读。
+- NSH 0.4.0 嵌套 TSX 入口不加载根 `nsh.json`，所以 Preview 入口必须留在仓库根目录（三行薄入口），测试已移到 `src/pages/fixtures/`。NowPlaying 布局测试在 cfg(test) 中改读 on_layout 的 payload，断言不变。
+- 小项待后续 UI 任务：通知/日志时间显示原始 ISO（UTC、微秒），应本地化；通知行按钮文字带序号（“清除通知 3”，疑为无障碍标签外露）；日志查看器在“其他”中同时有按钮和内联区块，重复；热图只占左侧一小块。
+- 待用户决定：应用许可证（关于页目前写“未声明”；QQ 插件 QRC 部分为 GPL-3.0）。
+- 待人工确认：真实鼠标/键盘、原生保存选择器、剪贴板、长期真实播放统计。
+- 下一步：按 `specs/MILESTONES.md` 拆 M4。
 
 ## 2026-11-10 更新：M3-01 已验收并提交
 

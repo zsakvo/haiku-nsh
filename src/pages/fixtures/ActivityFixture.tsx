@@ -8,7 +8,7 @@ import { prepareLibrary } from "./libraryAudio";
 import { collectionCover } from "./collectionCover";
 
 /** Every invocation owns its Core and media under a new temporary root. */
-export function ActivityFixture(props: { page?: "history" | "statistics" | "logs" | "notifications"; controls?: boolean }) {
+export function ActivityFixture(props: { page?: "history" | "statistics" | "logs" | "notifications" | "favorites"; controls?: boolean }) {
   const ready = resource(async () => {
     const core = await Core.openIsolated();
     const root = `/tmp/haiku-m1-03-fixtures/m3-02-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -29,11 +29,12 @@ export function ActivityFixture(props: { page?: "history" | "statistics" | "logs
     await core.player.pause();
     core.collections.setLiked(tracks[0], true);
     if (!props.controls) await core.history.seedFixture(tracks);
+    console.log(`M3-02 fixture ready: ${props.page ?? "history"}; ${tracks.length} local tracks; Dock current liked`);
     return { core, tracks };
   });
   return <View class="flex-1">
     <If when={!!ready()}>
-      <AppShell initialMode="light" initialRoute={{ kind: props.page === "statistics" ? "statistics" : "history" }}
+      <AppShell initialMode="light" initialRoute={{ kind: props.page === "statistics" ? "statistics" : props.page === "favorites" ? "favorites" : "history" }}
         initialOverlay={props.page === "logs" ? "settings" : undefined} initialSettingsCategory="其他"
         initialLogs={props.page === "logs"} initialNotifications={props.page === "notifications"} />
       <If when={props.controls}><Controls {...ready()!} /></If>

@@ -14,6 +14,7 @@ import { HistoryPage } from "../pages/HistoryPage";
 import { StatsPage } from "../pages/StatsPage";
 import { NotificationCenter } from "./Diagnostics";
 import { Button } from "../ui/Button";
+import { Menu, MenuItem } from "../ui/Surfaces";
 import { createCoreState } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
@@ -31,8 +32,9 @@ export function AppShell(props: {
   const nowPlaying = signal(props.initialNowPlaying ?? false);
   const notifications = signal(props.initialNotifications ?? false);
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
-  const showSettings = () => { nowPlaying.set(false); overlay.set("settings"); };
-  const showCommands = () => { nowPlaying.set(false); overlay.set("command"); };
+  const showSettings = () => { notifications.set(false); nowPlaying.set(false); overlay.set("settings"); };
+  const showCommands = () => { notifications.set(false); nowPlaying.set(false); overlay.set("command"); };
+  const showNotifications = () => { overlay.set(null); nowPlaying.set(false); notifications.set(true); };
   const closeOverlay = () => overlay.set(null);
   const goBack = () => { if (!overlay() && !nowPlaying()) nav.back(); };
   const goForward = () => { if (!overlay() && !nowPlaying()) nav.forward(); };
@@ -62,6 +64,7 @@ export function AppShell(props: {
         { label: "后退", shortcut: shortcuts.back, disabled: !nav.canBack() || !!overlay(), onSelect: goBack },
         { label: "前进", shortcut: shortcuts.forward, disabled: !nav.canForward() || !!overlay(), onSelect: goForward },
         { type: "separator" }, { label: "命令面板…", shortcut: shortcuts.commands, onSelect: showCommands },
+        { label: "通知中心…", onSelect: showNotifications },
         { role: "toggleFullScreen" },
       ] },
       { label: "窗口", submenu: [ { role: "minimize" }, { role: "zoom" }, { type: "separator" },
@@ -106,7 +109,11 @@ export function AppShell(props: {
       </View>
     </ShellSidebar>
     <WindowPanel>
-      <ShellToolbar><Button label="通知" size="sm" variant="ghost" onPress={() => notifications.set(true)} /></ShellToolbar>
+      <ShellToolbar>
+        <Menu trigger={<Button label="更多" size="sm" variant="ghost" onPress={() => {}} />}>
+          <MenuItem onSelect={showNotifications}><Text>通知中心…</Text></MenuItem>
+        </Menu>
+      </ShellToolbar>
       <View class="flex-1 min-h-0">
         {destinations.filter((page) => !["library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>

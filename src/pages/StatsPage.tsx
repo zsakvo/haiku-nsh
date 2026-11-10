@@ -3,6 +3,7 @@ import type { Core } from "haiku/native";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Surfaces";
 import { EmptyState } from "../ui/EmptyState";
+import { Tooltip } from "../ui/Surfaces";
 
 /** Small bounded charts use TSX views and semantic token colors; Rust performs all aggregation. */
 export function StatsPage(props: { core: Core; active: boolean }) {
@@ -17,15 +18,15 @@ export function StatsPage(props: { core: Core; active: boolean }) {
   );
   const data = () => aggregate() as any;
   const maxHour = () => Math.max(1, ...(data()?.hours ?? []));
+  const maxDay = () => Math.max(1, ...Object.values(data()?.days ?? {}).map(Number));
   const days = () => {
     const end = new Date();
-    const result: { date: string; value: number }[] = [];
-    for (let i = 83; i >= 0; i--) {
-      const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i);
+    const monday = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (end.getDay() + 6) % 7 - 77);
+    return Array.from({ length: 12 }, (_, week) => Array.from({ length: 7 }, (_, weekday) => {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + week * 7 + weekday);
       const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      result.push({ date, value: data()?.days?.[date] ?? 0 });
-    }
-    return result;
+      return { date, value: Number(data()?.days?.[date] ?? 0), future: d > end };
+    }));
   };
   return <View testID="page-statistics" class="flex-1 min-h-0 pb-28"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
@@ -56,22 +57,33 @@ export function StatsPage(props: { core: Core; active: boolean }) {
             <Each of={data()?.hours ?? []}>{(seconds, hour) =>
               <View class="flex-1 h-full justify-end gap-1">
                 <View role="image" accessibilityLabel={`${hour()} 时：${Math.round(Number(seconds()))} 秒`}
+                  tooltip={<Tooltip label={`${hour()} 时 · ${Math.round(Number(seconds()))} 秒`} />}
                   class="bg-primary rounded-(--radius-inset)"
                   style={{ height: Math.max(2, Number(seconds()) / maxHour() * 80) }} />
-                <Text class="text-xs text-muted-foreground">{hour() % 4 === 0 ? String(hour()) : ""}</Text>
+                <Text class="h-4 shrink-0 text-xs text-muted-foreground">{hour() % 4 === 0 ? String(hour()) : ""}</Text>
               </View>}
             </Each>
           </View>
         </View>
         <View class="gap-3">
           <Text class="text-sm font-semibold text-foreground">聆听日历 · 最近 12 周</Text>
-          <View testID="stats-calendar" class="flex-row flex-wrap gap-1 max-w-xl">
-            <Each of={days()} key={(d) => d.date}>{(d) =>
-              <View role="image" accessibilityLabel={`${d().date}：${Math.round(d().value)} 秒`}
-                class={`size-5 rounded-(--radius-inset) ${d().value > 0 ? "bg-primary" : "bg-muted"}`}
-                style={{ opacity: d().value > 0 ? Math.min(1, 0.35 + d().value / 120) : 1 }} />}
+          <View testID="stats-calendar" class="flex-row gap-2">
+            <View class="gap-1">
+              {["一", "二", "三", "四", "五", "六", "日"].map((day) =>
+                <Text class="h-4 w-4 text-xs text-muted-foreground">{day}</Text>)}
+            </View>
+            <Each of={days()} key={(week) => week[0].date}>{(week) =>
+              <View class="gap-1">
+                <Each of={week()} key={(d) => d.date}>{(d) =>
+                  <View role="image" accessibilityLabel={`${d().date}：${Math.round(d().value)} 秒`}
+                    tooltip={<Tooltip label={`${d().date} · ${Math.round(d().value)} 秒`} />}
+                    class={`size-4 rounded-sm ${d().value > 0 ? "bg-primary" : "bg-muted"}`}
+                    style={{ opacity: d().future ? 0 : d().value > 0 ? 0.25 + 0.75 * d().value / maxDay() : 1 }} />}
+                </Each>
+              </View>}
             </Each>
           </View>
+          <Text class="text-xs text-muted-foreground">每列一周，颜色越深表示当天聆听越久</Text>
           <Text class="text-xs text-muted-foreground">{`当前连续 ${data()?.currentStreak} 天 · 最长连续 ${data()?.longestStreak} 天`}</Text>
         </View>
         <View class="gap-2">
@@ -99,7 +111,7 @@ export function StatsPage(props: { core: Core; active: boolean }) {
         </View>
       </If>
     </Scroll>
-    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 p-5 gap-4">
+    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 max-w-full self-center mt-24 p-5 gap-4">
       <Text class="text-lg font-semibold text-foreground">清除本地统计？</Text>
       <Text class="text-sm text-muted-foreground">本机聆听记录将被清除，云端数据不受影响。</Text>
       <View class="flex-row justify-end gap-2">

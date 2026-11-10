@@ -52,7 +52,7 @@ export function LogsView(props: { core: Core }) {
       <Text class="text-xs text-muted-foreground">{`第 ${Math.floor(offset() / 50) + 1} 页`}</Text>
       <Button label="下一页" size="sm" disabled={offset() + 50 >= (data()?.total ?? 0)} onPress={() => offset.set(offset() + 50)} />
     </View>
-    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 p-5 gap-4">
+    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 max-w-full self-center mt-24 p-5 gap-4">
       <Text class="text-lg font-semibold text-foreground">清空日志？</Text>
       <Text class="text-sm text-muted-foreground">{channel() ? `清空 ${channel()} 频道全部日志。` : "清空 app 和 plugin 两个频道的全部日志。"}</Text>
       <View class="flex-row justify-end gap-2">
@@ -83,7 +83,7 @@ export function NotificationCenter(props: { core: Core; open: boolean; onClose: 
   const revision = signal(0), expanded = signal<Set<number>>(new Set());
   cleanup(props.core.notifications.onChange(() => revision.update((v) => v + 1)));
   const notices = () => { revision(); return props.core.notifications.notices() as any[]; };
-  return <Dialog open={props.open} onOpenChange={(e) => { if (!e.open) props.onClose(); }} class="w-128 p-5 gap-4">
+  return <Dialog open={props.open} onOpenChange={(e) => { if (!e.open) props.onClose(); }} class="w-128 max-w-full self-center mt-24 p-5 gap-4">
     <View class="flex-row items-center gap-2">
       <Text role="header" class="flex-1 text-lg font-semibold text-foreground">通知中心</Text>
       <Button label="清除全部通知" size="sm" disabled={!notices().length} onPress={() => props.core.notifications.clearNotice(null)} />

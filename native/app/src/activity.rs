@@ -137,13 +137,12 @@ impl ActivityService {
     }
     /// Filter source identities without copying tracks into TSX.
     pub fn sources(&self) -> Vec<String> {
-        self.bridge
-            .core
-            .history
-            .snapshot()
+        let state = self.bridge.core.history.snapshot();
+        state
             .tracks
             .iter()
             .map(|t| t.track.source_id.clone())
+            .chain(state.playlists.iter().map(|p| p.source_id.clone()))
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
             .collect()
@@ -288,9 +287,10 @@ impl ActivityService {
             for day in 0..28 {
                 for at in 0..2 {
                     let Some(track) = tracks.get((day + at) % tracks.len().max(1)) else { continue };
-                    let epoch = now - day as i64 * 86400 - at as i64 * 3600;
+                    let midnight = (now + offset as i64 * 60).div_euclid(86400) * 86400 - offset as i64 * 60;
+                    let epoch = midnight - day as i64 * 86400 + ((day * 5 + at * 9) % 24) as i64 * 3600;
                     s.sample(Some(track), day as u64 * 2 + at as u64, 0, true, 0., 0, epoch, offset);
-                    for second in 1..=30 { s.sample(Some(track), day as u64 * 2 + at as u64, 0, true, second as f64, second * 1000, epoch, offset); }
+                    for second in 1..=(15 + day as u64 % 5 * 10) { s.sample(Some(track), day as u64 * 2 + at as u64, 0, true, second as f64, second * 1000, epoch, offset); }
                     s.finish();
                 }
             }

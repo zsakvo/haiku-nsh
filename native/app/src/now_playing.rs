@@ -95,13 +95,10 @@ fn content_root(handle: ElementRef) -> nsh_core::element::View {
     effect(move || handle.focus());
     #[cfg(test)]
     let root = {
-        root.on_layout(move |_: &Bounds<Points>| {
-            spawn(async move {
-                if let Some(frame) = handle.measure().await {
-                    *tests::FRAME.lock().unwrap() =
-                        Some((frame.page.y.0, frame.frame.size.height.0));
-                }
-            });
+        root.on_layout(move |frame: &Bounds<Points>| {
+            // This absolute root is laid out at the surface origin. Inspect the
+            // layout event itself: a separate async measure can miss its first frame.
+            *tests::FRAME.lock().unwrap() = Some((frame.origin.y.0, frame.size.height.0));
         })
     };
     root
