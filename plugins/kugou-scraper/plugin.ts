@@ -31,6 +31,7 @@ async function request<T>(ctx: Context, url: string, query: Record<string, strin
 }
 export default definePlugin({
   id: 'kugou.scraper',
+  logo: 'logo.png',
   name: '酷狗刮削',
   version: '2.0.0',
   http: { headers: { 'User-Agent': 'Mozilla/5.0' } },

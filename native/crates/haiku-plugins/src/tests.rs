@@ -1055,3 +1055,18 @@ async fn contract_intercepts_bare_fetch_and_traverses_detail_tracks() {
             .any(|c| c.error.as_deref().is_some_and(|e| e.contains("Duplicate")))
     );
 }
+
+#[tokio::test]
+async fn qq_music_v2_offline_contract() {
+    let package =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev-plugins/qq-music");
+    let report = crate::contract::run_contract(&package, crate::contract::ContractMode::Replay)
+        .await
+        .unwrap();
+    assert!(
+        report.passed,
+        "{}\n{}",
+        report.summary(),
+        serde_json::to_string_pretty(&report).unwrap()
+    );
+}

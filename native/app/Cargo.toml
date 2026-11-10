@@ -5,6 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
+qrcode = { version = "0.14.1", default-features = false, features = ["image"] }
+image.workspace = true
 haiku-plugins = { path = "../crates/haiku-plugins" }
 nsh-core = "0.4.0"
 nsh-base = "0.4.0"

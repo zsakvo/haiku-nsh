@@ -190,6 +190,7 @@ async function detail(ctx: Context & PageArgs, kind: 'album' | 'artist' | 'playl
 }
 export default definePlugin({
   id: 'feiniu.music',
+  logo: 'logo.png',
   name: '飞牛音乐',
   version: '2.0.0',
   connection: {

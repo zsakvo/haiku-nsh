@@ -31,6 +31,9 @@ pub struct ContractCase {
     pub context: Value,
     #[serde(default)]
     pub schema: Option<String>,
+    /// Partial expected result; array patterns match their prefix recursively.
+    #[serde(default)]
+    pub expected_json: Option<Value>,
     #[serde(default)]
     pub expected_code: Option<String>,
     #[serde(default)]
@@ -46,6 +49,9 @@ pub struct HttpFixture {
     pub method: String,
     #[serde(default)]
     pub query: BTreeMap<String, String>,
+    /// Partial JSON request body used to distinguish batched CGI endpoints.
+    #[serde(default)]
+    pub request_json: Option<Value>,
     #[serde(default = "ok")]
     pub status: u16,
     #[serde(default)]
@@ -53,6 +59,20 @@ pub struct HttpFixture {
     pub body: Value,
     #[serde(default)]
     pub delay_ms: u64,
+}
+fn json_contains(value: &Value, pattern: &Value) -> bool {
+    match pattern {
+        Value::Object(fields) => fields.iter().all(|(key, expected)| {
+            value
+                .get(key)
+                .is_some_and(|value| json_contains(value, expected))
+        }),
+        Value::Array(pattern) => value.as_array().is_some_and(|values| {
+            values.len() >= pattern.len()
+                && values.iter().zip(pattern).all(|(a, b)| json_contains(a, b))
+        }),
+        _ => value == pattern,
+    }
 }
 fn get() -> String {
     "GET".into()
@@ -193,6 +213,10 @@ impl ReplayServer {
                                         key == k.as_str() && value == v.as_str()
                                     })
                                 })
+                                && route.request_json.as_ref().is_none_or(|pattern| {
+                                    serde_json::from_slice::<Value>(&body)
+                                        .is_ok_and(|value| json_contains(&value, pattern))
+                                })
                         })
                     });
                     let route = if record {
@@ -204,7 +228,7 @@ impl ReplayServer {
                             runtime.block_on(async {
                                 let mut request = reqwest::Client::new()
                                     .request(method.parse().ok()?, target.as_str())
-                                    .body(body);
+                                    .body(body.clone());
                                 for line in head.lines().skip(1) {
                                     if let Some((key, value)) = line.split_once(':') {
                                         if !["host", "content-length", "connection"]
@@ -226,6 +250,7 @@ impl ReplayServer {
                                     path: target.path().into(),
                                     method: method.clone(),
                                     query: BTreeMap::new(),
+                                    request_json: None,
                                     status,
                                     headers,
                                     body,
@@ -244,6 +269,7 @@ impl ReplayServer {
                                 .unwrap_or_default(),
                         );
                         HttpFixture {
+                            request_json: None,
                             path: String::new(),
                             method,
                             query: BTreeMap::new(),
@@ -325,6 +351,38 @@ fn entity(kind: &str, value: &Value) -> Result<()> {
 }
 /// Strict validation rejects bad entries instead of silently accepting host filtering.
 pub fn validate_schema(schema: &str, value: &Value) -> Result<()> {
+    if let Some(method) = schema.strip_prefix("auth:") {
+        let valid = match method {
+            "login" => {
+                !value["credential"].is_null()
+                    && (value["user"].is_null() || value["user"]["name"].is_string())
+            }
+            "user" => value.is_null() || value["name"].is_string(),
+            "refresh" => !value.is_null(),
+            "logout" => value.is_null(),
+            "qr.start" => {
+                value.get("state").is_some()
+                    && (value["image"].is_string() || value["url"].is_string())
+            }
+            "qr.poll" => match value["status"].as_str() {
+                Some("waiting" | "scanned" | "expired") => true,
+                Some("done") => validate_schema("auth:login", value).is_ok(),
+                _ => false,
+            },
+            "sms.send" => {
+                value.get("state").is_some()
+                    && value["cooldown"]
+                        .as_f64()
+                        .is_none_or(|seconds| seconds >= 0.)
+            }
+            _ => false,
+        };
+        return if valid {
+            Ok(())
+        } else {
+            Err(invalid("Invalid auth response"))
+        };
+    }
     if schema == "home" {
         let shelves = value["shelves"]
             .as_array()
@@ -432,6 +490,20 @@ fn validate_link(value: &Value) -> Result<()> {
     Ok(())
 }
 pub fn inferred_schema(path: &str) -> Option<String> {
+    if path.starts_with("auth.") {
+        return Some(
+            match path {
+                "auth.user" => "auth:user",
+                "auth.refresh" => "auth:refresh",
+                "auth.logout" => "auth:logout",
+                "auth.qrcode.start" => "auth:qr.start",
+                "auth.qrcode.poll" => "auth:qr.poll",
+                "auth.sms.send" => "auth:sms.send",
+                _ => "auth:login",
+            }
+            .into(),
+        );
+    }
     if let Some(kind) = path.strip_prefix("search.") {
         Some(format!("page:{kind}"))
     } else if [
@@ -496,6 +568,13 @@ async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCas
         return Ok(());
     }
     let mut value = result?;
+    if case
+        .expected_json
+        .as_ref()
+        .is_some_and(|pattern| !json_contains(&value, pattern))
+    {
+        return Err(invalid("Result did not match expectedJson"));
+    }
     let schema = case
         .schema
         .clone()

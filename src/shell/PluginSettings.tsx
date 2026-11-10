@@ -1,4 +1,5 @@
-import { cleanup, effect, Image, Scroll, signal, Text, View } from "nsh";
+import { cleanup, effect, Image, List, Scroll, signal, Text, View } from "nsh";
+import { PluginService } from "haiku/native";
 import { Button as BaseButton, Popover } from "nsh/base";
 import { Button, focus } from "../ui/Button";
 import { Icon } from "../ui/Icon";
@@ -90,8 +91,8 @@ export function SourcesSettings(props: { state: PluginsState; initialLogin?: str
   </View>;
 }
 
-export function SourceLogin(props: { state: PluginsState; initialPlugin: string; initialSource?: SourceRecord; onClose: () => void }) {
-  const plugin = signal(props.initialPlugin), method = signal(""), values = signal<Record<string, string>>(Object.fromEntries(
+export function SourceLogin(props: { state: PluginsState; initialPlugin: string; initialSource?: SourceRecord; initialMethod?: string; onClose: () => void }) {
+  const plugin = signal(props.initialPlugin), method = signal(props.initialMethod ?? ""), values = signal<Record<string, string>>(Object.fromEntries(
     Object.entries(props.initialSource?.connection ?? {}).filter(([, value]) => value !== "[REDACTED]")
   ));
   let session: string | null = null;
@@ -135,11 +136,12 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
     await cancel();
     const revision = generation;
     qrStatus.set("正在生成二维码…");
-    const start = await step("qrcode.start", variant());
+    const start = await step("qrcode.start", variant() || Object.keys(descriptor()?.auth?.qrcode?.variants ?? {})[0] || "");
     if (!start || closed || revision !== generation) return;
     presentation.set(start.result); qrStatus.set("请使用手机扫码");
     while (!closed && revision === generation && session) {
       const poll = await step("qrcode.poll", null);
+      if (closed || revision !== generation) return;
       if (!poll) { qrStatus.set("登录中断，请重试"); break; }
       if (poll.done) break;
       const status = String(poll.result.status);
@@ -148,6 +150,12 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
       if (status === "expired") break;
     }
   }
+  let qrKey = "";
+  effect(() => {
+    if (!descriptor() || descriptor()?.connection || activeMethod() !== "qrcode") return;
+    const key = `${plugin()}:${variant() || Object.keys(descriptor()?.auth?.qrcode?.variants ?? {})[0] || ""}`;
+    if (key !== qrKey) { qrKey = key; void startQr(); }
+  });
   async function submit() {
     if (descriptor()?.connection) {
       await props.state.run(async c => {
@@ -175,7 +183,7 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
         items={descriptor()?.authMethods.map(id => ({ value: id, title: ({
           qrcode: "二维码", sms: "短信", password: "账号密码", cookie: "Cookie", web: "网页登录",
         } as Record<string, string>)[id] })) ?? []}
-        onChange={id => { void cancel(); method.set(id); }} />
+        onChange={id => { void cancel(); method.set(id); cooldown.set(0); presentation.set({}); }} />
     </If>
     <If when={!!descriptor()?.connection || (method() || descriptor()?.authMethods[0]) === "password"}>
       <Each of={Object.entries(fields()).sort(([, a], [, b]) => Number(a.type === "secret") - Number(b.type === "secret"))} key={entry => entry[0]}>{entry => <Field
@@ -199,11 +207,11 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
       <Field label="验证码" value={code()} onChange={value => code.set(value)} />
     </If>
     <If when={(method() || descriptor()?.authMethods[0]) === "qrcode"}>
-      <SettingSelect label="扫码方式" value={variant()} items={Object.entries(
+      <SettingSelect label="扫码方式" value={variant() || Object.keys(descriptor()?.auth?.qrcode?.variants ?? {})[0] || ""} items={Object.entries(
         descriptor()?.auth?.qrcode?.variants ?? {}).map(([value, title]) => ({ value, title }))}
-        onChange={value => { variant.set(value); void cancel(); }} />
+        onChange={value => variant.set(value)} />
       <If when={typeof presentation().image === "string"}>
-        <Image src={String(presentation().image)} class="size-48 self-center" />
+        <Image testID="login-qr-image" src={String(presentation().image)} class="size-48 self-center" />
       </If>
       <Text class="text-sm text-muted-foreground">{qrStatus()}</Text>
       <Button label="生成或刷新二维码" onPress={() => void startQr()} />
@@ -221,12 +229,20 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
 export function PluginsSettings(props: { state: PluginsState }) {
   const importing = signal(false), location = signal(""), removing = signal<string | null>(null);
   const uses = (id: string) => props.state.value().sources.filter(s => s.pluginId === id);
+  async function pick(kind: string) {
+    await props.state.run(async c => {
+      const path = await PluginService.pickImport(kind);
+      if (path) await c.plugins.importPackage(path);
+    });
+  }
   return <View class="gap-4" testID="plugins-settings">
     <View class="flex-row items-center justify-between">
       <Text role="header" class="text-lg font-semibold text-foreground">插件</Text>
       <Menu trigger={<Button label="导入…" onPress={() => {}} />}>
-        {["ZIP 文件…", "本地目录…", "TypeScript 文件…", "HTTPS URL…"].map(label =>
-          <MenuItem onSelect={() => importing.set(true)}><Text>{label}</Text></MenuItem>)}
+        <MenuItem onSelect={() => void pick("zip")}><Text>ZIP 文件…</Text></MenuItem>
+        <MenuItem onSelect={() => void pick("directory")}><Text>本地目录…</Text></MenuItem>
+        <MenuItem onSelect={() => void pick("typescript")}><Text>TypeScript 文件…</Text></MenuItem>
+        <MenuItem onSelect={() => importing.set(true)}><Text>HTTPS URL…</Text></MenuItem>
       </Menu>
     </View>
     <Each of={props.state.value().packages} key={p => p.id}>{p => <View
@@ -240,11 +256,11 @@ export function PluginsSettings(props: { state: PluginsState }) {
           </View>
           <View class="flex-1 min-w-0 gap-1">
             <Text class="text-sm font-medium text-foreground">{p().name}</Text>
-            <Text class="text-xs text-muted-foreground">{p().version} · {p().author || "未提供作者"} · {p().id}</Text>
+            <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
           </View>
         </BaseButton>}>
         <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
-        <Text class="text-xs text-muted-foreground">{p().version} · {p().author || "未提供作者"} · {p().id}</Text>
+        <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
         <Text class="text-xs text-foreground">{p().capabilities.join("、")}</Text>
         <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
         <Button label="删除插件…" variant="destructive"
@@ -298,40 +314,103 @@ function JsonTree(props: { value: unknown; name?: string }) {
   </View>;
 }
 
+function eventLine(value: unknown) {
+  const event = value as { kind?: string; method?: string; phase?: string;
+    status?: number; url?: string; level?: string; message?: string };
+  return event.kind === "http"
+    ? `HTTP ${event.method} · ${event.phase}${event.status ? ` · ${event.status}` : ""}\n${event.url}`
+    : `${event.level || "日志"} · ${event.message || JSON.stringify(value)}`;
+}
+
 export function DeveloperSettings(props: { state: PluginsState; initialResult?: unknown }) {
-  const source = signal(""), capability = signal("track.get"), args = signal('["song:1/字"]');
+  const source = signal(""), capability = signal("track.get"), args = signal("[]");
+  const raw = signal(false), values = signal<Record<string, string>>({});
+  const watching = signal(""), watchStatus = signal("");
+  let stopWatch: (() => void) | undefined;
+  cleanup(() => stopWatch?.());
   const location = signal(""), result = signal<unknown>(props.initialResult ?? null);
   const activeSource = () => source() || props.state.value().sources[0]?.sourceId || "";
   const plugin = () => props.state.value().sources.find(s => s.sourceId === activeSource())?.pluginId;
   const descriptor = () => props.state.value().packages.find(p => p.id === plugin());
+  const fields = () => descriptor()?.parameters?.[capability()] || [];
+  effect(() => {
+    const path = capability();
+    const parameters = descriptor()?.parameters?.[path] || [];
+    values.set(Object.fromEntries(parameters.map(field => [field.key, field.default])));
+  });
+  function argumentsForCall() {
+    if (raw()) return { args: JSON.parse(args()), context: { limit: 20 } };
+    const argsValue: unknown[] = [], context: Record<string, unknown> = {};
+    for (const field of fields()) {
+      const input = values()[field.key] ?? field.default;
+      if (input === "" && field.key === "cursor") continue;
+      const value = field.type === "number" ? Number(input)
+        : field.type === "json" ? JSON.parse(input) : input;
+      if (field.target === "args") return { args: value as unknown[], context };
+      if (field.target === "context") context[field.key] = value;
+      else if (field.target === "arg") argsValue[field.index || 0] = value;
+      else {
+        const index = field.index || 0;
+        argsValue[index] = { ...(argsValue[index] as object || {}), [field.key]: value };
+      }
+    }
+    return { args: argsValue, context };
+  }
+  async function load() {
+    stopWatch?.(); watching.set("");
+    await props.state.run(async c => {
+      await c.plugins.importPackage(location());
+      stopWatch = await c.plugins.watchDirectory(location(), status => watchStatus.set(status));
+      watching.set(location()); watchStatus.set("正在监听文件变化");
+    });
+  }
   return <View class="gap-4" testID="developer-settings">
     <Text role="header" class="text-lg font-semibold text-foreground">开发者</Text>
+    <View class="flex-row items-start gap-6 min-w-0">
+    <View class="flex-1 min-w-0 gap-4">
     <Field label="本地插件目录" value={location()} onChange={value => location.set(value)} />
     <View class="flex-row"><Button label="加载或重新加载" loading={props.state.busy()}
-      onPress={() => void props.state.run(c => c.plugins.importPackage(location()))} /></View>
+      onPress={() => void load()} /></View>
+    <If when={!!watching()}><View class="flex-row items-center gap-2">
+      <Text class="flex-1 text-xs text-muted-foreground">{watchStatus()}：{watching()}</Text>
+      <Button label="停止监听" size="sm" onPress={() => {
+        stopWatch?.(); watching.set(""); watchStatus.set("");
+      }} />
+    </View></If>
     <SettingSelect label="实例" value={activeSource()} items={props.state.value().sources.map(s => ({
       value: s.sourceId, title: s.displayName || s.sourceId,
     }))} onChange={value => source.set(value)} />
     <SettingSelect label="能力" value={capability()} items={descriptor()?.capabilities.map(value => ({
       value, title: value,
     })) ?? []} onChange={value => capability.set(value)} />
-    <Field label="参数（JSON 数组）" value={args()} onChange={value => args.set(value)} />
-    <View class="flex-row gap-2">
+    <SettingSwitch label="原始 JSON" checked={raw()} onChange={value => raw.set(value)} />
+    <If when={raw()}><Field label="参数（JSON 数组）" value={args()}
+      onChange={value => args.set(value)} /></If>
+    <If when={!raw()}><View class="gap-3" testID="plugin-parameter-form">
+      <Each of={fields()} key={field => field.key}>{field => <Field label={field().label}
+        value={values()[field().key] ?? field().default}
+        onChange={value => values.set({ ...values(), [field().key]: value })} />}</Each>
+      <If when={fields().length === 0}><Text class="text-xs text-muted-foreground">此能力无需参数。</Text></If>
+    </View></If>
+    <View class="flex-row flex-wrap gap-2">
       <Button label="调用" variant="primary" disabled={!activeSource()} loading={props.state.busy()}
-        onPress={() => void props.state.run(async c => result.set(await c.plugins.invoke(
-          activeSource(), capability(), JSON.parse(args()), { limit: 20 },
-        )))} />
+        onPress={() => void props.state.run(async c => {
+          const input = argumentsForCall();
+          result.set(await c.plugins.invoke(activeSource(), capability(), input.args, input.context));
+        })} />
       <Button label="运行契约测试" disabled={!plugin()} loading={props.state.busy()}
         onPress={() => void props.state.run(async c => result.set(await c.plugins.testContract(plugin()!)))} />
       <Button label="查看存储" disabled={!activeSource()}
         onPress={() => void props.state.run(async c => result.set(await c.plugins.storage(activeSource())))} />
     </View>
-    <View class="flex-row gap-2">
+    <View class="flex-row flex-wrap gap-2">
       <Button label="清除 KV" disabled={!activeSource()}
         onPress={() => void props.state.run(c => c.plugins.clearStorage(activeSource()))} />
       <Button label="清除凭据" disabled={!activeSource()}
         onPress={() => void props.state.run(c => c.sources.logout(activeSource()))} />
     </View>
+    </View>
+    <View class="flex-1 min-w-0 gap-4">
     <If when={result() !== null}><View class="gap-2" testID="plugin-call-result">
       <Text class="text-sm font-medium text-foreground">返回结果</Text>
       <Scroll class="h-64 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
@@ -339,6 +418,14 @@ export function DeveloperSettings(props: { state: PluginsState; initialResult?: 
       </Scroll>
     </View></If>
     <Text role="header" class="text-sm font-medium text-foreground">日志与 HTTP 追踪</Text>
-    <Each of={props.state.events()}>{event => <Text class="text-xs text-muted-foreground">{JSON.stringify(event())}</Text>}</Each>
+    <List each={props.state.events()} class="h-40 min-h-0" testID="plugin-events"
+      keyExtractor={(_, index) => String(index)}
+      empty={<Text class="text-xs text-muted-foreground">尚无日志或 HTTP 追踪。调用能力后显示。</Text>}>
+      {event => <View class="border-b border-border py-2">
+        <Text class="text-xs text-muted-foreground" style={{ numberOfLines: 3 }}>{eventLine(event())}</Text>
+      </View>}
+    </List>
+    </View>
+    </View>
   </View>;
 }

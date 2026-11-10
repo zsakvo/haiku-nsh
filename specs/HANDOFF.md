@@ -23,6 +23,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M2-05 已验收并提交，M2 完成
+
+- qq-music v2（`dev-plugins/qq-music`，327 行，契约 34/34，不默认安装）、开发者面板（500ms 内容哈希轮询热重载、描述符参数表单 + 原始 JSON、日志/HTTP 追踪）、插件 logo（沿用参考版图标）与系统文件选择器、Rust 生成二维码（qrcode 0.14.1）、`sdk/GUIDE.md`（7 节，以 subsonic 为例）。workspace 228 通过，nsh test 17/17。
+- 小项待后续 UI 任务：二维码过期时应置灰/遮罩；开发者结果树空 `warnings` 不应显示展开箭头。
+- 待人工确认：真实 QQ/微信扫码、短信风控、VIP/地区权限、系统选择器、编辑器保存触发热重载。
+
 ## 2026-11-10 更新：M2-04（部分）已验收并提交，剩余转 M2-05
 
 - 完成：timers、feiniu FNID/中继/access-code、契约 detail 分页与裸 fetch 拦截；`core.sources`/`core.plugins` 导出；设置“来源/插件/开发者”面板（UI 修订后四张浅色截图已审阅）；设置左上橙色细线（隐藏外观面板 Radio ring 残留）已修。workspace 224 通过，nsh test 14/14。

@@ -20,8 +20,8 @@
 | 要求 | 状态 | 实施文件 | 验证 | 缺口 |
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
-| F02 插件包与来源生命周期 | M2-01～03 已验收；M2-04 第 0 步与设置核心已实现，待审阅，M2 尚未全部完成 | `haiku-plugins/src/{host,contract,events}.rs`、`native/app/src/plugins.rs`、`src/shell/PluginSettings.tsx` | workspace 224 通过/1 忽略；feiniu CLI 契约 21/21；tsc、nsh check/build、nsh test 14/14；四张真实截图 `.artifacts/m2-04/` | qq.music、GUIDE、目录自动监听、自动参数表单、包 logo、文件选择器与 URL→二维码生成未完成；record/live 仍为基础实现 |
-| F03 来源认证与用户内容 | M2-03 已验收；M2-04 来源表单、认证桥与飞牛远程连接已实现，待审阅，仍有缺口 | `haiku-plugins/src/source.rs`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs`、`src/shell/PluginSettings.tsx` | timers/abort、FNID/中继/安全码、detail 分页、裸 fetch 拦截回归；Headless 来源成功/失败清理、状态 Stop；`.artifacts/m2-04/` | web 使用手动 Cookie + 完成 URL 降级，无独立 webview 会话；QQ 登录未实现；QR/SMS/web 新面板与事件 Stop 尚无专门 Headless 回归，真实上游未验证 |
+| F02 插件包与来源生命周期 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/{host,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | workspace 228 通过/1 忽略；QQ CLI 契约 34/34；tsc、nsh check/build、nsh test 17/17；`.artifacts/m2-05/` | 目录监听为 500ms 内容哈希轮询；record/live 仍为基础实现；系统文件选择器与真实热重载体验待人工确认 |
+| F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
 | F04 推荐、发现与分类 | 未实现 | | | |
 | F05 搜索 | 未实现 | | | |
 | F06 队列与播放控制 | 部分实现（本地文件与播放界面） | `haiku-playback`、`native/app/src/{core,player_dock,seek_bar}.rs` | M1-04：workspace 183 通过/1 忽略；Headless 10/10 验证 Dock 命令、空队列禁用、拖动预览/单次 seek、设置内控制与实例保留；浅深 Dock、浅色 Settings+Dock、静态正在播放截图通过 | 入场动画未实现，按用户批准的静态方案收尾；网络候选/缓存恢复、统计与 ListeningProgress、真实多曲无缝听感未覆盖 |
@@ -542,3 +542,25 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - nsh check / build / test 各一次通过；14 tests passed，新增编辑连接与库来源无登录/登出回归；未新增构建警告（host 仍有既有例外）。
 - 日志：.artifacts/m2-04/nsh-{check,build,test}-ui-revision.log；浅色真实窗口覆盖 sources.png、login.png、plugins.png、developer.png。
 - 截图使用隔离数据目录与 loopback fixture，来源截图含同名、不同用户的两条来源；真实平台账号登录仍待人工确认。
+
+## 2026-11-10 M2-05：QQ、开发工具与指南收尾（待审阅）
+
+- 全部在主仓库工作，无 git 提交；qq.music 仅在 dev-plugins，不默认安装。
+- QQ v2：QQ/微信 QR、SMS、Cookie、user/refresh/logout；四类搜索、track get/streams/lyrics、album/artist/playlist、toplist、home、categories、me 与 scrape。
+- 协议层复用参考版请求/签名/QIMEI/QRC；AES/RSA 使用 haiku-jsrt crypto，凭据只经宿主注入与保存，不复制到 KV；QRC 保留原 GPL-3.0 归属注释。
+- 契约新增 requestJson 请求体部分匹配、认证返回 schema、expectedJson 值断言；QQ fixture 全离线，含独立加密 QRC 向量与首页 song→tracks/入口转换。
+- 修复包加载器声明模块时持锁造成二级相对导入死锁；增加三级模块导入回归。
+- 开发者目录按内容哈希每 500ms 轮询，安装事务热重载保留 KV；错误保留旧包并报告状态，Stop 停止后续重载。
+- 描述符导出标准 SDK 参数元数据，生成表单并保留原始 JSON；结果与虚拟化日志/HTTP 追踪分列、分别滚动。
+- 包内相对 logo 校验边界/512KiB 后转 data URL，支持 HTTPS；内置包附参考 logo，无作者时省略作者项；ZIP/目录/TS 使用现有 Rust 系统文件对话框。
+- Rust 将 QR url 编成带静区的 PNG；新增 qrcode 0.14.1（仅 image feature），复用已有 workspace image，无新平台依赖。
+- GUIDE 已完成：概念→Subsonic 实际片段→五种认证→能力/分页约束→错误恢复→CLI/契约/面板→发布，说明 web 降级与 record/live 限制。
+- workspace 首轮 228 passed / 0 failed / 1 ignored；新增首页值断言后再次回归同样通过，日志 cargo-test-workspace[-home-regression].log。
+- QQ check 首次发现加载器死锁，修复后通过；test 首轮缺 auth schema，修复后 34/34，首次/修复日志均保留；tsc 全插件通过。
+- nsh check 初轮静态文件选择器调用错误，改为 PluginService.pickImport 后通过；build 通过；test 17/17。
+- Headless 包含自动表单真实调用、来源成功/失败、插件启停/删除、QR 过期/刷新/进行中取消、SMS 冷却、Cookie/web 降级及状态/事件 Stop。
+- 证据 .artifacts/m2-05/：cli-{check,test}-qq-music*.log、tsc.log、nsh-*.log；浅色 plugins.png、developer.png、qrcode.png（真实 host，本地 fixture）。
+- 待人工：真实 QQ/微信手机确认、短信与安全风控/订阅权限、原生选择器、编辑器保存时热重载体验；无真实账号/上游访问或录制。
+- 偏离：目录轮询而非新增 OS watcher 依赖；参数元数据来自固定 SDK 签名，复杂认证使用 JSON；web 维持已接受降级；record/live 基础版。
+- 既有已安装且无 logo 元数据的内置旧包继续显示占位图标；本轮随新安装包提供 logo，不自动覆盖旧包。
+- 本轮无已知验收阻塞；M2 范围实现提交审阅，实际平台可用性不以 fixture 代替人工确认。

@@ -9,6 +9,7 @@ mod player_controls;
 mod player_dock;
 mod player_theme;
 mod plugins;
+mod plugin_tools;
 mod presentation;
 mod seek_bar;
 mod settings;

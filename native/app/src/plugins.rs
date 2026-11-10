@@ -97,6 +97,12 @@ impl PluginService {
                 .into_iter()
                 .map(|p| {
                     let mut descriptor = serde_json::to_value(&p.descriptor).unwrap();
+                    descriptor["logo"] = json!(crate::plugin_tools::logo(
+                        &p.path,
+                        p.descriptor.logo.as_deref()
+                    ));
+                    descriptor["parameters"] =
+                        json!(crate::plugin_tools::parameters(&p.descriptor.capabilities));
                     descriptor["enabled"] = json!(host.package_enabled(&p.descriptor.id));
                     descriptor
                 })
@@ -304,6 +310,82 @@ impl PluginService {
         .map_err(|e| e.to_string())??;
         Self::changed(&this).await
     }
+    /// Choose a ZIP, TypeScript file or directory with the native system file dialog.
+    pub async fn pick_import(kind: String) -> Result<Option<String>, String> {
+        use nsh_core::file_dialog::{FileFilter, OpenDialog};
+        let dialog = match kind.as_str() {
+            "directory" => OpenDialog::folders(),
+            "zip" => OpenDialog::files().filter(FileFilter::new("插件 ZIP", ["zip"])),
+            "typescript" => OpenDialog::files().filter(FileFilter::new("TypeScript 插件", ["ts"])),
+            _ => return Err("Unknown import kind".into()),
+        };
+        let paths = pick_paths(dialog)
+            .await
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+        Ok(paths.first().map(|p| p.to_string_lossy().into_owned()))
+    }
+    /// Poll a local package every 500ms and hot reload changes transactionally, preserving KV.
+    /// Stop cancels future reloads; an already running install finishes its transaction.
+    pub async fn watch_directory(
+        this: Instance<Self>,
+        location: String,
+        #[args(status)] callback: Callback<String>,
+    ) -> Result<Stop, String> {
+        let path = std::path::PathBuf::from(location);
+        let first_path = path.clone();
+        let first = background(async move { crate::plugin_tools::directory_hash(&first_path) })
+            .await
+            .map_err(|e| e.to_string())??;
+        let running = Rc::new(std::cell::Cell::new(true));
+        let active = running.clone();
+        let host = Self::host(&this);
+        Owner::detached().run(|| {
+            spawn(async move {
+                let mut previous = first;
+                while active.get() {
+                    timer(std::time::Duration::from_millis(500)).await;
+                    if !active.get() {
+                        break;
+                    }
+                    let path = path.clone();
+                    let host = host.clone();
+                    let change = background(async move {
+                        let hash = crate::plugin_tools::directory_hash(&path)?;
+                        if hash == previous {
+                            return Ok::<_, String>((hash, None));
+                        }
+                        let result = host
+                            .install_directory(&path, false)
+                            .await
+                            .map(|_| ())
+                            .map_err(|e| e.to_string());
+                        Ok((hash, Some(result)))
+                    })
+                    .await;
+                    if !active.get() {
+                        break;
+                    }
+                    match change {
+                        Ok(Ok((hash, result))) => {
+                            previous = hash;
+                            if let Some(result) = result {
+                                match result {
+                                    Ok(()) => {
+                                        let _ = Self::changed(&this).await;
+                                        callback.post("已热重载，继续监听".into());
+                                    }
+                                    Err(error) => callback.post(format!("重载失败：{error}")),
+                                }
+                            }
+                        }
+                        result => callback.post(format!("目录读取失败：{result:?}")),
+                    }
+                }
+            })
+        });
+        Ok(Stop::new(move || running.set(false)))
+    }
     /// Delete an unused third-party package; the host rejects builtins and referenced packages.
     pub async fn delete_package(this: Instance<Self>, plugin: String) -> Result<JsonValue, String> {
         let host = Self::host(&this);
@@ -398,7 +480,12 @@ impl PluginService {
                         .qrcode_start(text, login.cancel.clone())
                         .await
                         .map_err(|e| e.to_string())?;
-                    let presentation = qr.presentation.clone();
+                    let mut presentation = qr.presentation.clone();
+                    if presentation["image"].as_str().is_none() {
+                        if let Some(url) = presentation["url"].as_str() {
+                            presentation["image"] = json!(crate::plugin_tools::qr_image(url)?);
+                        }
+                    }
                     login.qr = Some(qr);
                     Ok(presentation)
                 }

@@ -938,3 +938,31 @@ async fn timers_repeat_clear_abort_and_unload() {
         .unwrap();
     assert_eq!(runtime.call("run", "null", SECOND).await.unwrap(), 42);
 }
+
+#[tokio::test]
+async fn package_relative_import_can_recursively_load_without_holding_source_lock() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("leaf.js"), "export const leaf = 21;").unwrap();
+    std::fs::write(
+        directory.path().join("helper.js"),
+        "import { leaf } from './leaf.js'; export const value = leaf * 2;",
+    )
+    .unwrap();
+    std::fs::write(
+        directory.path().join("plugin.ts"),
+        "import { value } from './helper.js'; export function answer() { return value; }",
+    )
+    .unwrap();
+    let vm = Runtime::spawn().unwrap();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        vm.load_package(directory.path(), "plugin.ts"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        vm.call("answer", "null", SECOND).await.unwrap(),
+        serde_json::json!(42)
+    );
+}

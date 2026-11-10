@@ -163,27 +163,31 @@ impl Host {
             errors: Mutex::default(),
             replay_base,
         });
-        for (id, source, fixture) in [
+        for (id, source, fixture, logo) in [
             (
                 "subsonic.music",
                 include_bytes!("../../../../plugins/subsonic/plugin.ts").as_slice(),
                 include_bytes!("../../../../plugins/subsonic/fixtures/contract.json").as_slice(),
+                include_bytes!("../../../../plugins/subsonic/logo.png").as_slice(),
             ),
             (
                 "feiniu.music",
                 include_bytes!("../../../../plugins/feiniu/plugin.ts").as_slice(),
                 include_bytes!("../../../../plugins/feiniu/fixtures/contract.json").as_slice(),
+                include_bytes!("../../../../plugins/feiniu/logo.png").as_slice(),
             ),
             (
                 "qq.scraper",
                 include_bytes!("../../../../plugins/qq-scraper/plugin.ts").as_slice(),
                 include_bytes!("../../../../plugins/qq-scraper/fixtures/contract.json").as_slice(),
+                include_bytes!("../../../../plugins/qq-scraper/logo.png").as_slice(),
             ),
             (
                 "kugou.scraper",
                 include_bytes!("../../../../plugins/kugou-scraper/plugin.ts").as_slice(),
                 include_bytes!("../../../../plugins/kugou-scraper/fixtures/contract.json")
                     .as_slice(),
+                include_bytes!("../../../../plugins/kugou-scraper/logo.png").as_slice(),
             ),
         ] {
             if !host
@@ -196,6 +200,7 @@ impl Host {
                 host.install_files(
                     BTreeMap::from([
                         ("plugin.ts".into(), source.to_vec()),
+                        ("logo.png".into(), logo.to_vec()),
                         ("fixtures/contract.json".into(), fixture.to_vec()),
                     ]),
                     true,

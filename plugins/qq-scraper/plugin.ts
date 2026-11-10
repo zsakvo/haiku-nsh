@@ -30,6 +30,7 @@ async function request<T>(ctx: Context, path: string, query: Record<string, stri
 }
 export default definePlugin({
   id: 'qq.scraper',
+  logo: 'logo.png',
   name: 'QQ 音乐刮削',
   version: '2.0.0',
   http: {

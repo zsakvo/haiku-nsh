@@ -114,6 +114,8 @@ impl Loader for PackageLoader {
         }
         let source = read_source(&path, &mut sources)
             .map_err(|e| rquickjs::Error::new_loading_message(name, e.message))?;
+        // Declaring a module may recursively load its imports.
+        drop(sources);
         Module::declare(ctx.clone(), name, source)
     }
 }

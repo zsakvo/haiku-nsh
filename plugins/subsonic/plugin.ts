@@ -145,6 +145,7 @@ async function search(
 }
 export default definePlugin({
   id: 'subsonic.music',
+  logo: 'logo.png',
   name: 'Subsonic',
   version: '2.0.0',
   author: 'Haiku',

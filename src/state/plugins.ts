@@ -4,9 +4,14 @@ import { Core } from "haiku/native";
 export interface PluginField {
   label: string; type: string; required?: boolean; placeholder?: string;
 }
+export interface PluginParameter {
+  key: string; label: string; target: "arg" | "object" | "context" | "args";
+  index?: number; type?: string; default: string;
+}
 export interface PluginDescriptor {
   id: string; name: string; version: string; author?: string; logo?: string;
   builtin: boolean; enabled: boolean; kind: string; capabilities: string[]; authMethods: string[];
+  parameters?: Record<string, PluginParameter[]>;
   connection?: { fields: Record<string, PluginField> };
   auth?: {
     password?: { fields?: Record<string, PluginField> };

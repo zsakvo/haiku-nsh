@@ -58,7 +58,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
           <View class="w-full max-w-2xl" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
           <View class="w-full max-w-2xl" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
-          <View class="w-full max-w-2xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
+          <View class="w-full max-w-5xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
           <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
           <View class="flex-col" style={{ display: ["外观", "播放", "存储", "来源", "插件", "开发者"].includes(selected()) ? "none" : "flex" }}>
             <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>

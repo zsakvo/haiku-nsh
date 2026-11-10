@@ -18,6 +18,8 @@
     "../plugins/feiniu/plugin.ts",
     "../plugins/qq-scraper/plugin.ts",
     "../plugins/kugou-scraper/plugin.ts",
-    "../native/app/tests/fixtures/settings-plugin/plugin.ts"
+    "../native/app/tests/fixtures/settings-plugin/plugin.ts",
+    "../dev-plugins/qq-music/plugin.ts",
+    "../native/app/tests/fixtures/auth-plugin/plugin.ts"
   ]
 }
