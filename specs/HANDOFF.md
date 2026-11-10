@@ -34,6 +34,14 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-10 更新：M4-02 已验收并提交
+
+- 搜索页（五种实体、来源筛选、即时查询 + 显式提交才写历史、加载更多）、命令面板多来源预览（280ms 防抖、起播用该来源完整第一页）；导出 `core.sources.search`、`core.sources.searchPreview`。旧响应按 (source, kind, query) + 递增版本丢弃。
+- workspace 244 通过，nsh test 25/25（输入替换改用 `app.clear`，经审阅者授权超限修复）；五张浅色截图已审阅；M4-01 遗留排版已修。
+- 小项待后续 UI 任务：命令面板曲目行只显示“播放 标题”，缺歌手；库来源浏览分组间距仍偏大。
+- 待人工确认：真实来源搜索、小窗口长列表、实机键盘。
+- 下一步 M4-03：推荐、分类、电台。
+
 ## 2026-11-10 更新：M4-01 已验收并提交
 
 - 网络播放：候选 `Local(PathBuf)` / `Network{url,headers,format,quality,expires_at}`；Controller 通过注入的地址解析 trait 和时钟编排（换候选、Expired 重取、1/2/4 秒重试、30 秒清零、提前 EOF 恢复），app 层由 SourceApi 实现；缓存键 `(EntityRef, quality)`，沿用 `audioQuality`，默认 high。审阅者已批准该接口（与 PLAYBACK.md §3 一致）。

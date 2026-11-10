@@ -15,14 +15,14 @@ export const focus = "focus-visible:outline-2 focus-visible:outline-ring";
 export function Button(props: {
   label: string; variant?: ButtonVariant; size?: "sm" | "md"; disabled?: boolean;
   loading?: boolean; selected?: boolean; onPress: () => void; testID?: string;
-  accessibilityLabel?: string;
+  accessibilityLabel?: string; class?: string;
 }) {
   return <BaseButton testID={props.testID} disabled={props.disabled || props.loading}
     accessibilityLabel={props.accessibilityLabel}
     selected={props.selected} onPress={props.onPress}
     class={`items-center justify-center rounded-(--radius) ${focus} disabled:opacity-40
       ${props.size === "sm" ? "min-h-7 px-2 py-1" : "min-h-8 px-3 py-1.5"}
-      ${variants[props.variant ?? "secondary"]}`}>
+      ${variants[props.variant ?? "secondary"]} ${props.class??""}`}>
     <Text class={`text-sm ${foregrounds[props.variant ?? "secondary"]}`}>
       {props.loading ? `${props.label}…` : props.label}
     </Text>

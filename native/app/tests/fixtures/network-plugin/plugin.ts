@@ -17,6 +17,13 @@ function tracks(ctx: Context & PageArgs) {
     : { items: [track("1", ctx)], next: "opaque:page/二", total: 2 };
 }
 let failAlbum = false;
+let searches: string[] = [];
+async function searching(keyword: string, ctx: Context) {
+  searches.push(keyword);
+  if(keyword === "慢请求") { ctx.log.info("slow search started"); await new Promise(r=>setTimeout(r,900)); }
+  if(keyword === "来源错误")throw new Upstream("搜索来源暂时离线");
+}
+
 function guard() {
   if (failAlbum) {
     failAlbum = false;
@@ -26,12 +33,22 @@ function guard() {
 export default definePlugin({
   id: "network.fixture", name: "回声音乐库", version: "1.0.0",
   connection: { fields: { url: field.url("服务器") }, identity: ["url"], async verify() { return {}; } },
+  search: {
+    async track({keyword,cursor},ctx) {
+      await searching(keyword,ctx);if(keyword === "空结果")return {items:[]};
+      return {items:Array.from({length:cursor?2:5},(_,i)=>({...track(String(i+1+(cursor?5:0)),ctx),title:`${keyword} · ${i+1+(cursor?5:0)}`})),next:cursor?undefined:"search:第二页"};
+    },
+    async album({keyword,cursor},ctx) {await searching(keyword,ctx);return {items:[{...album(ctx),title:`${keyword} · 专辑`}],next:cursor?undefined:"album:下一页"};},
+    async artist({keyword},ctx) {await searching(keyword,ctx);return {items:[{...artist(ctx),name:`${keyword} · 歌手`}]};},
+    async playlist({keyword},ctx) {await searching(keyword,ctx);return {items:Array.from({length:4},(_,i)=>({...playlist(ctx),id:`playlist/${i}`,title:`${keyword} · 歌单 ${i+1}`}))};},
+    async program({keyword},ctx) {await searching(keyword,ctx);return {items:[{id:"program/1",title:`${keyword} · 节目`}]};},
+  },
   track: {
     async streams(id, ctx) {
       ctx.log.info(`streams ${id} quality=${ctx.quality}`);
       return [{url:`${ctx.connection!.url}/song.flac`,format:"flac",quality:ctx.quality,expiresAt:Math.floor(Date.now()/1000)+3600}];
     },
-    async get(id, ctx) { if (id === "fail") failAlbum = true; return track("1",ctx); },
+    async get(id, ctx) { if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
   },
   album: { async get(id, ctx) { guard(); return {info:album(ctx),tracks:tracks(ctx)}; } },
   artist: {

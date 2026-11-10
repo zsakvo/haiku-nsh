@@ -13,6 +13,8 @@ import { LibraryPage } from "../pages/LibraryPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { StatsPage } from "../pages/StatsPage";
 import { SourceLibraryPage } from "../pages/SourceLibraryPage";
+import { SearchPage } from "../pages/SearchPage";
+import type { SearchRequest } from "../state/search";
 import { SourceDetailPage } from "../pages/SourceDetailPage";
 import { createPlugins } from "../state/plugins";
 import { NotificationCenter } from "./Diagnostics";
@@ -27,11 +29,13 @@ export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
-  initialNotifications?: boolean; initialLogs?: boolean;
+  initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
   const nav = createNavigation(props.initialRoute);
   const core = createCoreState();
+  const searchRequest=signal<SearchRequest|undefined>(props.initialSearch);
+  function openSearch(request:SearchRequest){searchRequest.set({...request});nav.navigate({kind:"search"});}
   const plugins = createPlugins();
   const librarySources = () => plugins.value().sources.filter((s) => s.enabled
     && plugins.value().packages.some((p) => p.id === s.pluginId && p.enabled && p.capabilities.includes("library.browse")));
@@ -107,7 +111,7 @@ export function AppShell(props: {
                 && !PluginService.isRemote((nav.current() as {ref:string}).ref) && ["album", "artist"].includes(nav.current().kind))}
               onPress={() => nav.navigate({ kind: page.id })} />)}
           <If when={group === "音乐库"}><Each of={librarySources()} key={(s) => s.sourceId}>{(source) =>
-            <SidebarItem icon="radio" label={source().displayName || plugins.value().packages.find((p) => p.id === source().pluginId)?.name || source().sourceId}
+            <SidebarItem icon="folder" label={source().displayName || plugins.value().packages.find((p) => p.id === source().pluginId)?.name || source().sourceId}
               selected={nav.current().kind === "source" && (nav.current() as {source:string}).source === source().sourceId}
               onPress={() => nav.navigate({kind:"source",source:source().sourceId})} />}
           </Each></If>
@@ -127,8 +131,9 @@ export function AppShell(props: {
         </Menu>
       </ShellToolbar>
       <View class="flex-1 min-h-0">
-        {destinations.filter((page) => !["library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["search", "library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
+          <SearchPage core={core()!} active={nav.current().kind==="search"} snapshot={plugins.value()} request={searchRequest()} navigate={nav.navigate} settings={showSettings} />
           <HistoryPage core={core()!} active={nav.current().kind === "history"} navigate={nav.navigate} />
           <StatsPage core={core()!} active={nav.current().kind === "statistics"} />
           <CollectionPage core={core()!} id="__liked__" active={nav.current().kind === "favorites"} onDeleted={() => nav.navigate({ kind: "favorites" })} />
@@ -180,7 +185,7 @@ export function AppShell(props: {
         if (event.open) closeOverlay();
       }} />
     </If>
-    <CommandPalette open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
+    <CommandPalette core={core()??undefined} initialQuery={props.initialCommandQuery} navigate={nav.navigate} search={openSearch} open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
       items={[
         ...destinations.map((page) => ({ id: page.id, label: `前往${page.label}`, group: "导航" })),
         { id: "settings", label: "打开设置…", group: "应用", shortcut: shortcuts.settings },

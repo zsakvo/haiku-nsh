@@ -282,6 +282,23 @@ impl SourceApi {
             .await?;
         self.page(kind.name(), value)
     }
+    /// Search playable SDK tracks without losing their source, extra or album metadata.
+    pub async fn search_tracks(
+        &self,
+        keyword: &str,
+        page: PageArgs,
+        cancel: Option<&Cancellation>,
+    ) -> Result<Page<Track>> {
+        let value = self
+            .invoke(
+                "search.track",
+                vec![json!({"keyword":keyword,"cursor":page.cursor,"limit":page.limit})],
+                json!({}),
+                cancel,
+            )
+            .await?;
+        self.tracks(value)
+    }
     pub async fn track(&self, id: &str, cancel: Option<&Cancellation>) -> Result<Track> {
         let value = self
             .invoke("track.get", vec![json!(id)], json!({}), cancel)

@@ -1,4 +1,4 @@
-import { cleanup, Image, resource, signal, Text, View } from "nsh";
+import { cleanup, Image, Scroll, resource, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
@@ -52,6 +52,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   }
   return <View testID="page-source-detail" class="flex-1 min-h-0 pb-28"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
+    <Scroll class="flex-1" contentClass="flex-col">
     <If when={first.loading() && !info()}>
       <View accessibilityLabel="正在加载详情" class="px-(--content-inset) gap-4">
         <View class="flex-row gap-5"><View class="size-32 rounded-(--radius-panel) bg-muted" />
@@ -96,11 +97,12 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
           <Text class="text-sm font-semibold text-foreground">热门曲目</Text>
         </If>
       </View>
-      <SourceTracks core={props.core} tracks={tracks()} active={props.active} />
+      <SourceTracks core={props.core} tracks={tracks()} active={props.active} fit />
       <View class="px-(--content-inset) py-2 flex-row gap-3 items-center">
         <Text class="text-xs text-muted-foreground">{`已加载 ${tracks().length} 首`}</Text>
         <If when={!!next()}><Button label="加载更多曲目" size="sm" loading={busy()} onPress={() => void act(() => more("tracks"))} /></If>
       </View>
     </If>
+    </Scroll>
   </View>;
 }

@@ -1,4 +1,4 @@
-import { cleanup, Image, List, resource, signal, Text, View } from "nsh";
+import { cleanup, Image, List, resource, signal, Text, token, View } from "nsh";
 import { CollectionsService, PluginService, TrackList, type Core } from "haiku/native";
 import type { EntityRef, Route } from "../shell/navigation";
 import { Button } from "../ui/Button";
@@ -14,7 +14,7 @@ export function entityRoute(entity: any): Route {
 export function SourceGrid(props: { items: any[]; navigate: (route: Route) => void; compact?: boolean }) {
   const rows = () => Array.from({ length: Math.ceil(props.items.length / 4) }, (_, i) => props.items.slice(i * 4, i * 4 + 4));
   return <List each={rows()} keyExtractor={(row) => row.map((e) => JSON.stringify(e.reference)).join(",")}
-    class={props.compact ? "h-40 min-h-0" : "h-56 min-h-0"} estimatedItemSize={156}>
+    class="shrink-0 min-h-0" style={{height:Math.min(rows().length,props.compact?1:3)*156}} estimatedItemSize={156}>
     {(row) => <View class="flex-row gap-4 pb-4">
       <Each of={row()} key={(e) => JSON.stringify(e.reference)}>{(entity) =>
         <View class="flex-1 min-w-0 gap-2 items-start">
@@ -22,7 +22,7 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
             <If when={!!entity().cover}><Image src={entity().cover} class="size-24" /></If>
             <If when={!entity().cover}><Text class="text-muted-foreground">♪</Text></If>
           </View>
-          <Button label={entity().title} variant="ghost" size="sm" disabled={!entity().reference}
+          <Button class="px-0" label={entity().title} variant="ghost" size="sm" disabled={!entity().reference}
             onPress={() => props.navigate(entityRoute(entity()))} />
         </View>}
       </Each>
@@ -31,7 +31,7 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
 }
 
 /** Remote rows share the existing native menus for likes and adding to user playlists. */
-export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean }) {
+export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean; fit?: boolean }) {
   const error = signal(""), creating = signal<any[] | null>(null);
   let retained: number | undefined;
   let disposed = false;
@@ -45,7 +45,8 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
   async function act(work: () => Promise<unknown>) {
     try { error.set(""); await work(); } catch (e) { error.set(String(e)); }
   }
-  return <View class="flex-1 min-h-0">
+  return <View class={props.fit ? "shrink-0 min-h-0" : "flex-1 min-h-0"}
+    style={props.fit ? {height:Math.min(props.tracks.length,8)*token("track-row-height")+token("compact-control-height")+8} : {}}>
     <If when={!!error() || !!handle.error()}><Text class="text-sm text-destructive">{error() || String(handle.error())}</Text></If>
     <If when={!!handle()}>
       <TrackList source={handle()!} active={props.active && !creating()}

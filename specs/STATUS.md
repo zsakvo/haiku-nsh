@@ -23,7 +23,7 @@
 | F02 插件包与来源生命周期 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/{host,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | workspace 228 通过/1 忽略；QQ CLI 契约 34/34；tsc、nsh check/build、nsh test 17/17；`.artifacts/m2-05/` | 目录监听为 500ms 内容哈希轮询；record/live 仍为基础实现；系统文件选择器与真实热重载体验待人工确认 |
 | F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
 | F04 推荐、发现与分类 | 未实现 | | | |
-| F05 搜索 | 未实现 | | | |
+| F05 搜索 | 部分实现（搜索页与命令面板；M4-02 fixture 验收完成，待审阅） | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | M4-02：workspace 244 通过/1 忽略；最终 nsh check/build 通过，nsh test 25/25；五张浅色实机截图齐全 | 五种实体、来源筛选、分页、历史、防旧结果覆盖、280ms 面板预览与完整第一页起播已实现；真实来源搜索与实机键盘体验待人工确认 |
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
@@ -642,3 +642,34 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 各预览截图后 Ctrl+C 停止；退出 1/随后开发连接关闭不作构建失败；仅出现约定允许的 block 0.1.6 / __eh_frame 提示。
 - 未覆盖/待人工：真实缓存落盘后二次命中与实机故障恢复、Subsonic/飞牛/QQ 播放、实际扬声器听感、真实远端收藏刷新及原生媒体操作；未访问真实上游。
 - 偏离：Rust Controller 直接注入 SourceApi 适配器，未复用参考版 TS/RPC 播放控制层；没有新增待定架构决策；F04/F05 保持原状。
+
+## 2026-11-10 M4-02：搜索与命令面板（fixture 验收完成，待审阅）
+
+- 主仓库保留改动，未提交 git，未改 Rex、参考项目、NSH 或依赖源码；保留审阅者的未跟踪任务文件。
+- 第 0 步：来源卡片标题去掉横向按钮内边距并与封面左对齐；网格按行数收紧高度、分组间距减小；侧栏库来源改用 folder 图标。
+- 来源详情改为可滚动内容，短列表按曲目数收拢，分页操作跟随列表；长列表保留最多 8 行的原生虚拟列表视口。
+- 搜索页保留挂载，提供 track/album/artist/playlist/program 五种类型，只显示所选来源支持项；已启用来源筛选，searchSourceId 沿用设置的未知字段持久化机制保存上次选择。
+- 查询结果使用原生 TrackList/封面网格；支持游标分页、加载/空/错误重试、历史提交/单项删除/确认清空。
+- 节目来源有 program.get 时进入通用详情，否则显示“此来源暂不提供节目详情”提示，不尝试猜测播放地址。
+- 首屏与分页结果用完整 (source,kind,query) 身份、递增 epoch、页面 active/销毁状态共同检查；面板用查询 epoch 和 open 检查丢弃旧结果。
+- 命令面板保留导航，使用现有原生 Command 上下选择/回车；280ms 防抖，多来源并发、每源预览至多 3 个歌单和 3 首曲目，提供搜索页查看全部。
+- 新增 app 原生 CommandKeyboard，焦点处理完成后注册 Escape 关闭，失焦/关闭时解绑；覆盖 Command 默认“先清空再关闭”，单次 Escape 关闭非空面板。
+- 面板曲目起播传入对应来源完整第一页 tracks 与所选 index，未截断为 3 首；监听仍返回 Stop，搜索页历史订阅随组件释放。
+- API：core.sources.search(source,kind,query,cursor?)→Page；searchPreview(query)→来源分组数组，含 source/title/tracks/playlists/errors。
+- SourceApi 新增 search_tracks，保持 SDK Track 的 source/extra/album；预览按来源及 track/playlist 分别隔离错误，不新增依赖。
+- 夹具：扩展 network-plugin，并增加 track-only 的 search-lite-plugin；SearchFixture 使用 openIsolated、loopback、音量 0，无真实上游。
+- 根 Search*Preview 为加载根 nsh.json/native/theme 的薄入口，共享夹具与两个新 Headless 用例放在 src/pages/fixtures/。
+- 验收 1：cargo test --manifest-path native/Cargo.toml --workspace 首轮通过，244 passed/1 ignored；新增屏障用例验证来源并发与错误隔离，沿用既有搜索历史去重测试。
+- 验收 2：nsh test -v 最终 25/25（9 Rust、16 Headless）；证据 .artifacts/m4-02/nsh-test-keyboard-final.log。
+- 两条搜索流程已通过：搜索起播第 2 首/队列 5 首、加载至 7 项、切 tab/来源、慢请求后新查询、历史单项删除/确认清空。
+- 面板覆盖 280ms 防抖（短词未调用来源）、预览仅 3 首但起播队列 5 首、旧结果丢弃、查看全部和非空查询单次 Escape 关闭。
+- 审阅者授权超出修复上限后，替换输入统一改为 app.clear(selector) 后 app.type(selector,text)，去掉 press 聚焦/全选退格；搜索页流程随即通过。
+- 随后面板测试 24/25，原生 Command 的 Escape 优先于 JS 绑定且先清空查询；仅加 Dialog.onCancel 仍未关闭，最终用 app 原生按键适配解决，未弱化测试。
+- 早期失败日志 nsh-test{,-repair1,-repair2,-review-repair,-review-final}.log 均保留；nsh check 初轮 app.clock 可空错误及修复日志亦保留。
+- 全绿后 nsh check、nsh build -v 各一次通过，日志 nsh-check-final.log、nsh-build-final.log；之后仅更新 STATUS，没有再改代码。
+- 验收 3：五个根预览分别真实 nsh run --target macos -v，独立临时根、浅色、loopback；日志 nsh-run-{tracks,albums,history,command,library}.log。
+- 五张截图均已查看：search-tracks-light.png、search-albums-light.png、search-history-light.png、command-preview-light.png、library-light.png。
+- 所有证据位于 .artifacts/m4-02/；capture-{tracks,albums,history,command,library}.log 记录屏幕未锁定及窗口；仅 CGSession/CGWindow 只读查询与 screencapture。
+- 各预览截图后 Ctrl+C 停止，其退出 1 为人为结束；仅有允许的 block 0.1.6 / __eh_frame 提示；临时捕获脚本已删除，无 GUI 自动化或汇总 JSON。
+- 已接受的做法：输入变化即时查询，显式搜索/回车/历史选择才写历史；旧 native 请求可完成但结果被丢弃；节目无详情选提示方案；根薄入口沿用既有约定。
+- 未覆盖/待人工：真实来源搜索、最小窗口长列表布局与实机键盘体验；未访问真实上游，无新增待定架构决策；保留改动并停止，未提交 git。

@@ -1,6 +1,7 @@
 //! Native Core and playback surfaces; retained shell navigation lives in TSX.
 use nsh_core::prelude::*;
 mod core;
+mod command_keyboard;
 mod exit;
 mod collections;
 mod activity;
@@ -21,6 +22,7 @@ mod settings;
 mod track_list;
 mod track_source;
 pub use core::{Core, CoreBridge};
+pub use command_keyboard::CommandKeyboard;
 pub use now_playing::NowPlaying;
 pub use player_dock::PlayerDock;
 pub use seek_bar::SeekBar;
@@ -30,6 +32,7 @@ pub use track_list::TrackList;
 #[native_module("haiku/native")]
 fn native(registry: &mut Registry) {
     registry.class::<Core>();
+    registry.register::<CommandKeyboard>();
     registry.register::<TrackList>();
     registry.register::<SeekBar>();
     registry.register::<PlayerDock>();

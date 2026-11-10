@@ -4,11 +4,11 @@ import { Icon } from "./Icon";
 import { Kbd } from "./Navigation";
 import { Tooltip } from "./Surfaces";
 import { focus } from "./Button";
-export function SearchField(props: { value: string; label: string; placeholder?: string; onChange: (value: string) => void; autoFocus?: boolean; sidebar?: boolean }) {
+export function SearchField(props: { value: string; label: string; placeholder?: string; onChange: (value: string) => void; onSubmit?: () => void; autoFocus?: boolean; sidebar?: boolean }) {
   return <View class="min-h-(--compact-control-height) flex-row items-center gap-2 rounded-(--radius) border border-input bg-card px-2 py-1 focus-within:border-ring">
     <Icon name="search" small sidebar={props.sidebar} color="muted-foreground" />
     <Input accessibilityLabel={props.label} value={props.value} placeholder={props.placeholder}
-      onChange={(event) => props.onChange(event.value)} autoFocus={props.autoFocus}
+      onChange={(event) => props.onChange(event.value)} onSubmit={props.onSubmit} autoFocus={props.autoFocus}
       style={props.sidebar ? { fontSize: token(props.value ? "sidebar-text-size" : "sidebar-hint-size") } : {}}
       class="flex-1 min-w-0 text-sm text-foreground placeholder:text-muted-foreground" />
   </View>;

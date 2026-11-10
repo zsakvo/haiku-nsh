@@ -180,6 +180,58 @@ impl Drop for PluginService {
 }
 #[class]
 impl PluginService {
+    /// Search one enabled source and SDK kind; the cursor is opaque, tracks remain playable.
+    pub async fn search(
+        this: Instance<Self>,
+        source: String,
+        kind: String,
+        query: String,
+        cursor: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { crate::sources::search(host, source, kind, query, cursor).await })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+    }
+    /// Concurrent first-page track/playlist results per enabled source, with isolated errors.
+    /// The UI previews three of each; tracks contains the entire first page for playback.
+    pub async fn search_preview(this: Instance<Self>, query: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move { crate::sources::search_preview(host, query).await })
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// Start two isolated search sources, including a track-only source, for offline acceptance.
+    pub async fn start_search_fixture(this: Instance<Self>) -> Result<JsonValue, String> {
+        let first = Self::start_network_fixture(this.clone()).await?;
+        let host = Self::host(&this);
+        let url = first["url"].as_str().unwrap().to_owned();
+        let second = background(async move {
+            host.install_files(
+                BTreeMap::from([(
+                    "plugin.ts".into(),
+                    include_bytes!("../tests/fixtures/search-lite-plugin/plugin.ts").to_vec(),
+                )]),
+                false,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            host.connect(
+                "search.lite.fixture",
+                BTreeMap::from([("url".into(), url)]),
+                Some("轻量曲库".into()),
+            )
+            .await
+            .map(|s| s.record.source_id.clone())
+            .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await?;
+        Ok(json!({"sourceId":first["sourceId"],"secondSourceId":second}))
+    }
     /// Start the isolated loopback library/audio fixture for offline acceptance previews.
     pub async fn start_network_fixture(this: Instance<Self>) -> Result<JsonValue, String> {
         let host = Self::host(&this);

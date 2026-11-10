@@ -7,8 +7,8 @@ test("sidebar reaches every destination", async () => {
   await app.waitFor("id:nav-home");
   for (const page of destinations) {
     await app.press(`id:nav-${page.id}`);
-    await app.waitFor(["history", "statistics"].includes(page.id) ? `id:page-${page.id}` : `text:${page.title}`);
-    if (!["favorites", "playlists", "history", "statistics"].includes(page.id)) expect(app.texts()).toContain(page.description);
+    await app.waitFor(["search", "history", "statistics"].includes(page.id) ? `id:page-${page.id}` : `text:${page.title}`);
+    if (!["search", "favorites", "playlists", "history", "statistics"].includes(page.id)) expect(app.texts()).toContain(page.description);
   }
 });
 test("back and forward retain page input; new navigation truncates forward history", async () => {
