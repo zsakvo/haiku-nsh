@@ -3,7 +3,7 @@ use crate::{document::Document, history::StoredTrack};
 use chrono::{Datelike, Local, TimeZone, Timelike, Utc};
 use haiku_model::Track;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -36,6 +36,7 @@ pub struct StatsState {
     pub watermark: i64,
     pub revision: u64,
     pub account_id: String,
+    pub account_server: String,
 }
 impl Default for StatsState {
     fn default() -> Self {
@@ -46,6 +47,7 @@ impl Default for StatsState {
             watermark: 0,
             revision: 0,
             account_id: String::new(),
+            account_server: String::new(),
         }
     }
 }
@@ -58,6 +60,7 @@ struct Segment {
 pub struct Stats {
     doc: Document<StatsState>,
     current: Arc<Mutex<Option<Segment>>>,
+    changes: tokio::sync::watch::Sender<u64>,
 }
 impl Stats {
     pub fn open(root: &Path) -> Result<Self, String> {
@@ -72,6 +75,7 @@ impl Stats {
         Ok(Self {
             doc,
             current: Arc::default(),
+            changes: tokio::sync::watch::channel(0).0,
         })
     }
     pub fn revision(&self) -> u64 {
@@ -85,6 +89,48 @@ impl Stats {
     }
     pub fn snapshot(&self) -> StatsState {
         self.doc.get()
+    }
+    /// Local changes only: remote merges and watermark updates must not trigger uploads.
+    pub fn subscribe_local(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.changes.subscribe()
+    }
+    /// Reset remote data and cursors when changing either account or server, retaining local plays.
+    pub fn set_account(&self, id: &str, server: &str) {
+        let current = self.snapshot();
+        if current.account_id == id && current.account_server == server {
+            return;
+        }
+        self.doc.edit(|s| {
+            s.account_id = id.into();
+            s.account_server = server.into();
+            s.events
+                .retain(|e| e.extra.get("isRemote") != Some(&Value::Bool(true)));
+            s.watermark = 0;
+            s.revision = 0;
+        });
+    }
+    /// Commit successful batches/pages. Callers fence this transaction against account changes.
+    pub fn sync_commit(
+        &self,
+        watermark: i64,
+        revision: u64,
+        remote: Vec<ListenEvent>,
+    ) -> Result<(), String> {
+        self.doc.edit(|s| {
+            s.watermark = s.watermark.max(watermark);
+            s.revision = s.revision.max(revision);
+            let mut seen: BTreeSet<_> = s.events.iter().map(|e| e.event_id.clone()).collect();
+            s.events.extend(
+                remote
+                    .into_iter()
+                    .filter(|e| seen.insert(e.event_id.clone())),
+            );
+            s.events.sort_by_key(|e| e.played_at);
+            if s.events.len() > 5000 {
+                s.events.drain(..s.events.len() - 5000);
+            }
+        });
+        self.doc.flush()
     }
     /// Flush the active segment too, so process exit never depends on an audio session.
     pub fn flush(&self) -> Result<(), String> {
@@ -110,6 +156,7 @@ impl Stats {
                 s.events.drain(..s.events.len() - 5000);
             }
         });
+        self.changes.send_modify(|revision| *revision += 1);
     }
     pub fn clear(&self) {
         self.current.lock().unwrap().take();
@@ -118,6 +165,7 @@ impl Stats {
             s.revision = 0;
             s.watermark = 0;
         });
+        self.changes.send_modify(|revision| *revision += 1);
     }
     /// A pause, seek, generation change or anomalous gap ends a continuous segment.
     #[allow(clippy::too_many_arguments)]

@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 haiku-model.workspace = true
+haiku-store.workspace = true
 haiku-library.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -15,4 +16,8 @@ reqwest.workspace = true
 lofty.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 haiku-library = { workspace = true, features = ["test-support"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "=3.7.0"

@@ -43,6 +43,7 @@ unsafe impl Trace for Listeners {
 #[derive(Clone)]
 struct DataRoot {
     path: std::path::PathBuf,
+    credentials: Arc<dyn haiku_services::account::Credentials>,
     // A fixture directory lives as long as its Core/bridge or engine selection.
     _temporary: Option<Arc<tempfile::TempDir>>,
 }
@@ -193,6 +194,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    account: Instance<crate::account::AccountService>,
     downloads: Instance<crate::downloads::DownloadService>,
     scrape: Instance<crate::scrape::ScrapeService>,
     lyrics: Instance<crate::lyrics::LyricsService>,
@@ -215,6 +217,11 @@ impl Core {
             .get()
             .unwrap_or_else(|| DataRoot {
                 path: haiku_store::data_root(),
+                credentials: if cfg!(test) || std::env::var("HAIKU_NO_KEYCHAIN").as_deref() == Ok("1") {
+                    Arc::new(haiku_services::account::MemoryCredentials::default())
+                } else {
+                    Arc::new(haiku_services::account::SystemCredentials)
+                },
                 _temporary: None,
             });
         global::<Option<DataRoot>>().set(Some(selected.clone()));
@@ -360,6 +367,14 @@ impl Core {
             crate::scrape::ScrapeService::new(service)
         };
         downloads.watch_collections(bridge.collections.clone());
+        let account = {
+            let root = bridge._root.path.clone();
+            let credentials = bridge._root.credentials.clone();
+            let service = blocking(move || haiku_services::account::Service::open(&root, credentials))
+                .await.map_err(|e| JsError::Error(e.to_string()))?
+                .map_err(|e| JsError::Error(e.to_string()))?;
+            crate::account::AccountService::new(service, bridge.stats.clone())
+        };
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
@@ -371,6 +386,7 @@ impl Core {
             .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            account,
             downloads,
             scrape,
             lyrics,
@@ -402,6 +418,7 @@ impl Core {
             .map_err(|e| JsError::Error(e.to_string()))?;
         Self::select_root(DataRoot {
             path,
+            credentials: Arc::new(haiku_services::account::MemoryCredentials::default()),
             _temporary: None,
         })
         .await
@@ -426,6 +443,7 @@ impl Core {
         .map_err(|e| JsError::Error(e.to_string()))?;
         Self::select_root(DataRoot {
             path,
+            credentials: Arc::new(haiku_services::account::MemoryCredentials::default()),
             _temporary: Some(Arc::new(dir)),
         })
         .await
@@ -439,6 +457,11 @@ impl Core {
     #[getter]
     pub fn collections(&self) -> Instance<crate::collections::CollectionsService> {
         self.collections.clone()
+    }
+    /// Haiku account sessions and informational membership, backed by system credentials.
+    #[getter]
+    pub fn account(&self) -> Instance<crate::account::AccountService> {
+        self.account.clone()
     }
     /// Offline download queue, resumable transfers and durable records.
     #[getter]
@@ -455,7 +478,7 @@ impl Core {
     pub fn history(&self) -> Instance<crate::activity::ActivityService> {
         self.activity.clone()
     }
-    /// Locally measured listening segments and aggregates; no remote upload.
+    /// Listening segments and aggregates, including account-fenced remote statistics.
     #[getter]
     pub fn stats(&self) -> Instance<crate::activity::ActivityService> {
         self.activity.clone()
@@ -472,6 +495,7 @@ impl Core {
     }
     /// Flush pending collections and playback, releasing the cached Core for a later open.
     pub async fn close(this: Instance<Self>) -> Result<(), String> {
+        this.with(|s| s.account.with(|a| a.stop()));
         crate::downloads::DownloadService::close(this.with(|s| s.downloads.clone())).await?;
         crate::scrape::ScrapeService::close(this.with(|s| s.scrape.clone())).await?;
         let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));

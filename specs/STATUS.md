@@ -30,9 +30,9 @@
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
-| F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
+| F12 历史与听歌统计 | 部分实现（本地与远程服务） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；eventId、watermark、远程去重、分页事务、退避与登出隔离通过 | 账户/同步状态界面未做；真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
-| F14 Haiku 账号 | 未实现 | | | |
+| F14 Haiku 账号 | 部分实现（Rust + core.account） | `haiku-services::account`、`native/app/src/account.rs` | M5-03：账号 loopback 4/4，workspace 282 通过/1 忽略，nsh check/build 通过 | 设置账户界面、专项 Headless 与截图未做；真实服务端与 Keychain 实机待确认 |
 | F15 同步与备份 | 未实现 | | | |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
 
@@ -840,3 +840,31 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未完成：完整nsh test全绿；未专测崩溃/断电时跨文件迁移恢复、真实跨卷/磁盘满/系统权限与目录选择器交互；无真实上游请求。
 - 无新增架构待决事项；上述真实文件系统与上游场景待人工确认。
 - 审阅者：复跑完整 nsh test 61/61（nsh-test-reviewer.log），Search Escape 为既有偶发；两张截图已审阅。遗留：`watch_collections` 每 100ms 轮询（已有变更通道可改为等待事件，持续错误会每 100ms 记一次日志）。
+
+## 2026-11-11 M5-03：账号与统计上传（Rust 部分，待审阅）
+
+- 仅主仓库修改，未提交 git；按额度优先完成 §1–§2，本轮未进入 §3。
+- 新增 haiku-services::{account,stats_upload}、native/app/src/account.rs；Core 初始化/关闭及退出钩子接入，未修改歌词 effect。
+- core.account 导出 snapshot/sendCode/login/logout/refresh/subscription/plans/setServer/onChange→Stop，均带文档；错误包含 code/transport，不导出令牌。
+- snapshot/onChange 附带 upload：syncing/lastSync/error/retryAt；上传自动随账号运行，Core close/退出/服务释放时停止。
+- 邮箱验证码与大小写归一的 60 秒冷却、登录/恢复/登出、用户、5 分钟会员缓存、有效套餐排序完成；会员不控制功能。
+- 401/code10002 单飞刷新并最多重放一次；保留旧 refresh_token；非网络刷新失败清会话，网络失败保留离线缓存。
+- 请求和提交绑定 epoch；登出/切换服务后迟到刷新、上传响应均丢弃，账号及服务地址共同隔离远程统计。
+- 账号配置/缓存沿参考版 haiku_state/{api_config,account_cache}.json 字段；令牌仅存系统凭据后端。
+- macOS 新增 security-framework=3.7.0，直接调用 Keychain，避免外部命令传递令牌或明文回退；传递依赖见 Cargo.lock。
+- Keychain 使用独立 Haiku NSH/account-token 命名空间（D5），令牌 JSON 与参考版兼容；不读取参考应用凭据。
+- Core.openIsolated/openIn、Rust 测试及 HAIKU_NO_KEYCHAIN=1 使用内存凭据；内存后端随 engine 数据根保留，恢复测试显式复用后端。
+- 统计继续使用既有 <data>/stats.json，保留参考字段并增加 accountServer，用于服务地址隔离；未迁移到参考版 listening-stats.json 路径。
+- eventId 沿用 SHA1(device|sourceId|track|played|tz)，硬编码参考值回归通过；POST 每批 500，watermark 含时间戳相等项，远程/demo 事件不上传。
+- GET meta/events 使用 revision/since/cursor，最多 100 页；完整拉取后去重合并并推进 revision，坏分页不提交远程事件。
+- 本地变更通道触发 12 秒防抖，远程合并不触发上传；每 120 秒拉取，失败指数退避 15 秒至 30 分钟；同步错误仅用于状态展示。
+- 账号首轮 3/4，单次复跑 4/4；workspace 重现连接截断，诊断日志定位 IncompleteMessage。
+- 修正 loopback 夹具 accept 后显式清除非阻塞标志，避免 Darwin 继承 O_NONBLOCK 后将 WouldBlock 当作 EOF；未修改并发断言或生产重试次数。
+- 上传专项 5/5：cargo-stats-upload.log；最终 workspace 282 通过/1 忽略：cargo-workspace-repair2.log，含账号 4/4、上传 5/5。
+- nsh check/build 各一次通过：nsh-check.log、nsh-build.log；完整 nsh test 一次 61/61：nsh-test.log，Player/Search 均通过。
+- nsh test 前 IOConsoleLocked=No：screen-unlocked.log；所有账号/上传测试只连接 127.0.0.1，未访问真实 API。
+- 证据均在 .artifacts/m5-03/，含初次失败与诊断日志；workspace 仅已知 block 提示，Headless runner 显示 1 条未展开构建 warning，fixture 沿有 lofty PADDING 提示。
+- 未完成：§3 账户设置界面（含上传状态）、验证码倒计时→登录→会员→确认登出的专项 Headless、两张浅色截图。
+- 未覆盖：真实服务器契约、Keychain 授权/重启恢复实机、120 秒周期的实时时钟等待；已覆盖调度防抖、退避边界、登出停止与账号切换。
+- 无新增待决架构事项；真实服务端与 Keychain 实机由人工确认，后续继续 §3 与截图。
+- 审阅者：§1–§2 已验收（workspace 最新 282 通过/1 忽略，nsh test 61/61；新增依赖 security-framework 3.7.0 仅 macOS，用于规格要求的 Keychain，认可）。§3 界面与截图转第二部分。

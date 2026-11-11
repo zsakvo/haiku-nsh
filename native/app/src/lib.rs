@@ -1,6 +1,7 @@
 //! Native Core and playback surfaces; retained shell navigation lives in TSX.
 use nsh_core::prelude::*;
 mod core;
+mod account;
 mod command_keyboard;
 mod exit;
 mod collections;

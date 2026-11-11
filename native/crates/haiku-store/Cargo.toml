@@ -16,3 +16,4 @@ chrono = "0.4"
 regex = "1"
 url = "2"
 sha1 = "0.10"
+tokio.workspace = true
