@@ -9,6 +9,7 @@ import { Menu, MenuItem, Dialog } from "../ui/Surfaces";
 import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
+import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 
 /** Retained likes/user playlist page with a Rust-owned virtual source and selection. */
 export function CollectionPage(props: { core: Core; id: string; active: boolean; onDeleted: () => void }) {
@@ -104,6 +105,9 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
           </View>
         </View>
       </View>
+      <If when={!liked && !!collection()}>
+        <AutoDownloadControls core={props.core} id={props.id} />
+      </If>
       <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
       <View class="flex-row gap-2 items-center">
         <View class="flex-1"><SearchField label={liked ? "筛选喜欢" : "筛选歌单"}

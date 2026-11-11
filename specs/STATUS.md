@@ -31,7 +31,7 @@
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
-| F13 下载与媒体缓存 | 部分实现（M5-01 Rust 已验收；下载页与设置已接入，曲库菜单验收失败） | `native/app/src/{download_service,downloads,presentation,track_list}.rs`、`src/pages/DownloadsPage.tsx`、`src/shell/DownloadSettings.tsx` | check/build 通过；最终完整 nsh test 52/53，Player 2/2；失败重试/移除确认/设置保存通过 | 两张浅色截图已检查；曲库右键下载后队列仍为空；自动歌单/目录迁移留 M5-02；详见 M5-01 §2 小节 |
+| F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
 | F14 Haiku 账号 | 未实现 | | | |
 | F15 同步与备份 | 未实现 | | | |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
@@ -309,7 +309,7 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - PLAYBACK 完整范围尚未覆盖：网络候选/1-2-4 秒恢复与提前 EOF 缓存处理留 M4；统计上报、专辑/节目 ListeningProgress 尚未接入；真实多曲无缝听感、系统媒体控制及界面留后续任务。
 - 按指定标题提交一次并纳入任务文件；开始时 MILESTONES 无待提交修改；未修改 Rex/上游/参考项目。
 
-## 2026-11-10 M1-03：本地曲库与 Rust TrackList（待审阅）
+## 2026-11-10 M1-03：本地曲库与 Rust TrackList（已验收）
 
 - 基线 `84c2a60` 为半成品；续接 service/可取消扫描/track_source，未重复 M1-02；旧试播入口与临时 Core 方法已在基线删除。
 - Core.library 现已导出：持久根、扫描/取消、进度/变更→Stop、后台文件操作、Rust 查询句柄、分组分页、编辑/重置/逐文件写回、原生目录/封面选择与 Finder 请求；所有导出有文档。
@@ -371,7 +371,7 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 全部证据位于 `.artifacts/m1-04/`；保留历史失败证据与工作区供审阅，M1-04 按入场动画缺口收尾，不提交/推送，不进入后续任务。
 
 
-## 2026-11-10 M1-05：音效/响度、缓存、持久设置与媒体中心（待审阅）
+## 2026-11-10 M1-05：音效/响度、缓存、持久设置与媒体中心（已验收）
 
 - Rust Settings schemaVersion=1，保持参考版 themeMode/brandColor/audioEffects/volumeNormalization/preventScreenSleepOnPlayer/mediaCacheEnabled/mediaCacheMaxBytes/audioQuality 字段名；未知顶层/嵌套字段由 serde flatten 保留，移动端字段不丢失。
 - SettingsStore 互斥合并、临时文件+sync+原子替换、数值 clamp（含负数容量）；失败不发布。损坏文件改名 settings.json.corrupt-<时间> 后默认恢复并输出诊断；尚无 UI 通知。
@@ -405,7 +405,7 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未修改 README、生成 host、依赖、工具链、参考版或 Rex；保留工作区，不提交/推送。
 
 
-## 2026-11-10 M2-01：运行时 R1–R12（待审阅）
+## 2026-11-10 M2-01：运行时 R1–R12（已验收）
 
 - 所有操作均在主仓库 `/Users/zsakvo/Project/GPUI/haiku-nsh`；只改 Rust/依赖及本 STATUS；未提交/推送，未改 UI、Rex、参考版或上游。
 - 保留审阅者既有改动/未跟踪任务说明；根 `.cargo/config.toml` 的 dev/release build-override.strip=false 按审阅者明确授权保留，本轮未另改。
@@ -472,7 +472,7 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 证据：.artifacts/m2-02/{cargo-test-plugins-review,tsc-review,nsh-test-review}.log；警告仅既有 block、target-dir、__eh_frame。
 - 上节列出的模型/聚合/认证状态/元数据/回归/坏包隔离与崩溃恢复遗留已获审阅者接受，纳入 M2-03 第 0 步，本轮未扩展；未提交 git。
 
-## 2026-11-10 M2-03：遗留、刮削宿主、三插件、离线契约与 CLI（待审阅）
+## 2026-11-10 M2-03：遗留、刮削宿主、三插件、离线契约与 CLI（已验收）
 
 - 全部操作在主仓库 /Users/zsakvo/Project/GPUI/haiku-nsh；未提交/推送，未改 UI/TSX 导出、参考版、NSH、Rex；保留审阅者未跟踪任务文件。
 - SourceApi：home 六类 Shelf、Entry/Link/more 校验并丢弃坏条目；creator/host/episodeCount/subtitle/quality/explicit 透传；无 id Artist 保留，reference=None 表示不可点击。
@@ -543,7 +543,7 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 日志：.artifacts/m2-04/nsh-{check,build,test}-ui-revision.log；浅色真实窗口覆盖 sources.png、login.png、plugins.png、developer.png。
 - 截图使用隔离数据目录与 loopback fixture，来源截图含同名、不同用户的两条来源；真实平台账号登录仍待人工确认。
 
-## 2026-11-10 M2-05：QQ、开发工具与指南收尾（待审阅）
+## 2026-11-10 M2-05：QQ、开发工具与指南收尾（已验收）
 
 - 全部在主仓库工作，无 git 提交；qq.music 仅在 dev-plugins，不默认安装。
 - QQ v2：QQ/微信 QR、SMS、Cookie、user/refresh/logout；四类搜索、track get/streams/lyrics、album/artist/playlist、toplist、home、categories、me 与 scrape。
@@ -810,3 +810,33 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 持久化仍为<data>/haiku_state/downloads.json，参考版字段与haikuTrack扩展兼容；未改core.downloads API/调度/歌词effect。
 - 无新增架构决定；真实上游、目录权限、系统选择器与Finder reveal需人工确认。
 - 审阅者（第二部分）：Downloads 用例失败根因为测试选择器 `role:button[下载]` 命中侧栏下载导航而非菜单项，审阅者改为 `role:menuitem[下载]`（一行，未改断言）；复跑完整 nsh test 53/53（nsh-test-reviewer3.log），两张截图已审阅。M5-01 §1–§2 已验收，§3 转 M5-02。
+
+
+## 2026-11-11 M5-02：自动下载歌单与目录迁移（已验收）
+
+- 仅主仓库修改，未提交git；参考版只读，未修改任务文档/依赖；仅STATUS更新specs。
+- download_management.rs在Rust独立监听Collections与设置输入，100ms检查revision/自动歌单配置；不依赖TSX effect，启动恢复后也同步。
+- 开启本地/收藏歌单自动下载现有曲目，新增和完整远端收藏刷新自动入队；origin=auto:<本地歌单ID>，playlistIds记录多重归属。
+- 手动enqueue永久提升origin=manual；跟随移除更新归属，取消并等待worker释放后再次核对手动标记与当前全部自动歌单，才删除音频/临时文件/侧车。
+- 文件删除失败以autoRemovalPending扩展标记保留重试；禁用自动下载本身保留下载，关闭跟随移除也保留文件。
+- haiku-store设置新增参考版autoDownloadPlaylists:string[]和downloadFollowPlaylistRemoval:boolean（默认[]/false）；设置仍在<data>/settings.json。
+- 任务仍在<data>/haiku_state/downloads.json；沿用origin/playlistIds等参考字段及haikuTrack扩展，未改playlists.loro格式；重开持久化已测。
+- core.downloads新增changeDirectory(next,move|keep|cancel)、directorySnapshot、onDirectoryChange→Stop；进度running/total/completed/moved/errors，导出带注释。
+- move/keep建立迁移屏障、取消并等待活动worker释放，原手动暂停保持暂停；完成或异常通过RAII恢复调度；cancel不创建目录或更改设置。
+- move保留相对路径，音频/.part/侧车逐文件临时复制、sync和不覆盖发布，再删除原文件；失败保留原记录路径，报告曲目/文件/错误。
+- 目标父目录链接逃逸拒绝；新目录规范化绝对路径，空值仍指向~/Music/Haiku；keep保留已有文件/记录路径，仅切换新任务默认目录。
+- 偏离参考：迁移完成后自动恢复先前运行任务；原默认目录外文件保留并显式报告，参考版静默跳过；未新增其他持久化文件。
+- CollectionPage本地/收藏与SourceDetail已收藏歌单均接入自动下载；跟随移除沿参考是全局选项，界面明确说明保护条件。
+- 下载设置改为目录草稿+移动/保留/取消对话框，显示迁移进度和可滚动逐文件失败报告；设置镜像沿既有SettingsService更新路径发布。
+- 自动下载相关Rust3/3：cargo-test-auto-download.log；目录迁移首轮路径别名断言/无限streams夹具失败，修正后3/3：cargo-test-directory-change-repair1.log。
+- workspace一次273通过/1忽略：cargo-test-workspace.log；nsh check/build均通过：nsh-{check,build}.log。
+- 首轮完整nsh test60/61，迁移夹具JS访问Core系统临时目录被fs权限拒绝；改用公开core.downloads.verify从Rust校验文件，未扩宽权限。
+- 最终完整nsh test60/61：nsh-test-repair1.log；新增自动下载/实际文件迁移两条Headless2/2，Player2/2，其余任务相关Rust亦通过。
+- 唯一最终失败为既有Search.test命令面板Escape条件5秒超时；首轮该项通过；未追加诊断、未修改断言、不判为偶发，全量全绿验收尚未完成。
+- workspace之后将watch_collections绑定移到Core重复open检查之后；完整nsh test覆盖该接线，未重复workspace；最终截图仅补对话框居中类。
+- 浅色实机截图已检查：auto-download.png（自动下载/跟随移除均开启）、directory-migration.png（三选确认居中）；所有证据在.artifacts/m5-02/。
+- 所有nsh test/截图前IOConsoleLocked=No；fixture使用Core.openIsolated+loopback；本轮预览均关闭；git diff --check通过。
+- 仅已知cargo target-dir/block/__eh_frame提示；运行时另有lofty对fixture FLAC缺PADDING自动补块的warn，日志保留。
+- 未完成：完整nsh test全绿；未专测崩溃/断电时跨文件迁移恢复、真实跨卷/磁盘满/系统权限与目录选择器交互；无真实上游请求。
+- 无新增架构待决事项；上述真实文件系统与上游场景待人工确认。
+- 审阅者：复跑完整 nsh test 61/61（nsh-test-reviewer.log），Search Escape 为既有偶发；两张截图已审阅。遗留：`watch_collections` 每 100ms 轮询（已有变更通道可改为等待事件，持续错误会每 100ms 记一次日志）。

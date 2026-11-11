@@ -30,6 +30,7 @@ import { LyricsSearch } from "./LyricsSearch";
 
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
+  initialDownloadDirectory?: string;
   initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
@@ -185,7 +186,7 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} onLibrary={() => nav.navigate({kind: "library"})} />
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
       <NowPlaying open={nowPlaying() && !lyricsSearch()}

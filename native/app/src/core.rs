@@ -359,8 +359,9 @@ impl Core {
                 .await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
             crate::scrape::ScrapeService::new(service)
         };
+        downloads.watch_collections(bridge.collections.clone());
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
-        let downloads = crate::downloads::DownloadService::new(downloads);
+        let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());

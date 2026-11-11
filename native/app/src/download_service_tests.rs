@@ -400,3 +400,288 @@ async fn failed_retry_budget_and_retry_all() {
     assert!(service.snapshot().is_empty());
     service.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn auto_download_watches_additions_favorite_refresh_and_reopen() {
+    use haiku_store::collections::Collections;
+    let (root, service, server) = fixture().await;
+    let collections = Collections::open(root.path()).unwrap();
+    let local = collections.create("自动歌单").unwrap();
+    let song = track("song", &server);
+    collections.add(&local, &[song.clone()]).unwrap();
+    let favorite = collections
+        .favorite("download.fixture", "remote", "Fixture", "收藏", "", "", &[])
+        .unwrap();
+    service
+        .settings
+        .update(json!({
+            "autoDownloadPlaylists": [local, favorite],
+            "downloadFollowPlaylistRemoval": true,
+        }))
+        .unwrap();
+    service.watch_collections(collections.clone());
+    wait(&service, |items| {
+        items.len() == 1 && items[0].status == "completed"
+    })
+    .await;
+    assert_eq!(service.snapshot()[0].origin, format!("auto:{local}"));
+    assert_eq!(service.snapshot()[0].playlist_ids, vec![local.clone()]);
+    let added = track("song2", &server);
+    collections.add(&local, &[added.clone()]).unwrap();
+    wait(&service, |items| {
+        items.len() == 2 && items.iter().all(|i| i.status == "completed")
+    })
+    .await;
+    let version = collections.refresh_version(&favorite).unwrap();
+    collections
+        .refresh_favorite(&favorite, version, "收藏", "", "", &[added.clone()])
+        .unwrap();
+    wait(&service, |items| {
+        items
+            .iter()
+            .any(|i| i.track.id == "song2" && i.playlist_ids.contains(&favorite))
+    })
+    .await;
+    collections.flush().unwrap();
+    service.shutdown().await.unwrap();
+    let restored =
+        Service::open(root.path(), service.host.clone(), service.settings.clone()).unwrap();
+    restored.watch_collections(Collections::open(root.path()).unwrap());
+    assert_eq!(
+        restored.settings.get().auto_download_playlists,
+        vec![local.clone(), favorite]
+    );
+    assert!(restored.settings.get().download_follow_playlist_removal);
+    assert_eq!(restored.snapshot().len(), 2);
+    // Restart settings and records are reference-compatible, without converting auto to manual.
+    let reopened = SettingsStore::open(root.path()).unwrap();
+    assert_eq!(reopened.get().auto_download_playlists[0], local);
+    assert!(
+        restored
+            .snapshot()
+            .iter()
+            .all(|i| i.origin.starts_with("auto:"))
+    );
+    restored.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn auto_download_follow_removal_preserves_manual_and_other_auto_membership() {
+    use haiku_store::collections::Collections;
+    let (root, service, server) = fixture().await;
+    let collections = Collections::open(root.path()).unwrap();
+    let a = collections.create("A").unwrap();
+    let b = collections.create("B").unwrap();
+    let song = track("song", &server);
+    collections.add(&a, &[song.clone()]).unwrap();
+    collections.add(&b, &[song.clone()]).unwrap();
+    service
+        .settings
+        .update(json!({
+            "autoDownloadPlaylists": [a, b], "downloadFollowPlaylistRemoval": true,
+        }))
+        .unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    wait(&service, |items| items[0].status == "completed").await;
+    let downloaded = service.snapshot()[0].clone();
+    let audio = downloaded.path.clone().unwrap();
+    collections.remove(&a, &[song.entity_ref()]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    assert!(Path::new(&audio).is_file());
+    assert_eq!(service.snapshot()[0].playlist_ids, vec![b.clone()]);
+    collections.remove(&b, &[song.entity_ref()]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    assert!(service.snapshot().is_empty());
+    assert!(!Path::new(&audio).exists());
+    assert!(downloaded.sidecars.iter().all(|p| !Path::new(p).exists()));
+
+    collections.add(&a, &[song.clone()]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    wait(&service, |items| items[0].status == "completed").await;
+    // An explicit manual enqueue claims an existing automatic job permanently.
+    service.enqueue(json!(song)).await.unwrap();
+    let manual = service.snapshot()[0].clone();
+    collections.remove(&a, &[song.entity_ref()]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    assert_eq!(service.snapshot()[0].origin, "manual");
+    assert!(Path::new(manual.path.as_ref().unwrap()).exists());
+    service.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn auto_download_without_follow_keeps_file_and_disable_does_not_delete() {
+    use haiku_store::collections::Collections;
+    let (root, service, server) = fixture().await;
+    let collections = Collections::open(root.path()).unwrap();
+    let id = collections.create("保留").unwrap();
+    let song = track("song", &server);
+    collections.add(&id, &[song.clone()]).unwrap();
+    service
+        .settings
+        .update(json!({"autoDownloadPlaylists": [id]}))
+        .unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    wait(&service, |items| items[0].status == "completed").await;
+    collections.remove(&id, &[song.entity_ref()]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    assert!(service.snapshot()[0].playlist_ids.is_empty());
+    assert!(service.path(&key(&song)).unwrap().is_file());
+    collections.add(&id, &[song]).unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    service
+        .settings
+        .update(json!({
+            "autoDownloadPlaylists": [], "downloadFollowPlaylistRemoval": true,
+        }))
+        .unwrap();
+    service.reconcile_auto(&collections).await.unwrap();
+    assert_eq!(service.snapshot().len(), 1);
+    service.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn directory_change_cancel_keep_and_move_preserve_records_and_sidecars() {
+    let (root, service, server) = fixture().await;
+    service
+        .enqueue(json!(track("song", &server)))
+        .await
+        .unwrap();
+    wait(&service, |items| items[0].status == "completed").await;
+    let original = service.snapshot()[0].clone();
+    let previous = service.settings.get().download_dir;
+    let canceled = root.path().join("canceled");
+    service
+        .change_directory(canceled.display().to_string(), "cancel".into())
+        .await
+        .unwrap();
+    assert!(!canceled.exists());
+    assert_eq!(service.settings.get().download_dir, previous);
+    let kept = root.path().join("kept");
+    let report = service
+        .change_directory(kept.display().to_string(), "keep".into())
+        .await
+        .unwrap();
+    assert_eq!(report.moved, 0);
+    let kept = kept.canonicalize().unwrap();
+    assert_eq!(service.snapshot()[0].path, original.path);
+    assert!(Path::new(original.path.as_ref().unwrap()).exists());
+    service
+        .enqueue(json!(track("song2", &server)))
+        .await
+        .unwrap();
+    wait(&service, |items| {
+        items.len() == 2 && items[1].status == "completed"
+    })
+    .await;
+    let second = service.snapshot()[1].clone();
+    assert!(Path::new(second.path.as_ref().unwrap()).starts_with(&kept));
+    let moved = root.path().join("moved");
+    let report = service
+        .change_directory(moved.display().to_string(), "move".into())
+        .await
+        .unwrap();
+    let moved = moved.canonicalize().unwrap();
+    assert_eq!(report.moved, 3); // audio + cover + lyrics for the job in the current directory
+    assert_eq!(report.errors.len(), 3); // retained older files remain at their prior location
+    assert_eq!(report.completed, report.total);
+    assert!(!report.running);
+    let after = service.snapshot();
+    assert_eq!(after[0].path, original.path);
+    assert!(Path::new(after[1].path.as_ref().unwrap()).starts_with(&moved));
+    assert!(!Path::new(second.path.as_ref().unwrap()).exists());
+    assert!(after[1].sidecars.iter().all(|p| Path::new(p).is_file()));
+    service.shutdown().await.unwrap();
+    let restored =
+        Service::open(root.path(), service.host.clone(), service.settings.clone()).unwrap();
+    assert_eq!(restored.snapshot()[1].path, after[1].path);
+    assert_eq!(
+        SettingsStore::open(root.path()).unwrap().get().download_dir,
+        moved.display().to_string()
+    );
+    restored.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn directory_change_reports_partial_failure_without_overwriting() {
+    let (root, service, server) = fixture().await;
+    service
+        .enqueue(json!(track("song", &server)))
+        .await
+        .unwrap();
+    wait(&service, |items| items[0].status == "completed").await;
+    let before = service.snapshot()[0].clone();
+    let target = root.path().join("collision");
+    fs::create_dir_all(&target).unwrap();
+    let target = target.canonicalize().unwrap();
+    let occupied = target.join(
+        Path::new(before.path.as_ref().unwrap())
+            .file_name()
+            .unwrap(),
+    );
+    fs::write(&occupied, b"User file").unwrap();
+    let report = service
+        .change_directory(target.display().to_string(), "move".into())
+        .await
+        .unwrap();
+    assert_eq!(report.moved, 2);
+    assert_eq!(report.errors.len(), 1);
+    assert!(report.errors[0].contains(&before.track.title));
+    let after = service.snapshot()[0].clone();
+    assert_eq!(after.path, before.path);
+    assert!(Path::new(after.path.as_ref().unwrap()).is_file());
+    assert_eq!(fs::read(occupied).unwrap(), b"User file");
+    assert!(
+        after
+            .sidecars
+            .iter()
+            .all(|p| Path::new(p).starts_with(&target))
+    );
+    assert_eq!(service.directory_snapshot().errors, report.errors);
+    service.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn directory_change_drains_running_jobs_and_blocks_scheduler_until_done() {
+    let (root, service, server) = fixture().await;
+    service
+        .enqueue(json!([track("slow", &server), track("song", &server)]))
+        .await
+        .unwrap();
+    wait(&service, |items| {
+        items[0].status == "downloading" && items[0].received > 0
+    })
+    .await;
+    let migrating = service.clone();
+    let target = root.path().join("new");
+    let new_dir = target.display().to_string();
+    let migration =
+        tokio::spawn(async move { migrating.change_directory(new_dir, "move".into()).await });
+    let mut progress = service.directory_subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !progress.borrow().running {
+            progress.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    {
+        let state = service.state.lock().unwrap();
+        assert!(state.migrating);
+        assert_eq!(state.items[1].attempts, 0);
+    }
+    // Even an explicit pump cannot start a queued task during the migration barrier.
+    service.pump();
+    assert_eq!(service.snapshot()[1].attempts, 0);
+    migration.await.unwrap().unwrap();
+    assert!(!service.state.lock().unwrap().migrating);
+    service
+        .control(&key(&track("slow", &server)), "pause")
+        .unwrap();
+    wait(&service, |items| items[1].status == "completed").await;
+    assert_eq!(service.snapshot()[0].status, "paused");
+    assert!(
+        Path::new(service.snapshot()[1].path.as_ref().unwrap())
+            .starts_with(target.canonicalize().unwrap())
+    );
+    service.shutdown().await.unwrap();
+}

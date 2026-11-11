@@ -9,6 +9,7 @@ export interface SettingsSnapshot {
   downloadDir: string; downloadQuality: string; downloadNaming: string; downloadLayout: string;
   downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
   downloadLyricsMode: string; downloadLyricsTranslation: boolean; downloadReuseMediaCache: boolean;
+  autoDownloadPlaylists: string[]; downloadFollowPlaylistRemoval: boolean;
   schemaVersion: number; themeMode: "light" | "dark" | "system"; brandColor: string;
   audioEffects: AudioEffects; volumeNormalization: boolean; preventScreenSleepOnPlayer: boolean;
   mediaCacheEnabled: boolean; mediaCacheMaxBytes: number;

@@ -59,6 +59,16 @@ struct State {
     active: BTreeMap<String, Active>,
     retry_at: BTreeMap<String, Instant>,
     stopped: bool,
+    migrating: bool,
+}
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryProgress {
+    pub running: bool,
+    pub total: usize,
+    pub completed: usize,
+    pub moved: usize,
+    pub errors: Vec<String>,
 }
 pub struct Service {
     root: PathBuf,
@@ -67,6 +77,8 @@ pub struct Service {
     state: Mutex<State>,
     events: watch::Sender<Vec<Item>>,
     retry_delays: Vec<Duration>,
+    management: tokio::sync::Mutex<()>,
+    directory_events: watch::Sender<DirectoryProgress>,
 }
 struct PluginCancel(Cancellation);
 impl Drop for PluginCancel {
@@ -104,6 +116,8 @@ impl Service {
                 ..Default::default()
             }),
             events,
+            management: tokio::sync::Mutex::new(()),
+            directory_events: watch::channel(DirectoryProgress::default()).0,
             retry_delays: vec![Duration::from_secs(2), Duration::from_secs(8)],
         });
         service.save(&service.state.lock().unwrap())?;
@@ -177,6 +191,15 @@ impl Service {
                 None,
             )
         };
+        self.enqueue_tracks(tracks, playlist_name, playlist_id, "manual")
+    }
+    fn enqueue_tracks(
+        self: &Arc<Self>,
+        tracks: Vec<Track>,
+        playlist_name: Option<String>,
+        playlist_id: Option<String>,
+        origin: &str,
+    ) -> Result<()> {
         let quality = self.settings.get().download_quality;
         let mut state = self.state.lock().unwrap();
         if state.stopped {
@@ -189,7 +212,9 @@ impl Service {
             }
             let key = key(&track);
             if let Some(item) = state.items.iter_mut().find(|i| i.key == key) {
-                item.origin = "manual".into();
+                if origin == "manual" {
+                    item.origin = "manual".into();
+                }
                 if let Some(id) = &playlist_id {
                     if !item.playlist_ids.contains(id) {
                         item.playlist_ids.push(id.clone());
@@ -218,7 +243,7 @@ impl Service {
                 error: None,
                 warning: None,
                 attempts: 0,
-                origin: "manual".into(),
+                origin: origin.into(),
                 playlist_ids: playlist_id.clone().into_iter().collect(),
                 playlist_name: playlist_name.clone(),
                 index: multiple.then_some(index + 1),
@@ -237,7 +262,7 @@ impl Service {
     pub fn pump(self: &Arc<Self>) {
         let concurrency = self.settings.get().download_concurrency as usize;
         let mut state = self.state.lock().unwrap();
-        while !state.stopped && state.active.len() < concurrency {
+        while !state.stopped && !state.migrating && state.active.len() < concurrency {
             let next = state.items.iter().position(|i| {
                 i.status == "queued"
                     && !state.active.contains_key(&i.key)
@@ -922,3 +947,6 @@ fn read_item(mut value: Value) -> Result<Item> {
 #[cfg(test)]
 #[path = "download_service_tests.rs"]
 mod tests;
+
+#[path = "download_management.rs"]
+mod management;

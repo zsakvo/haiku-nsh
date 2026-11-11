@@ -18,6 +18,8 @@ unsafe impl Trace for Listeners {
 pub struct DownloadService {
     service: Arc<Service>,
     listeners: Listeners,
+    directory_listeners: Listeners,
+    settings: Instance<crate::settings::SettingsService>,
     next: u64,
     owner: Owner,
     _exit: crate::exit::ExitGuard,
@@ -29,9 +31,15 @@ impl DownloadService {
             .await
             .map_err(|e| e.to_string())?
     }
-    pub(crate) fn new(service: Arc<Service>) -> Instance<Self> {
+    pub(crate) fn new(
+        service: Arc<Service>,
+        settings: Instance<crate::settings::SettingsService>,
+    ) -> Instance<Self> {
         let listeners = Listeners::default();
         let callbacks = listeners.clone();
+        let directory_listeners = Listeners::default();
+        let directory_callbacks = directory_listeners.clone();
+        let mut directory_events = service.directory_subscribe();
         let mut events = service.subscribe();
         let owner = Owner::detached();
         owner.run(|| {
@@ -39,6 +47,23 @@ impl DownloadService {
                 while events.changed().await.is_ok() {
                     let value = serde_json::to_value(events.borrow_and_update().clone()).unwrap();
                     let callbacks = callbacks.0.borrow().values().cloned().collect::<Vec<_>>();
+                    for callback in callbacks {
+                        callback.post(value.clone());
+                    }
+                }
+            })
+        });
+        owner.run(|| {
+            spawn(async move {
+                while directory_events.changed().await.is_ok() {
+                    let value =
+                        serde_json::to_value(directory_events.borrow_and_update().clone()).unwrap();
+                    let callbacks = directory_callbacks
+                        .0
+                        .borrow()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>();
                     for callback in callbacks {
                         callback.post(value.clone());
                     }
@@ -54,6 +79,8 @@ impl DownloadService {
         Instance::new(Self {
             service,
             listeners,
+            directory_listeners,
+            settings,
             next: 0,
             owner,
             _exit: exit,
@@ -68,6 +95,38 @@ impl Drop for DownloadService {
 }
 #[class]
 impl DownloadService {
+    /// Change the default directory with move/keep/cancel; report each failed file separately.
+    pub async fn change_directory(
+        this: Instance<Self>,
+        next: String,
+        mode: String,
+    ) -> Result<JsonValue, String> {
+        let (service, settings) = this.with(|s| (s.service.clone(), s.settings.clone()));
+        let canceled = mode == "cancel";
+        let report = background(async move { service.change_directory(next, mode).await })
+            .await
+            .map_err(|e| e.to_string())??;
+        if !canceled {
+            // Publish the durable setting through the existing DSP/cache/settings mirror path.
+            crate::settings::SettingsService::update(settings, serde_json::json!({})).await?;
+        }
+        serde_json::to_value(report).map_err(|e| e.to_string())
+    }
+    /// Read directory migration progress and per-file errors independently of the task list.
+    pub fn directory_snapshot(&self) -> JsonValue {
+        serde_json::to_value(self.service.directory_snapshot()).unwrap()
+    }
+    /// Hear initial and subsequent migration progress; Stop unregisters this listener.
+    pub fn on_directory_change(&mut self, #[args(progress)] callback: Callback<JsonValue>) -> Stop {
+        self.next += 1;
+        let id = self.next;
+        callback.post(self.directory_snapshot());
+        self.directory_listeners.0.borrow_mut().insert(id, callback);
+        let listeners = self.directory_listeners.clone();
+        Stop::new(move || {
+            listeners.0.borrow_mut().remove(&id);
+        })
+    }
     /// Enqueue SDK track(s) or {source,kind,id} for an album/playlist/toplist; returns after scheduling.
     pub async fn enqueue(this: Instance<Self>, tracks: JsonValue) -> Result<(), String> {
         let service = this.with(|s| s.service.clone());

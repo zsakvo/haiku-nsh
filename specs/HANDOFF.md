@@ -34,6 +34,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M5-02 已验收并提交
+
+- 自动下载歌单（本地与收藏，跟随移除双条件）、更换下载目录（移动/保留/取消，暂停调度，逐文件报告）。`core.downloads` 新增 changeDirectory / directorySnapshot / onDirectoryChange。审阅者复跑完整 nsh test 61/61。
+- 遗留：`download_management::watch_collections` 每 100ms 轮询，宜改为等待已有变更通道。
+- 下一步 M5-03（`specs/tasks/M5-03-account-and-stats-upload.md`）：Haiku 账号与统计上传；之后 M5-04 Gist 同步与备份。
+
 ## 2026-11-11 更新：M5-01 第二部分（下载界面）已验收并提交
 
 - 下载页（状态筛选、虚拟列表、进度、批量与移除确认）、设置“下载”分组、TrackList 菜单/多选/详情页“下载全部”入口。审阅者修正测试选择器（菜单项是 `role:menuitem`，`role:button[下载]` 会命中侧栏导航），完整 nsh test 53/53。

@@ -26,7 +26,7 @@ const categories = [
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; onLibrary?: () => void }) {
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; onLibrary?: () => void }) {
   const selected = signal(props.initialCategory ?? "外观");
   const settings = createSettings();
   const plugins = createPlugins();
@@ -56,7 +56,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
             <AppearanceOptions appearance={props.appearance} />
           </View></If>
           <If when={!!settings.value()}>
-            <If when={selected() === "下载"}><View class="w-full max-w-2xl flex-col"><DownloadSettings settings={settings} /></View></If>
+            <If when={selected() === "下载"}><View class="w-full max-w-2xl flex-col"><DownloadSettings initialDirectory={props.initialDownloadDirectory} settings={settings} /></View></If>
             <If when={selected() === "歌词"}><View class="w-full max-w-2xl"><LyricsSettings settings={settings} /></View></If>
             <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
             <View class="w-full max-w-2xl flex-col" style={{ display: selected() === "存储" ? "flex" : "none" }}>

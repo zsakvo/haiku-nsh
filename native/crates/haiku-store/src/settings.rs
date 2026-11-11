@@ -69,6 +69,8 @@ pub struct Settings {
     pub download_concurrency: u32,
     pub download_wifi_only: bool,
     pub download_reuse_media_cache: bool,
+    pub auto_download_playlists: Vec<String>,
+    pub download_follow_playlist_removal: bool,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -95,6 +97,8 @@ impl Default for Settings {
             download_concurrency: 3,
             download_wifi_only: true,
             download_reuse_media_cache: true,
+            auto_download_playlists: vec![],
+            download_follow_playlist_removal: false,
             extra: BTreeMap::new(),
         }
     }

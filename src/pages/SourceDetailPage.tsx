@@ -5,6 +5,7 @@ import { mirrorCollections } from "../state/collections";
 import { Button } from "../ui/Button";
 import { SourceGrid, SourceTracks } from "./SourceContent";
 import { Dialog } from "../ui/Surfaces";
+import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 
 /** One retained page per EntityRef. Resources reject stale loads; pagination also checks its epoch. */
 export function SourceDetailPage(props: { core: Core; reference: string; active: boolean; navigate: (route: Route) => void }) {
@@ -130,6 +131,9 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
         <If when={!!info().description}>
           <Text style={{ numberOfLines: expanded() ? 0 : 2 }} class="text-sm text-muted-foreground">{info().description}</Text>
           <View class="flex-row"><Button label={expanded() ? "收起描述" : "展开描述"} size="sm" variant="ghost" onPress={() => expanded.set(!expanded())} /></View>
+        </If>
+        <If when={!!favoriteId()}>
+          <AutoDownloadControls core={props.core} id={favoriteId()!} />
         </If>
         <If when={info().reference?.kind === "artist"}>
           <Text class="text-sm font-semibold text-foreground">专辑</Text>
