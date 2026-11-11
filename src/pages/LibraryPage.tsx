@@ -87,6 +87,7 @@ export function LibraryPage(props: {
     await act(async () => {
       if (command === "reveal") { for (const id of ids) await library.reveal(id); return; }
       const tracks = ids.map((id) => library.track(id)).filter(Boolean);
+      if (command === "download") await props.core.downloads.enqueue(tracks);
       if (command === "append") await props.core.player.append(tracks);
       if (command === "next") for (const track of [...tracks].reverse()) await props.core.player.playNext(track);
     });
@@ -98,6 +99,13 @@ export function LibraryPage(props: {
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">
           {props.group ? (detail()?.title ?? (props.groupKind === "album" ? "本地专辑" : "本地艺术家")) : "本地曲库"}
         </Text>
+        <If when={!!props.group}><Button label="下载全部" size="sm" onPress={() => void act(async () => {
+          const handle = await library.query({ group: props.group });
+          try {
+            const ids = await LibraryService.queryIds(handle);
+            await props.core.downloads.enqueue(ids.map(id => library.track(id)).filter(Boolean));
+          } finally { await library.releaseQuery(handle); }
+        })} /></If>
         <Button label="管理文件夹…" size="sm" disabled={busy()} onPress={() => rootsOpen.set(true)} />
         <If when={!!scrape().items.length}>
           <Button label="刮削审阅…" size="sm" onPress={() => reviewOpen.set(true)} />
@@ -151,6 +159,7 @@ export function LibraryPage(props: {
           <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
           <Button label="编辑信息…" size="sm" onPress={() => editor.set(selected())} />
           <Button label="刮削…" size="sm" disabled={scrape().running} onPress={() => scrapeIds.set(selected())} />
+          <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void action("download", selected())} />
           <Button label="加入队列" size="sm" onPress={() => void action("append", selected())} />
         </View>
       </If>

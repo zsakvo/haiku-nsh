@@ -110,6 +110,7 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
         .child(command(props, at, cx, "play", "播放"))
         .child(command(props, at, cx, "next", "下一首播放"))
         .child(command(props, at, cx, "append", "加入队列"))
+        .child(command(props, at, cx, "download", "下载"))
         .child(when(
             move || revision.is_some(),
             move || {

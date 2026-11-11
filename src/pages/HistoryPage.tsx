@@ -36,6 +36,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
   async function action(command: string, keys: string[]) {
     try {
       const tracks = await CollectionsService.selectedTracks(handle()!, keys) as any[];
+      if (command === "download") await props.core.downloads.enqueue(tracks);
       if (command === "append") await props.core.player.append(tracks);
       if (command === "next") for (const track of [...tracks].reverse()) await props.core.player.playNext(track);
       if (command === "new-playlist") playlistEditor.set(tracks);
@@ -52,6 +53,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
         <Button label="歌单历史" size="sm" variant={tab() === "playlists" ? "primary" : "secondary"} onPress={() => tab.set("playlists")} />
         <Button label="清空历史…" size="sm" onPress={() => confirming.set(true)} />
         <If when={tab() === "tracks" && selected().length > 0}>
+          <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void action("download", selected())} />
           <Button label="删除所选历史" size="sm" onPress={() => selected().forEach((key) => service.remove("tracks", key))} />
         </If>
       </View>

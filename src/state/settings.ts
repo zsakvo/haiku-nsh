@@ -6,6 +6,9 @@ export interface AudioEffects {
   autoPreamp: boolean; preampDb: number; stereoWidth: number; balance: number; mono: boolean;
 }
 export interface SettingsSnapshot {
+  downloadDir: string; downloadQuality: string; downloadNaming: string; downloadLayout: string;
+  downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
+  downloadLyricsMode: string; downloadLyricsTranslation: boolean; downloadReuseMediaCache: boolean;
   schemaVersion: number; themeMode: "light" | "dark" | "system"; brandColor: string;
   audioEffects: AudioEffects; volumeNormalization: boolean; preventScreenSleepOnPlayer: boolean;
   mediaCacheEnabled: boolean; mediaCacheMaxBytes: number;

@@ -67,6 +67,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       if (name === "new-playlist") { editor.set(await selectedTracks(keys)); return; }
       if (name === "remove") { service.remove(props.id, keys); return; }
       const tracks = await selectedTracks(keys);
+      if (name === "download") await props.core.downloads.enqueue(tracks);
       if (name === "append") await props.core.player.append(tracks);
       if (name === "next") for (const track of [...tracks].reverse()) await props.core.player.playNext(track);
       if (name === "edit") { trackEditor.set(tracks.map((t) => t.id)); return; }
@@ -91,6 +92,8 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
           <View class="flex-row flex-wrap gap-2">
             <Button label="播放全部" variant="primary" size="sm" disabled={!collection()?.trackCount}
               onPress={() => void act(() => service.playSource(source()!, ""))} />
+            <Button label="下载全部" size="sm" disabled={!collection()?.trackCount}
+              onPress={() => void act(() => props.core.downloads.enqueue(service.tracks(props.id)))} />
             <If when={collection()?.kind === "user"}>
               <Button label="编辑歌单…" size="sm" onPress={() => editor.set("edit")} />
               <Button label="删除歌单…" size="sm" onPress={() => deleting.set(true)} />
@@ -115,6 +118,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       <If when={!!selected().length}>
         <View class="flex-row flex-wrap gap-2 items-center">
           <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
+          <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void command("download", selected())} />
           <Button label={liked ? "取消喜欢所选" : "移除所选"} size="sm"
             onPress={() => void command("remove", selected())} />
           <Menu trigger={<Button label="加入歌单…" size="sm" onPress={() => {}} />}>

@@ -57,7 +57,14 @@ impl Server {
                         body.len()
                     );
                     let _ = stream.write_all(header.as_bytes());
-                    let _ = stream.write_all(&body);
+                    if request.contains("/download-slow") {
+                        for chunk in body.chunks(8192) {
+                            if stream.write_all(chunk).is_err() { break; }
+                            std::thread::sleep(std::time::Duration::from_millis(400));
+                        }
+                    } else {
+                        let _ = stream.write_all(&body);
+                    }
                 });
             }
         });

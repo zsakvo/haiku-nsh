@@ -10,6 +10,7 @@ import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
 import { LibraryPage } from "../pages/LibraryPage";
+import { DownloadsPage } from "../pages/DownloadsPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { StatsPage } from "../pages/StatsPage";
 import { SourceLibraryPage } from "../pages/SourceLibraryPage";
@@ -135,12 +136,13 @@ export function AppShell(props: {
         </Menu>
       </ShellToolbar>
       <View class="flex-1 min-h-0">
-        {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
           <HomePage core={core()!} active={nav.current().kind==="home"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <CategoriesPage core={core()!} active={nav.current().kind==="categories"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <RadioPage core={core()!} active={nav.current().kind==="radio"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <SearchPage core={core()!} active={nav.current().kind==="search"} snapshot={plugins.value()} request={searchRequest()} navigate={nav.navigate} settings={showSettings} />
+          <DownloadsPage core={core()!} active={nav.current().kind === "downloads"} />
           <HistoryPage core={core()!} active={nav.current().kind === "history"} navigate={nav.navigate} />
           <StatsPage core={core()!} active={nav.current().kind === "statistics"} />
           <CollectionPage core={core()!} id="__liked__" active={nav.current().kind === "favorites"} onDeleted={() => nav.navigate({ kind: "favorites" })} />

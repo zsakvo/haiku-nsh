@@ -116,6 +116,10 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
             <If when={info().track_count != null}><Text class="text-xs text-muted-foreground">{info().track_count} 首歌曲</Text></If>
             <View class="flex-row gap-2 flex-wrap">
               <Button label="播放全部" size="sm" variant="primary" disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
+              <If when={info().reference?.kind !== "artist"}>
+                <Button label="下载全部" size="sm" disabled={busy()}
+                  onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
+              </If>
               <Button label="随机播放" size="sm" disabled={!tracks().length || busy()} onPress={() => void act(() => play(true))} />
               <If when={canFavorite()}><Button label={favoriteId() ? "取消收藏歌单" : "收藏歌单"} size="sm" loading={busy()}
                 onPress={() => favoriteId() ? unfavorite.set(true)

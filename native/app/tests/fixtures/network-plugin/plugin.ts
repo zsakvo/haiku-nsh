@@ -1,3 +1,4 @@
+let downloadRecovered = false;
 import { definePlugin, field, Upstream } from "haiku";
 import type { Context, PageArgs, Track, Album, Artist, Playlist } from "haiku";
 const track = (id: string, ctx: Context): Track => ({
@@ -72,10 +73,12 @@ export default definePlugin({
   },
   track: {
     async streams(id, ctx) {
+      if (id === "download-retry" && !downloadRecovered) throw new Upstream("下载夹具暂时离线");
+      if (id === "download-slow") return [{ url: `${ctx.connection!.url}/download-slow`, format: "flac", quality: ctx.quality }];
       ctx.log.info(`streams ${id} quality=${ctx.quality}`);
       return [{url:`${ctx.connection!.url}/song.flac`,format:"flac",quality:ctx.quality,expiresAt:Math.floor(Date.now()/1000)+3600}];
     },
-    async get(id, ctx) { if(id === "playlist-offline")playlistOffline=true; if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
+    async get(id, ctx) { if (id === "download-recover") downloadRecovered = true; if(id === "playlist-offline")playlistOffline=true; if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
   },
   album: { async get(id, ctx) { guard(); return {info:album(ctx),tracks:tracks(ctx)}; } },
   artist: {

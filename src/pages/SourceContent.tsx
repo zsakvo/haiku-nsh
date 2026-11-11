@@ -32,6 +32,7 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
 
 /** Remote rows share the existing native menus for likes and adding to user playlists. */
 export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean; fit?: boolean }) {
+  const selected = signal<string[]>([]);
   const error = signal(""), creating = signal<any[] | null>(null);
   let retained: number | undefined;
   let disposed = false;
@@ -48,11 +49,21 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
   return <View class={props.fit ? "shrink-0 min-h-0" : "flex-1 min-h-0"}
     style={props.fit ? {height:Math.min(props.tracks.length,8)*token("track-row-height")+token("compact-control-height")+8} : {}}>
     <If when={!!error() || !!handle.error()}><Text class="text-sm text-destructive">{error() || String(handle.error())}</Text></If>
+    <If when={!!selected().length && !!handle()}>
+      <View class="flex-row gap-2 px-(--content-inset) py-2">
+        <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
+        <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void act(async () => {
+          await props.core.downloads.enqueue(await CollectionsService.selectedTracks(handle()!, selected()));
+        })} />
+      </View>
+    </If>
     <If when={!!handle()}>
       <TrackList class="flex-1 min-h-0" source={handle()!} active={props.active && !creating()}
+        onSelectionChange={e => selected.set(e.ids)}
         onPlay={(e) => void act(() => props.core.collections.playSource(e.source, e.id))}
         onAction={(e) => void act(async () => {
           const tracks = await CollectionsService.selectedTracks(handle()!, e.ids) as any[];
+          if (e.command === "download") await props.core.downloads.enqueue(tracks);
           if (e.command === "append") await props.core.player.append(tracks);
           if (e.command === "next") for (const t of [...tracks].reverse()) await props.core.player.playNext(t);
           if (e.command === "new-playlist") creating.set(tracks);
