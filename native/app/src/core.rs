@@ -44,6 +44,7 @@ unsafe impl Trace for Listeners {
 struct DataRoot {
     path: std::path::PathBuf,
     credentials: Arc<dyn haiku_services::account::Credentials>,
+    sync_secrets: Arc<dyn haiku_services::sync::Secrets>,
     // A fixture directory lives as long as its Core/bridge or engine selection.
     _temporary: Option<Arc<tempfile::TempDir>>,
 }
@@ -194,6 +195,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    sync: Instance<crate::sync::SyncService>,
     account: Instance<crate::account::AccountService>,
     downloads: Instance<crate::downloads::DownloadService>,
     scrape: Instance<crate::scrape::ScrapeService>,
@@ -221,6 +223,11 @@ impl Core {
                     Arc::new(haiku_services::account::MemoryCredentials::default())
                 } else {
                     Arc::new(haiku_services::account::SystemCredentials)
+                },
+                sync_secrets: if cfg!(test) || std::env::var("HAIKU_NO_KEYCHAIN").as_deref() == Ok("1") {
+                    Arc::new(haiku_services::sync::MemorySecrets::default())
+                } else {
+                    Arc::new(haiku_services::sync::SystemSecrets)
                 },
                 _temporary: None,
             });
@@ -375,6 +382,21 @@ impl Core {
                 .map_err(|e| JsError::Error(e.to_string()))?;
             crate::account::AccountService::new(service, bridge.stats.clone(), bridge._root._temporary.is_some())
         };
+        let sync = {
+            let root = bridge._root.path.clone();
+            let secrets = bridge._root.sync_secrets.clone();
+            let collections = bridge.collections.clone();
+            let store = settings.clone();
+            let isolated = bridge._root._temporary.is_some();
+            let mut options = haiku_services::sync::Options::default();
+            if isolated || cfg!(test) || std::env::var("HAIKU_NO_KEYCHAIN").as_deref() == Ok("1") {
+                options.github_base = "http://127.0.0.1:9".into();
+            }
+            let service = blocking(move || haiku_services::sync::Service::open(
+                &root, collections, store, secrets, options,
+            )).await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
+            crate::sync::SyncService::new(service, isolated)
+        };
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
@@ -386,6 +408,7 @@ impl Core {
             .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            sync,
             account,
             downloads,
             scrape,
@@ -419,6 +442,7 @@ impl Core {
         Self::select_root(DataRoot {
             path,
             credentials: Arc::new(haiku_services::account::MemoryCredentials::default()),
+            sync_secrets: Arc::new(haiku_services::sync::MemorySecrets::default()),
             _temporary: None,
         })
         .await
@@ -444,6 +468,7 @@ impl Core {
         Self::select_root(DataRoot {
             path,
             credentials: Arc::new(haiku_services::account::MemoryCredentials::default()),
+            sync_secrets: Arc::new(haiku_services::sync::MemorySecrets::default()),
             _temporary: Some(Arc::new(dir)),
         })
         .await
@@ -462,6 +487,11 @@ impl Core {
     #[getter]
     pub fn account(&self) -> Instance<crate::account::AccountService> {
         self.account.clone()
+    }
+    /// Gist synchronization of the Loro collections document; credentials stay in Keychain.
+    #[getter]
+    pub fn sync(&self) -> Instance<crate::sync::SyncService> {
+        self.sync.clone()
     }
     /// Offline download queue, resumable transfers and durable records.
     #[getter]
@@ -495,6 +525,7 @@ impl Core {
     }
     /// Flush pending collections and playback, releasing the cached Core for a later open.
     pub async fn close(this: Instance<Self>) -> Result<(), String> {
+        crate::sync::SyncService::close(this.with(|s| s.sync.clone())).await?;
         this.with(|s| s.account.with(|a| a.stop()));
         crate::downloads::DownloadService::close(this.with(|s| s.downloads.clone())).await?;
         crate::scrape::ScrapeService::close(this.with(|s| s.scrape.clone())).await?;

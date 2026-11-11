@@ -34,6 +34,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M5-04 已验收并提交
+
+- Gist 同步：`haiku-services::sync` 与 `core.sync`；Gist 文件 `playlists.loro.b64` + `sync-meta.json`（HAIKU_SYNC_2 gzip/base64，兼容读取参考版旧格式）；PAT 存 Keychain `Haiku NSH / github_pat`。workspace 286 通过/1 忽略，nsh test 63/63。
+- 偶发：`haiku-plugins` Subsonic 夹具单次 TCP read 解析（tests.rs:369），已随 M5-05 派修。参考版 albumProgress 已合并保存但未接入播放器。
+- 待人工确认：真实 GitHub 权限、跨设备同步、Keychain 授权。下一步 M5-05 备份，之后 M6。
+
 ## 2026-11-11 更新：M5-03 已验收并提交（第一部分账号服务与统计上传，第二部分账户设置界面，nsh test 62/62）
 
 - `haiku-services::{account,stats_upload}` 与 `core.account`（snapshot/sendCode/login/logout/refresh/subscription/plans/setServer/onChange）；令牌存 Keychain（新增 macOS 依赖 `security-framework` 3.7.0），测试用内存凭据与 loopback 假服务端。workspace 282 通过/1 忽略，nsh test 61/61。

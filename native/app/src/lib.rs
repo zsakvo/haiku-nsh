@@ -2,6 +2,7 @@
 use nsh_core::prelude::*;
 mod core;
 mod account;
+mod sync;
 mod account_fixture;
 mod command_keyboard;
 mod exit;

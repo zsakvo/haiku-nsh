@@ -1999,6 +1999,9 @@ dependencies = [
 name = "haiku-services"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "flate2",
  "futures",
  "haiku-library",
  "haiku-model",

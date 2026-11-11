@@ -33,7 +33,7 @@
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
 | F14 Haiku 账号 | 已实现（M5-03 界面待审阅） | `haiku-services::account`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | Rust 第一部分已验收；本轮 check/build 通过、账户 Headless 1/1、完整 nsh test 62/62；两张浅色截图已检查 | 真实服务端与 Keychain 实机待确认 |
-| F15 同步与备份 | 未实现 | | | |
+| F15 同步与备份 | 部分实现（Gist 已实现，待审阅） | `haiku-services::sync`、`native/app/src/sync.rs`、`src/shell/SyncSettings.tsx` | 同步 Rust 4/4、Headless 专项 1/1、完整 nsh test 63/63；check/build 通过；两张浅色截图已查看；workspace 被 Subsonic 既有测试夹具失败中断 | 真实 GitHub/Keychain 待人工确认；备份留 M5-05；详见 M5-04 |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
 
 ## 2026-11-09 实施文档
@@ -889,3 +889,28 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 证据均在 .artifacts/m5-03/；仅既有 target-dir/block/__eh_frame 提示，下载音频 fixture 沿有 lofty PADDING 提示。
 - STATUS F12/F14 已更新；无本轮未完成项或新增待决事项。真实服务端发送邮件/登录、Keychain 授权与重启恢复仍待人工确认；未专项测服务地址表单保存、同步失败画面或深色实机截图。
 - 审阅者：§3 已验收（完整 nsh test 62/62，两张截图已审阅）；account_fixture 沿用 network_fixture 模式，仅隔离 Core 使用。
+
+## 2026-11-11 M5-04：Gist 同步（待审阅）
+
+- 新增 haiku-services::{sync,sync_fixture}、sync_tests 与参考版 v2 编码夹具；Collections 新增本地变更 watch，远端 import 刷新视图但不触发回传。
+- PAT 使用 Keychain 的 Haiku NSH / github_pat；隔离 Core 使用内存后端。默认启动不发请求；夹具仅连接 127.0.0.1 假 GitHub API，未访问真实 api.github.com。
+- core.sync 导出 snapshot/setToken/clearToken/createGist/bindGist/disconnect/syncNow/onChange→Stop，均附文档；startFixture 仅允许 openIsolated。
+- 支持私密 Gist、ID/URL 绑定、校验 PAT、清除/断开；epoch 取消令牌/绑定切换前的请求，单飞共享结果，Core.close 取消并等待调度和手动请求退出。
+- 调度等待本地变更/config/status 通道；12 秒防抖、120 秒拉取、15 秒至 5 分钟退避；401/403/404 暂停并展示错误，保留失败上传的待重试意图。
+- 文件名兼容 playlists.loro.b64 与 sync-meta.json；写 gzip/base64 v2 HAIKU_SYNC_2 envelope，读取参考版非 gzip v2 与 gzip/raw 旧 Loro。
+- Loro 原子落盘仍为 <dataRoot>/playlists.loro；gistId/syncProvider 在 settings.json；兼容 albumProgress 按 updatedAt 合并，保留最新 500 项，存 haiku_state/album-progress.json。
+- albumProgress 仅保留/合并参考数据，本轮未新增播放器进度写入；没有实现自建后端或 .haikubak。
+- 设置“同步”替换占位：掩码 PAT/保存/清除、创建/绑定、立即同步、断开确认、版本/时间/错误/暂停/下次重试；复用 Field/Button/Dialog 和主题 token。
+- 初次 Rust 专项被重试计数的整数类型推断错误阻断；显式 u32 后 4/4 通过：cargo-sync-repair1.log。
+- Rust 覆盖双实例冲突合并/交换律/幂等/持久化、参考编码互读、防抖/拉取/退避/无回传、单飞/迟到响应/关闭。
+- cargo test --manifest-path native/Cargo.toml --workspace 一次失败：Subsonic 夹具单次 TCP read 后在 tests.rs:369 nth(1).unwrap() 崩溃，随后 /stop connection reset；未修改该任务外夹具，也未重跑 workspace。
+- workspace 中断前 208 通过/1 失败/1 忽略；后续包及 doctest 未执行，不能视为 workspace 验收通过；日志 cargo-workspace.log。
+- nsh check/build 各一次通过：nsh-check.log、nsh-build.log；Headless 专项 1/1：nsh-test-sync.log。
+- 完整 nsh test 一次 63/63：nsh-test.log，包含新增 Gist 流程、Player/Search 回归。
+- Headless 覆盖保存 PAT→创建 Gist→手动同步显示版本/时间→取消断开→确认断开；夹具独立数据根，无真实凭据。
+- 两张浅色截图已查看：sync-disconnected.png、sync-connected.png；开发窗口均已关闭，nsh-run-{disconnected,connected}.log。
+- 测试与截图前 IOConsoleLocked=No，记录 screen-lock-*.log；窗口只用只读查询，记录 window-{disconnected,connected}.log。
+- 证据均在 .artifacts/m5-04/；仅既有 block/target-dir/__eh_frame 提示。未提交 git。
+- 待人工：真实 GitHub PAT 权限/大文件 raw URL/跨设备往返、Keychain 授权和应用重启恢复；未专项验证 UI 绑定/错误/清除 PAT 路径及深色画面。
+- 待决定：是否在后续小轮修复 Subsonic 测试夹具的空/分段读取处理，并补齐 workspace 全量验收；本轮功能范围无其他待决项。
+- 审阅者：已验收。复跑 workspace 286 通过/0 失败/1 忽略（cargo-workspace-reviewer.log），Codex 一次中断为 Subsonic 夹具单次 read 解析偶发（tests.rs:369），非本任务回归，列入 M5-05 顺带修复；完整 nsh test 63/63；两张截图已审阅。

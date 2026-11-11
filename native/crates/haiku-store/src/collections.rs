@@ -59,6 +59,7 @@ struct State {
     listeners: Vec<mpsc::Sender<Change>>,
     error: Option<String>,
     versions: std::collections::BTreeMap<String, u64>,
+    local_changes: tokio::sync::watch::Sender<u64>,
 }
 impl State {
     fn changed(&mut self, ids: Vec<String>) {
@@ -154,6 +155,7 @@ impl Collections {
             listeners: vec![],
             error: None,
             versions: Default::default(),
+            local_changes: tokio::sync::watch::channel(0).0,
         }));
         let (tx, rx) = mpsc::channel();
         let disk_state = state.clone();
@@ -202,6 +204,7 @@ impl Collections {
         let changed = !ids.is_empty();
         state.changed(ids);
         if changed {
+            state.local_changes.send_modify(|revision| *revision += 1);
             let _ = self.0.tx.send(Wake::Changed);
         }
         Ok(result)
@@ -234,6 +237,10 @@ impl Collections {
     }
     pub fn revision(&self) -> u64 {
         self.0.state.lock().unwrap().revision
+    }
+    /// Local mutations only. Remote imports refresh views without scheduling another upload.
+    pub fn subscribe_local(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.0.state.lock().unwrap().local_changes.subscribe()
     }
     /// Most recent background write failure, cleared by a successful retry.
     pub fn persistence_error(&self) -> Option<String> {
@@ -421,10 +428,17 @@ impl Collections {
         self.0.state.lock().unwrap().core.export_snapshot()
     }
     pub fn import(&self, bytes: &[u8]) -> Result<Vec<String>, String> {
-        self.mutate(|s| {
-            let ids = s.core.import(bytes)?;
-            Ok((ids.clone(), ids))
-        })
+        // Validate before changing the live document; preserve causal history even for a view no-op.
+        PlaylistCore::from_snapshot(bytes)?;
+        let ids = {
+            let mut state = self.0.state.lock().unwrap();
+            let ids = state.core.import(bytes)?;
+            state.changed(ids.clone());
+            state.dirty = true;
+            ids
+        };
+        self.flush()?;
+        Ok(ids)
     }
 }
 fn to_entry(t: &Track) -> TrackEntry {

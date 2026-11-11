@@ -4,3 +4,6 @@ pub mod downloads;
 
 pub mod account;
 pub mod stats_upload;
+pub mod sync;
+#[cfg(any(test, feature = "test-support"))]
+pub mod sync_fixture;

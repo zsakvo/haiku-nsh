@@ -50,6 +50,8 @@ impl Default for AudioEffects {
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub schema_version: u32,
+    pub sync_provider: String,
+    pub gist_id: String,
     pub theme_mode: String,
     pub brand_color: String,
     pub audio_effects: AudioEffects,
@@ -78,6 +80,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema_version: 1,
+            sync_provider: "gist".into(),
+            gist_id: String::new(),
             theme_mode: "light".into(),
             brand_color: "orange".into(),
             audio_effects: AudioEffects::default(),
