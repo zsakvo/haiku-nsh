@@ -27,7 +27,7 @@
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
-| F09 桌面集成 | 部分实现（媒体中心、全局快捷键；M6-01 待审阅） | `haiku-macos::{shortcuts,lifecycle,system}`、`native/app/src/{shortcuts,platform/media}.rs` | 媒体/后台播放沿用既有验收；M6-01 Carbon 整组注册、校验、失败回滚与 Controller 接线；workspace 295 通过/1 忽略，完整 nsh test 65/65 | 真实全局按键、系统占用冲突待人工；其他平台 no-op 未编译验证；M6-02～05 未覆盖；详见 M6-01 |
+| F09 桌面集成 | 部分实现（媒体中心、全局快捷键已验收；M6-02 菜单栏待审阅） | `haiku-macos::{shortcuts,lifecycle,system,menubar,menubar_api}`、`native/app/src/{menubar,platform/*}.rs` | M6-02 单例安装、逐字歌词、按钮/菜单回 Core、原子过期队列拒绝与设置持久化；workspace 298 通过/1 忽略，nsh test 68/68，check/build 通过；真实播放、菜单栏截图及原生快照齐全 | 按钮/菜单真实点击与原生暂停/seek 待人工；其他平台 no-op 未编译验证；M6-03～05 未覆盖；详见 M6-02 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
@@ -970,3 +970,30 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 已知限制：备份热恢复目前只刷新 SettingsService，尚未通知 ShortcutsService 或重做快捷键注册；恢复含快捷键覆盖的备份后需重启应用，本轮未补此接线。
 - 待审阅者决定：应用许可证；确认全局默认未绑定及后退/前进沿用 Cmd+[/] 的可逆默认选择。无新增依赖，无架构变更。
 - 保留全部改动，未提交 git，未修改 Rex 会话/窗格、参考版、NSH 或依赖源码；任务文件原有审阅修改保留。
+
+## 2026-11-11 M6-02：菜单栏组件（待审阅）
+
+- `haiku-macos::menubar_api` 改为进程内适配器；主队列 OnceLock 内创建，重复安装不再产生第二个状态项。
+- 正常 Core 在原生窗口就绪后安装；隔离 fixture 禁用，Headless 无原生宿主不安装；其他平台 no-op。
+- `native/app/src/menubar.rs` 负责纯投影、值去重、菜单生成与事件映射；`platform/menubar.rs` 的稳定 worker 执行原生更新。
+- effect 只读取低频播放/歌词/设置/集合信号并入队；NSH timer 仅在下一句起点唤醒，不订阅逐帧位置。
+- 换歌/换句、播放暂停、缓冲变化及 timeline_revision（seek）重设锚点；逐字由 Core Animation 推进。
+- 非逐字长句滚动改用播放时间轴，暂停冻结、seek 重算；保留真实屏幕指针坐标的按钮命中修复。
+- 原生事件复用既有 channel 回 Core：上一首/切换/下一首→Controller，喜欢/加入歌单→Collections；显示窗口/退出→原生生命周期。
+- 更多按钮左右键均打开菜单，按本任务的队列菜单语义；显示主窗口移至菜单项。
+- 菜单含当前队列、仅 user 类型的可写歌单、显示主窗口、菜单栏歌词显示与退出；空队列/无歌单禁用。
+- 队列 token 含 queue_version、索引、EntityRef；新增 JumpIfQueue 在播放 actor 内原子校验，过期项忽略且不打开音频。
+- 歌单 token 同时记录当前曲目身份，曲目已切换则忽略；喜欢与歌单写入后刷新集合 revision。
+- 设置强类型字段兼容参考版：menubarLyricsVisible=true、menubarLyricHighlight="system" / "#RRGGBB"；未知字段保留，无效颜色回退 system。
+- 设置“歌词”复用共享 Switch/Select/Field，支持显示开关、系统/自定义颜色；非 macOS 隐藏这组项。
+- debug snapshot 通过主队列栅栏读取已应用的原生文本、图标 accessibilityDescription、可见性及菜单定义数量，写入运行日志。
+- 验收 1：cargo test --manifest-path native/Cargo.toml --workspace 一次，298 通过、0 失败、1 忽略；cargo-workspace.log。
+- 覆盖推送去重、换句/暂停/seek 重锚、假音频后端事件映射、新鲜/过期/身份不符队列选择、可写歌单及设置兼容。
+- 验收 2：nsh check、nsh build、完整 nsh test 各一次通过；nsh-check.log、nsh-build.log、nsh-test.log；68/68，含开关与颜色重开持久化。
+- 验收 3：nsh run MenubarRun.tsx --target macos --window-size 1200x900 -v 一次；隔离显式数据目录 data/，loopback 测试音频真实播放。
+- nsh-run.log 原生快照确认 playing=true、favorite=true、wordCount=2、menuItemCount=7，随 0/5/10/15 秒歌词边界更新；截图后 Ctrl+C 停止。
+- menubar-light.png 为包含系统菜单栏的全屏截图，已查看；歌词与五按钮可见，主窗口部分被其他窗口遮挡。
+- 测试/截图前未锁屏：screen-lock.log、screen-lock-run.log；证据均在 .artifacts/m6-02/，未做 GUI 自动化。
+- 编译仅已知 block 0.1.6 / __eh_frame 提示；Headless runner 报 1 warning（非 verbose 未展开），既有标签夹具另有 PADDING block 提示。
+- 未覆盖/待人工：真实按钮与菜单选择/命中、原生暂停/seek/后台同步、其他平台编译；桌面歌词窗口/锁定留 M6-03。
+- 无失败修复轮次、无架构决策待定；保留改动，未提交 git，未修改 Rex 会话/窗格、参考版、NSH 或依赖源码。

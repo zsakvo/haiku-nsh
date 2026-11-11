@@ -6,11 +6,17 @@ pub fn initialize() {
 
 #[cfg(target_os = "macos")]
 mod media;
-pub(crate) fn initialize_media(bridge: std::rc::Rc<crate::core::CoreBridge>) {
+#[cfg(target_os = "macos")]
+mod menubar;
+pub(crate) fn initialize_media(
+    bridge: std::rc::Rc<crate::core::CoreBridge>,
+    settings: nsh_core::prelude::Instance<crate::settings::SettingsService>,
+    native: bool,
+) {
     #[cfg(target_os = "macos")]
-    media::initialize(bridge);
+    media::initialize(bridge, settings, native);
     #[cfg(not(target_os = "macos"))]
-    let _ = bridge;
+    let _ = (bridge, settings, native);
 }
 pub(crate) fn clear_media() {
     #[cfg(target_os = "macos")]

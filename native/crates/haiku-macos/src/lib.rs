@@ -11,9 +11,7 @@ pub mod events;
 pub mod glass;
 #[cfg(target_os = "macos")]
 pub mod lifecycle;
-#[cfg(target_os = "macos")]
 pub mod menubar;
-#[cfg(target_os = "macos")]
 pub mod menubar_api;
 pub mod shortcuts;
 #[cfg(target_os = "macos")]

@@ -1,4 +1,4 @@
-import { signal, Text, View } from "nsh";
+import { platform, signal, Text, View } from "nsh";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/LibraryControls";
 import { SettingSelect, SettingSwitch } from "../ui/SettingsControls";
@@ -10,6 +10,8 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
   const providers = () => lyricsProviders(settings());
   const editing = signal(false), id = signal(""), name = signal(""), url = signal("");
   const response = signal("text"), path = signal(""), headers = signal("{}"), error = signal("");
+  const highlightDraft = signal("");
+  const highlightError = signal("");
   const custom = (key: string) => settings().lyricsCustomProviders.find(p => p.id === key);
   function edit(provider?: CustomLyricsProvider) {
     id.set(provider?.id ?? ""); name.set(provider?.name ?? "");
@@ -53,6 +55,23 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
   }
   return <View testID="lyrics-settings" class="gap-4">
     <Text role="header" class="text-lg font-semibold text-foreground">歌词</Text>
+    <If when={platform.os === "macos"}><View class="gap-3">
+      <SettingSwitch label="菜单栏歌词" checked={settings().menubarLyricsVisible}
+        onChange={menubarLyricsVisible => void props.settings.update({ menubarLyricsVisible })} />
+      <SettingSelect label="菜单栏逐字高亮" value={settings().menubarLyricHighlight === "system" ? "system" : "custom"}
+        items={[{ value: "system", title: "跟随系统" }, { value: "custom", title: "自定义颜色" }]}
+        onChange={v => void props.settings.update({ menubarLyricHighlight: v === "system" ? "system" : "#007AFF" })} />
+      <If when={settings().menubarLyricHighlight !== "system"}><View class="gap-2">
+        <Field label="菜单栏高亮颜色" value={highlightDraft() || settings().menubarLyricHighlight}
+          onChange={v => highlightDraft.set(v)} placeholder="#RRGGBB" />
+        <View class="flex-row"><Button label="保存高亮颜色" onPress={() => {
+          const color=highlightDraft() || settings().menubarLyricHighlight;
+          if (!/^#[0-9a-f]{6}$/i.test(color)) { highlightError.set("请输入 #RRGGBB 格式的颜色"); return; }
+          highlightError.set(""); void props.settings.update({ menubarLyricHighlight: color });
+        }} /></View>
+        <If when={!!highlightError()}><Text class="text-sm text-destructive">{highlightError()}</Text></If>
+      </View></If>
+    </View></If>
     <SettingSwitch label="自动查找远端歌词" checked={settings().lyricsAutoSearch}
       onChange={lyricsAutoSearch => void props.settings.update({ lyricsAutoSearch })} />
     <Text class="text-sm text-muted-foreground">本地文件与音乐来源优先；远端按以下顺序查找，逐字歌词优先。</Text>

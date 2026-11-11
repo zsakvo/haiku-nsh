@@ -6,6 +6,7 @@ export interface AudioEffects {
   autoPreamp: boolean; preampDb: number; stereoWidth: number; balance: number; mono: boolean;
 }
 export interface SettingsSnapshot {
+  menubarLyricsVisible: boolean; menubarLyricHighlight: string;
   downloadDir: string; downloadQuality: string; downloadNaming: string; downloadLayout: string;
   downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
   downloadLyricsMode: string; downloadLyricsTranslation: boolean; downloadReuseMediaCache: boolean;

@@ -49,6 +49,8 @@ impl Default for AudioEffects {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    pub menubar_lyrics_visible: bool,
+    pub menubar_lyric_highlight: String,
     pub shortcuts: BTreeMap<String, String>,
     pub global_shortcuts: BTreeMap<String, String>,
     pub schema_version: u32,
@@ -81,6 +83,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            menubar_lyrics_visible: true,
+            menubar_lyric_highlight: "system".into(),
             shortcuts: BTreeMap::new(),
             global_shortcuts: BTreeMap::new(),
             schema_version: 1,
@@ -120,6 +124,11 @@ fn clamp(v: f32, min: f32, max: f32, fallback: f32) -> f32 {
 }
 impl Settings {
     pub fn normalize(&mut self) {
+        if self.menubar_lyric_highlight != "system" && !(self.menubar_lyric_highlight.len() == 7
+            && self.menubar_lyric_highlight.starts_with('#')
+            && self.menubar_lyric_highlight.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {
+            self.menubar_lyric_highlight = "system".into();
+        }
         self.schema_version = self.schema_version.max(1);
         if !["light", "dark", "system"].contains(&self.theme_mode.as_str()) {
             self.theme_mode = "light".into();
@@ -280,6 +289,19 @@ impl SettingsStore {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn menubar_reference_settings_roundtrip() {
+        let root = tempfile::tempdir().unwrap();
+        let store = SettingsStore::open(root.path()).unwrap();
+        assert!(store.get().menubar_lyrics_visible);
+        assert_eq!(store.get().menubar_lyric_highlight, "system");
+        store.update(json!({"menubarLyricsVisible":false,"menubarLyricHighlight":"#12aBcD","futureMenu":17})).unwrap();
+        let s = SettingsStore::open(root.path()).unwrap().get();
+        assert!(!s.menubar_lyrics_visible);
+        assert_eq!(s.menubar_lyric_highlight,"#12aBcD");
+        assert_eq!(s.extra["futureMenu"],17);
+        assert_eq!(store.update(json!({"menubarLyricHighlight":"invalid"})).unwrap().menubar_lyric_highlight,"system");
+    }
     #[test]
     fn shortcut_reference_fields_persist_and_reset() {
         let root=tempfile::tempdir().unwrap(); let store=SettingsStore::open(root.path()).unwrap();

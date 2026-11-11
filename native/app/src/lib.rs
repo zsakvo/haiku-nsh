@@ -31,6 +31,7 @@ mod presentation;
 mod seek_bar;
 mod settings;
 mod shortcuts;
+mod menubar;
 mod track_list;
 mod track_source;
 pub use core::{Core, CoreBridge};

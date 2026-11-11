@@ -6,8 +6,7 @@
 //! 唱到一半再开始滚动。
 //!
 //! 与 music-cli 的差异（见 `specs/features/menubar-lyrics.md`）：
-//! - logo 按钮**左键**：激活 app，并对主窗 `deminiaturize` + `makeKeyAndOrderFront`
-//!   （覆盖 orderOut 隐藏 / 最小化 / 被遮挡），原生完成；
+//! - 更多按钮**左键/右键**：打开动态队列菜单；主窗口通过菜单项恢复；
 //! - logo 按钮**右键**：弹出由 Flutter 经 [`MenuBarHandle::set_menu`] 下发的动态菜单
 //!   （支持分隔线与一级子菜单）；叶子项点击把其 `id` 经事件通道回传。
 //!
@@ -21,6 +20,8 @@ use std::sync::mpsc::Sender;
 // ===================== 跨平台共享类型 =====================
 
 /// 菜单栏按钮/菜单点击事件（送进 [`Sender`]，由 FRB 层转发给 Dart）。
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MenuBarEvent {
     /// 上一首。
     Prev,
@@ -39,7 +40,7 @@ pub enum MenuBarEvent {
 /// - `is_separator` 为真时忽略 `id/title/enabled/children`，渲染为分隔线。
 /// - `children` 非空时渲染为带子菜单的父项（父项自身不触发点击回调）。
 /// - 叶子项点击经事件通道回传 `id`。
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MenuItemSpec {
     pub id: String,
     pub title: String,
@@ -60,11 +61,13 @@ mod imp {
     pub struct MenuBarHandle;
 
     impl MenuBarHandle {
+        pub fn set_visible(&self, _visible: bool) {}
         pub fn set_text(&self, _text: String, _scroll_delay: f64) {}
         pub fn set_lyric_line(
             &self,
             _text: String,
             _words: Vec<(f64, f64, String)>,
+            _start: f64,
             _pos: f64,
             _paused: bool,
             _scroll_delay: f64,
@@ -149,8 +152,8 @@ mod imp {
         text: String,
         /// 整句像素宽度（换行时量一次）。
         text_width: f64,
-        /// 本句文字设置的时刻（非逐字滚动的时间基准，用于「唱到一半再滚动」的延迟计时）。
-        set_at: Instant,
+        /// 当前行在播放时间轴上的起点，用于可暂停的非逐字滚动。
+        scroll_start: f64,
         /// 开始滚动前的等待秒数（歌词行 = 该句时长的一半；标题 = 固定 1.5s）。
         scroll_delay: f64,
         /// 长句滚动是否**无缝循环**：标题 `true`（两段副本首尾相接无限滚），
@@ -259,6 +262,7 @@ mod imp {
             &self,
             text: String,
             words: Vec<(f64, f64, String)>,
+            start: f64,
             pos: f64,
             paused: bool,
             scroll_delay: f64,
@@ -275,6 +279,7 @@ mod imp {
                 st.pos_at = Instant::now();
                 st.paused = paused;
                 st.scroll_delay = scroll_delay.max(0.0);
+                st.scroll_start = start;
                 if same {
                     apply_timeline(view as id);
                     return;
@@ -284,33 +289,23 @@ mod imp {
                 st.synced = !st.words.is_empty();
                 st.word_x.clear();
                 st.text_width = 0.0; // rebuild_content 里重新测量
-                st.set_at = Instant::now();
+
                 // 歌词行的长句滚动是「一次性揭示」，不循环（与逐字模式观感一致）。
                 st.loop_scroll = false;
                 rebuild_content(view as id);
             });
         }
 
-        /// 同步播放进度锚点（位置每 200ms 一跳时调用）。
-        ///
-        /// **稳态下这里什么都不做**：逐字高亮由 Core Animation 按已提交的关键帧在合成端
-        /// 自己走完整句，主线程不参与。只有两种情况需要重挂动画——暂停态翻转，或位置发生
-        /// 跳变（seek / 切歌 / 恢复播放对不上，判据是与按 1x 外推的预期值偏差超过
-        /// [`REANCHOR_TOLERANCE`]）。
+        /// Only called on pause/resume/seek; always reanchor, including sub-350ms seeks.
         pub fn set_progress(&self, pos: f64, paused: bool) {
             let view = self.lyrics_view;
             Queue::main().exec_async(move || unsafe {
                 let obj = &*(view as *const Object);
                 let st = marquee_state(obj);
-                // 预期位置必须在写入新值**之前**算。
-                let jumped = (pos - st.current_pos()).abs() > REANCHOR_TOLERANCE;
-                let flipped = paused != st.paused;
                 st.song_pos = pos;
                 st.pos_at = Instant::now();
                 st.paused = paused;
-                if flipped || jumped {
-                    apply_timeline(view as id);
-                }
+                apply_timeline(view as id);
             });
         }
 
@@ -330,6 +325,7 @@ mod imp {
             let btn = self.play_btn;
             Queue::main().exec_async(move || unsafe {
                 let img = make_image(if playing { IC_PAUSE } else { IC_PLAY });
+                let _: () = msg_send![img, setAccessibilityDescription: ns_string(if playing {"playing"} else {"paused"})];
                 let _: () = msg_send![btn as id, setImage: img];
             });
         }
@@ -339,8 +335,29 @@ mod imp {
             let btn = self.heart_btn;
             Queue::main().exec_async(move || unsafe {
                 let img = make_image(if fav { IC_LIKED } else { IC_LIKE });
+                let _: () = msg_send![img, setAccessibilityDescription: ns_string(if fav {"favorite"} else {"unfavorite"})];
                 let _: () = msg_send![btn as id, setImage: img];
             });
+        }
+
+        /// Main-queue fence reads the native view, images and applied menu definitions.
+        #[cfg(debug_assertions)]
+        pub fn snapshot(&self) -> serde_json::Value {
+            let h=self.clone();
+            Queue::main().exec_sync(move || unsafe {
+                let st=marquee_state(&*(h.lyrics_view as *const Object));
+                let play:id=msg_send![h.play_btn as id,image];
+                let heart:id=msg_send![h.heart_btn as id,image];
+                let playing=nsstring_to_string(msg_send![play,accessibilityDescription])=="playing";
+                let favorite=nsstring_to_string(msg_send![heart,accessibilityDescription])=="favorite";
+                let hidden:BOOL=msg_send![h.lyrics_view as id,isHidden];
+                let visible:BOOL=msg_send![h.status_item as id,isVisible];
+                fn count(items:&[MenuItemSpec])->usize {items.iter().map(|i|1+count(&i.children)).sum()}
+                let items=&state_of(&*(h.target as *const Object)).menu_items;
+                serde_json::json!({"text":st.text,"playing":playing,"favorite":favorite,
+                    "menuItemCount":count(items),"lyricsVisible":hidden==NO,"visible":visible==YES,
+                    "paused":st.paused,"position":st.current_pos(),"wordCount":st.words.len()})
+            })
         }
 
         /// 同步右键菜单项列表（下次右键弹出时据此动态构建）。
@@ -389,9 +406,9 @@ mod imp {
             let play_btn = mk(1.0, IC_PLAY, sel!(onToggle:));
             let _next = mk(2.0, IC_NEXT, sel!(onNext:));
             let heart_btn = mk(3.0, IC_LIKE, sel!(onFavorite:));
-            // logo 按钮用自定义类：左键 onLogo:（置顶 app），右键 onLogoRight:（弹菜单）。
+            // 更多按钮左右键均弹菜单，真实屏幕坐标命中保持不变。
             let more_btn =
-                icon_menu_button(rect(4.0 * BTN, 0.0, BTN, h), IC_MORE, target, sel!(onLogo:));
+                icon_menu_button(rect(4.0 * BTN, 0.0, BTN, h), IC_MORE, target, sel!(onLogoRight:));
             let _: () = msg_send![button_bar, addSubview: more_btn];
 
             let _: () = msg_send![container, addSubview: lyrics_view];
@@ -655,7 +672,7 @@ mod imp {
         let st = Box::new(MarqueeState {
             text: String::new(),
             text_width: 0.0,
-            set_at: Instant::now(),
+            scroll_start: 0.,
             scroll_delay: 1.5,
             loop_scroll: true,
             words: Vec::new(),
@@ -695,10 +712,6 @@ mod imp {
     const MARQUEE_GAP: f64 = 44.0;
     /// 长句滚动速度（逻辑像素 / 秒）。与旧实现的 30fps × 1px 等价，手感不变。
     const SCROLL_SPEED: f64 = 30.0;
-    /// 位置 tick 与「按 1x 外推的预期位置」的偏差超过这么多秒，判定为 seek / 切歌，
-    /// 需要重新锚定动画时间轴。正常播放下偏差只有网络抖动量级，远小于它。
-    const REANCHOR_TOLERANCE: f64 = 0.35;
-
     extern "C" fn marquee_set_text(this: &Object, _: Sel, ns: id) {
         unsafe {
             let st = marquee_state(this);
@@ -707,8 +720,8 @@ mod imp {
                 return;
             }
             st.text = new;
-            st.set_at = Instant::now(); // 重新开始「唱到一半」的延迟计时
-                                        // set_text 用于标题等非逐字文本：清掉上一句的逐字时间轴。
+            st.scroll_start = st.current_pos(); // 标题也使用可暂停的播放时钟
+            // set_text 用于标题等非逐字文本：清掉上一句的逐字时间轴。
             st.words.clear();
             st.word_x.clear();
             st.synced = false;
@@ -950,8 +963,17 @@ mod imp {
         }
 
         // 长句：等 scroll_delay（歌词行 = 本句时长的一半）过去再开始滚。
-        // 时间基是「本句被设置的墙钟时刻」，因为非逐字的行只有句时长、没有字级时间轴。
-        let begin = now - st.set_at.elapsed().as_secs_f64() + st.scroll_delay;
+        // 使用播放时钟而非持续墙钟，暂停冻结，seek 后从句首重算。
+        let elapsed = (st.current_pos() - st.scroll_start - st.scroll_delay).max(0.);
+        if st.paused {
+            let distance = if st.loop_scroll {
+                (elapsed * SCROLL_SPEED) % (tw + MARQUEE_GAP)
+            } else { (elapsed * SCROLL_SPEED).min(tw - vw) };
+            let _: () = msg_send![scroll, setPosition: NSPoint::new(-distance, 0.0)];
+            commit_tx();
+            return;
+        }
+        let begin = now - (st.current_pos() - st.scroll_start) + st.scroll_delay;
         if st.loop_scroll {
             // 标题：两段副本首尾相接，滚过一个 loop_w 即无缝回到原位，无限重复。
             let loop_w = tw + MARQUEE_GAP;

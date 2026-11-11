@@ -4,7 +4,11 @@ use haiku_playback::{Command, Mode, Status};
 use nsh_core::prelude::*;
 use std::{rc::Rc, time::Duration};
 
-pub(super) fn initialize(bridge: Rc<CoreBridge>) {
+pub(super) fn initialize(
+    bridge: Rc<CoreBridge>,
+    settings: Instance<crate::settings::SettingsService>,
+    native_enabled: bool,
+) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let native = haiku_macos::events::subscribe();
     std::thread::spawn(move || {
@@ -14,15 +18,58 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             }
         }
     });
-    let shortcut_bridge=Rc::downgrade(&bridge);
+    let shortcut_bridge = Rc::downgrade(&bridge);
     let controller = bridge.controller.clone();
     let collections = bridge.collections.clone();
     spawn(async move {
         while let Some(event) = rx.recv().await {
             if event.name == "shortcuts.event" {
-                if let Some(id)=event.data["id"].as_str() {
-                    if let Some(bridge)=shortcut_bridge.upgrade() {if let Err(e)=crate::shortcuts::dispatch(&bridge,id).await {log::warn!("Global shortcut: {e}");}}
+                if let Some(id) = event.data["id"].as_str() {
+                    if let Some(bridge) = shortcut_bridge.upgrade() {
+                        if let Err(e) = crate::shortcuts::dispatch(&bridge, id).await {
+                            log::warn!("Global shortcut: {e}");
+                        }
+                    }
                 }
+            }
+            if event.name == "menubar.event" {
+                if let Some(bridge) = shortcut_bridge.upgrade() {
+                    let result = async {
+                        let event =
+                            serde_json::from_value(event.data).map_err(|e| e.to_string())?;
+                        let action = crate::menubar::dispatch(
+                            &bridge.controller,
+                            &bridge.collections,
+                            event,
+                        )
+                        .await?;
+                        bridge
+                            .collections_revision
+                            .set(bridge.collections.revision());
+                        match action {
+                            crate::menubar::HostAction::ShowWindow => {
+                                haiku_macos::lifecycle::show_main_window()
+                            }
+                            crate::menubar::HostAction::Quit => haiku_macos::lifecycle::quit(),
+                            crate::menubar::HostAction::ToggleLyrics => {
+                                let visible =
+                                    bridge.settings.get_untracked().menubar_lyrics_visible;
+                                crate::settings::SettingsService::update(
+                                    settings.clone(),
+                                    serde_json::json!({"menubarLyricsVisible":!visible}),
+                                )
+                                .await?;
+                            }
+                            crate::menubar::HostAction::None => {}
+                        }
+                        Ok::<_, String>(())
+                    }
+                    .await;
+                    if let Err(e) = result {
+                        log::warn!("Menubar command: {e}");
+                    }
+                }
+                continue;
             }
             if event.name == "media.event" {
                 if event.data["kind"].as_str() == Some("favorite") {
@@ -39,29 +86,39 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             }
         }
     });
-    let (shortcut_updates,mut shortcut_pending)=tokio::sync::mpsc::unbounded_channel::<Vec<haiku_store::shortcuts::Binding>>();
+    let (shortcut_updates, mut shortcut_pending) =
+        tokio::sync::mpsc::unbounded_channel::<Vec<haiku_store::shortcuts::Binding>>();
     spawn(async move {
         use haiku_macos::shortcuts::GlobalShortcuts;
-        while let Some(bindings)=shortcut_pending.recv().await {
-            let _=blocking(move || {
-                let backend=haiku_macos::shortcuts::SystemShortcuts{native:true};
-                if let Err(e)=backend.replace(&bindings) {log::warn!("Global shortcut registration: {e}");}
-            }).await;
+        while let Some(bindings) = shortcut_pending.recv().await {
+            let _ = blocking(move || {
+                let backend = haiku_macos::shortcuts::SystemShortcuts { native: true };
+                if let Err(e) = backend.replace(&bindings) {
+                    log::warn!("Global shortcut registration: {e}");
+                }
+            })
+            .await;
         }
     });
-    let shortcut_settings=bridge.settings;
-    let ready = signal(haiku_macos::lifecycle::native_host());
+    let shortcut_settings = bridge.settings;
+    let ready = signal(native_enabled && haiku_macos::lifecycle::native_host());
     set_interval(Duration::from_millis(200), move || {
-        if !ready.get_untracked() && haiku_macos::lifecycle::native_host() {
+        if native_enabled && !ready.get_untracked() && haiku_macos::lifecycle::native_host() {
             ready.set(true);
         }
     });
-    let registered=stored(false);
+    super::menubar::initialize(bridge.clone(), ready, native_enabled);
+    let registered = stored(false);
     effect(move || {
-        if !ready.get() || registered.get() {return;}
+        if !ready.get() || registered.get() {
+            return;
+        }
         registered.replace(true);
-        let s=shortcut_settings.get_untracked();
-        let _=shortcut_updates.send(haiku_store::shortcuts::effective(&s.shortcuts,&s.global_shortcuts));
+        let s = shortcut_settings.get_untracked();
+        let _ = shortcut_updates.send(haiku_store::shortcuts::effective(
+            &s.shortcuts,
+            &s.global_shortcuts,
+        ));
     });
     // One consumer preserves main-queue ordering, including rapid pause/seek/close.
     enum Update {

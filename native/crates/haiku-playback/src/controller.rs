@@ -93,6 +93,8 @@ pub enum Command {
     Clear,
     Move(i32, i32),
     Jump(i32),
+    /// Status-menu selection is checked atomically against the current queue.
+    JumpIfQueue { version: u64, index: i32, identity: String },
     SetSleep(u32),
     SleepAfterTrack,
     ExtendSleep,
@@ -1006,6 +1008,15 @@ impl Actor {
                 self.publish(true);
                 self.prepare_next();
                 immediate = false;
+            }
+            Command::JumpIfQueue { version, index, identity } => {
+                if self.state.queue_version != version || index < 0 ||
+                    self.queue.tracks.get(index as usize).is_none_or(|t| t.entity_ref().encode() != identity) {
+                    return Ok(());
+                }
+                self.queue.jump(index)?;
+                self.failed = 0;
+                self.start_current(0.0);
             }
             Command::Jump(index) => {
                 self.queue.jump(index)?;

@@ -364,9 +364,6 @@ impl Core {
             plugins.clone(),
         );
         crate::presentation::initialize(bridge.clone(), library.clone());
-        bridge
-            .owner
-            .run(|| crate::platform::initialize_media(bridge.clone()));
         let scrape = {
             let (root, library, host, settings) = (
                 bridge._root.path.clone(), library.clone(), plugins.clone(), settings.clone(),
@@ -408,6 +405,7 @@ impl Core {
         let shortcut_store=settings.clone();
         let native_shortcuts=bridge._root._temporary.is_none();
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
+        bridge.owner.run(|| crate::platform::initialize_media(bridge.clone(), settings.clone(), native_shortcuts));
         let shortcuts=crate::shortcuts::ShortcutsService::new(shortcut_store,settings.clone(),bridge.clone(),native_shortcuts);
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =

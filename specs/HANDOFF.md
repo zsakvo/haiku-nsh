@@ -35,6 +35,11 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M6-02 已验收并提交
+
+- 菜单栏：`native/app/src/menubar.rs`（投影与事件映射）、`platform/menubar.rs`（单一 worker，信号变化或下一行歌词边界才唤醒，不轮询）；队列菜单经 `Command::JumpIfQueue` 原子拒绝过期选择；设置 `menubarLyricsVisible`/`menubarLyricHighlight` 位于“歌词”分组。审阅者复跑 workspace 298 通过，nsh test 68/68；真实运行快照确认逐字歌词/播放/喜欢/7 个菜单项。
+- 待人工确认：真实按钮与菜单点击命中、暂停/seek 同步。下一步 M6-03 桌面歌词。
+
 ## 2026-11-11 更新：M6-01 已验收并提交
 
 - 全局快捷键：`haiku-store::shortcuts`（校验、默认值、参考版字段兼容）、`haiku-macos::GlobalShortcuts`（Carbon，整组替换失败回滚，其他平台 no-op）、`core.shortcuts`；设置“快捷键”录制/冲突/恢复默认，“其他”关于区块与应用菜单共用。审阅者复跑 workspace 295 通过/1 忽略，nsh test 65/65。

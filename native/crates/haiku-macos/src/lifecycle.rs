@@ -115,3 +115,13 @@ pub fn show_main_window() {
         #[allow(deprecated)] app.activateIgnoringOtherApps(true);
     });
 }
+
+/// Normal AppKit termination preserves NSH's delegate and Core's exit barrier.
+pub fn quit() {
+    dispatch::Queue::main().exec_async(|| unsafe {
+        use cocoa::base::{id,nil};
+        use objc::{class,msg_send,sel,sel_impl};
+        let app:id=msg_send![class!(NSApplication),sharedApplication];
+        let _:()=msg_send![app,terminate:nil];
+    });
+}
