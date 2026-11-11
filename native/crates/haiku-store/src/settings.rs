@@ -49,6 +49,8 @@ impl Default for AudioEffects {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    pub shortcuts: BTreeMap<String, String>,
+    pub global_shortcuts: BTreeMap<String, String>,
     pub schema_version: u32,
     pub sync_provider: String,
     pub gist_id: String,
@@ -79,6 +81,8 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            shortcuts: BTreeMap::new(),
+            global_shortcuts: BTreeMap::new(),
             schema_version: 1,
             sync_provider: "gist".into(),
             gist_id: String::new(),
@@ -228,6 +232,21 @@ impl SettingsStore {
             recovery,
         })
     }
+    /// Replace both maps without recursive merge retaining removed overrides.
+    pub fn replace_shortcuts(&self, bindings: &[crate::shortcuts::Binding]) -> Result<Settings, String> {
+        let bindings = crate::shortcuts::validate(bindings)?;
+        let mut guard = self.value.lock().unwrap_or_else(|e| e.into_inner());
+        let mut next = guard.clone();
+        next.shortcuts.clear(); next.global_shortcuts.clear();
+        for b in bindings {
+            let default = crate::shortcuts::defaults().into_iter().find(|e|e.id==b.id && e.scope==b.scope).unwrap();
+            if b.chord!=default.chord {
+                if b.scope=="app" { &mut next.shortcuts } else { &mut next.global_shortcuts }.insert(b.id,b.chord);
+            }
+        }
+        crate::json_file::write(&self.path, &next).map_err(|e|e.to_string())?;
+        *guard=next.clone(); Ok(next)
+    }
     pub fn recovery_warning(&self) -> Option<String> {
         self.recovery.clone()
     }
@@ -261,6 +280,19 @@ impl SettingsStore {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn shortcut_reference_fields_persist_and_reset() {
+        let root=tempfile::tempdir().unwrap(); let store=SettingsStore::open(root.path()).unwrap();
+        store.update(json!({"shortcuts":{"navigateBack":"alt+arrowleft"},"glassAutoInvert":true})).unwrap();
+        let reopened=SettingsStore::open(root.path()).unwrap().get();
+        assert_eq!(reopened.shortcuts["navigateBack"],"alt+arrowleft");
+        let mut bindings=crate::shortcuts::effective(&reopened.shortcuts,&reopened.global_shortcuts);
+        bindings.iter_mut().find(|b|b.scope=="global" && b.id=="togglePlayback").unwrap().chord="control+alt+p".into();
+        store.replace_shortcuts(&bindings).unwrap();
+        assert_eq!(SettingsStore::open(root.path()).unwrap().get().global_shortcuts["togglePlayback"],"control+alt+p");
+        store.replace_shortcuts(&crate::shortcuts::defaults()).unwrap();
+        let reset=SettingsStore::open(root.path()).unwrap().get(); assert!(reset.shortcuts.is_empty()); assert!(reset.global_shortcuts.is_empty()); assert_eq!(reset.extra["glassAutoInvert"],true);
+    }
     #[test]
     fn atomic_merge_unknown_fields_clamp_and_reopen() {
         let root = tempfile::tempdir().unwrap();

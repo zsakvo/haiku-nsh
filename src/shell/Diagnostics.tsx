@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { localDateTime } from "../ui/dateTime";
+import { AboutContent } from "./About";
 import { BackupSettings } from "./BackupSettings";
 
 /** Filtered pages and redaction come from Rust; copying and saving are explicit actions. */
@@ -80,11 +81,7 @@ export function OtherSettings(props: { core: Core; initialLogs?: boolean; backup
         <Button label="关闭日志查看器" onPress={() => logs.set(false)} />
       </View>
     </Dialog>
-    <View class="gap-2">
-      <Text class="text-lg font-semibold text-foreground">关于 Haiku</Text>
-      <Text class="text-sm text-muted-foreground">Haiku 1.0.0 · Native Shell 0.4.0</Text>
-      <Text class="text-sm text-muted-foreground">应用许可证尚未声明。Iconoir 图标使用 MIT 许可证，插画使用 unDraw 许可；授权文件随资源提供。</Text>
-    </View>
+    <AboutContent />
   </View>;
 }
 /** Expansion state belongs to notice IDs, independently of recycled list cells. */

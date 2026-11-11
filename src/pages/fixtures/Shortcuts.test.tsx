@@ -1,0 +1,20 @@
+import { expect, open, test } from "nsh/test";
+test("record shortcut, report conflicts, restore one and all defaults", async()=>{
+  const app=await open("../../../ShortcutsPreview.tsx",{platform:"macos",width:1200,height:1100});
+  await app.waitFor("id:shortcut-settings");
+  await app.press("id:shortcut-edit-app-togglePlayback");
+  await app.keyboard.press("ctrl+alt+p");
+  await app.waitFor("id:shortcut-edit-app-togglePlayback >> text:⌃⌥P");
+  await app.press("id:shortcut-edit-app-togglePlayback");
+  await app.keyboard.press("cmd+k");
+  await app.waitFor("id:shortcut-error");
+  expect(app.texts().some(t=>t.includes("快捷键冲突"))).toBe(true);
+  await app.press("id:shortcut-reset-app-togglePlayback");
+  await app.waitFor("id:shortcut-edit-app-togglePlayback >> text:Space");
+  await app.press("id:shortcut-edit-app-togglePlayback");
+  await app.keyboard.press("ctrl+alt+p");
+  await app.waitFor("id:shortcut-edit-app-togglePlayback >> text:⌃⌥P");
+  await app.press("id:shortcut-reset-all");
+  await app.waitFor("id:shortcut-edit-app-togglePlayback >> text:Space");
+  expect(app.shows("id:shortcut-error")).toBe(false);
+});

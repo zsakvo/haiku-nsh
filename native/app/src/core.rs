@@ -195,6 +195,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    shortcuts: Instance<crate::shortcuts::ShortcutsService>,
     backup: Instance<crate::backup::BackupService>,
     sync: Instance<crate::sync::SyncService>,
     account: Instance<crate::account::AccountService>,
@@ -404,7 +405,10 @@ impl Core {
             collections: bridge.collections.clone(), history: bridge.history.clone(), stats: bridge.stats.clone(),
             sync: sync.with(|s| s.authority()), downloads: downloads.clone(),
         };
+        let shortcut_store=settings.clone();
+        let native_shortcuts=bridge._root._temporary.is_none();
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
+        let shortcuts=crate::shortcuts::ShortcutsService::new(shortcut_store,settings.clone(),bridge.clone(),native_shortcuts);
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
@@ -419,6 +423,7 @@ impl Core {
         );
         let backup = crate::backup::BackupService::new(backup_runtime, settings.clone(), plugins.clone());
         let core = Instance::new(Self {
+            shortcuts,
             backup,
             sync,
             account,
@@ -561,6 +566,9 @@ impl Core {
         global::<Option<Instance<Core>>>().set(None);
         Ok(())
     }
+    /// Atomic global registration and durable, reference-compatible app bindings.
+    #[getter]
+    pub fn shortcuts(&self) -> Instance<crate::shortcuts::ShortcutsService> { self.shortcuts.clone() }
     /// Durable settings, effects and cache preferences; TSX is a subscribed mirror.
     #[getter]
     pub fn settings(&self) -> Instance<crate::settings::SettingsService> {
@@ -597,6 +605,13 @@ impl Core {
         crate::platform::initialize();
     }
 
+    /// Software identity shared by Settings and the application About menu.
+    pub fn about_info() -> JsonValue {
+        let manifest: JsonValue=serde_json::from_str(include_str!("../../../nsh.json")).unwrap();
+        serde_json::json!({"version":manifest["version"],"framework":"0.4.0",
+            "license":"应用许可证尚未声明。",
+            "notices":concat!("Iconoir icons — MIT\n",include_str!("../../../assets/icons/LICENSE"),"\n\nunDraw illustrations\n",include_str!("../../../assets/illustrations/LICENSE.txt"),"\n\nNative Shell 0.4.0 — Apache-2.0\nRust 依赖的完整发行声明将在打包阶段随应用提供。")})
+    }
     /// Replace semantic tokens shared by TSX and Rust.
     pub async fn apply_theme(json: String) -> Result<(), String> {
         set_tokens(nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?);

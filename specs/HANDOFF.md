@@ -35,6 +35,13 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M6-01 已验收并提交
+
+- 全局快捷键：`haiku-store::shortcuts`（校验、默认值、参考版字段兼容）、`haiku-macos::GlobalShortcuts`（Carbon，整组替换失败回滚，其他平台 no-op）、`core.shortcuts`；设置“快捷键”录制/冲突/恢复默认，“其他”关于区块与应用菜单共用。审阅者复跑 workspace 295 通过/1 忽略，nsh test 65/65。
+- 审阅修正：Codex 把 Carbon FFI 的 `ItemCount`/`ByteCount` 参数改成了 `u32`，SDK 中二者为 `unsigned long`，已改回 `usize`。
+- 遗留：备份热恢复不刷新快捷键注册（需重启）；应用许可证未声明（待用户决定，M6-05 补第三方声明）；冲突提示带英文 “Error:” 前缀且不指明冲突项（并入 M6-04 小项）。
+- 待人工确认：真实全局按键、与系统快捷键冲突、菜单“关于”。下一步 M6-02 菜单栏。
+
 ## 2026-11-11 更新：M5-05 已验收并提交，M5 完成
 
 - `.haikubak` 备份：`haiku-services::backup` 与 `core.backup`；读 schema 1/2、写 schema 2；拒绝恶意路径/符号链接/未来 schema；安全备份 `<dataRoot>/backups/` 保留 3 份；v1 插件跳过并列出，Subsonic 连接字段迁移。入口在设置“其他 → 备份与恢复”。顺带修复 Subsonic 测试夹具读取。workspace 291 通过/1 忽略，nsh test 64/64。

@@ -27,14 +27,14 @@
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
-| F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
+| F09 桌面集成 | 部分实现（媒体中心、全局快捷键；M6-01 待审阅） | `haiku-macos::{shortcuts,lifecycle,system}`、`native/app/src/{shortcuts,platform/media}.rs` | 媒体/后台播放沿用既有验收；M6-01 Carbon 整组注册、校验、失败回滚与 Controller 接线；workspace 295 通过/1 忽略，完整 nsh test 65/65 | 真实全局按键、系统占用冲突待人工；其他平台 no-op 未编译验证；M6-02～05 未覆盖；详见 M6-01 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
 | F14 Haiku 账号 | 已实现（M5-03 界面待审阅） | `haiku-services::account`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | Rust 第一部分已验收；本轮 check/build 通过、账户 Headless 1/1、完整 nsh test 62/62；两张浅色截图已检查 | 真实服务端与 Keychain 实机待确认 |
 | F15 同步与备份 | 已验证（M5 范围，备份待审阅） | `haiku-services::{sync,backup}`、`native/app/src/{sync,backup}.rs`、`src/shell/{SyncSettings,BackupSettings}.tsx` | M5-04 已验收；M5-05 备份 Rust 5/5，workspace 291 通过/1 忽略，check/build 通过，Headless 专项 1/1，完整 nsh test 64/64；两张浅色截图已查看 | 真实 GitHub/Keychain、原生备份选择器与真实跨平台备份待人工确认；详见 M5-04/M5-05 |
-| F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
+| F16 设置、通知与日志 | 部分实现（M6-01 快捷键/关于待审阅） | `haiku-store::{settings,shortcuts,logs}`、`native/app/src/{settings,shortcuts,activity}.rs`、`src/shell/{Settings,ShortcutSettings,About,Diagnostics}.tsx` | 已有设置/日志/通知沿用验收；M6-01 录制→冲突→单项/全部恢复通过，check/build 通过，两张浅色截图已查看；菜单与设置共用关于内容 | 应用许可证待决定；菜单关于、真实全局按键与系统选择器待人工；备份热恢复后快捷键刷新未接线；详见 M6-01 |
 
 ## 2026-11-09 实施文档
 
@@ -941,3 +941,32 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 待人工：原生打开/保存选择器、真实用户备份与跨平台往返、Keychain PAT 导入授权；未做大体积和并发安装/目录迁移压力验证。
 - 任务范围无未完成项，无需新增审阅决策；v2 插件保留 NSH descriptor/plugin.ts，不尝试在参考版 v1 宿主运行，符合 D9。
 - 审阅者：已验收。恶意路径测试覆盖绝对路径/../反斜杠/符号链接/未来 schema；新增依赖 zip 8.6.0（备份 ZIP 格式所需）认可；workspace 291 通过/1 忽略，nsh test 64/64；两张截图已审阅。M5 完成。
+
+## 2026-11-11 M6-01：全局快捷键、快捷键设置与关于（待审阅）
+
+- `haiku-store::shortcuts` 统一操作 ID、组合键规范化、默认组及跨组冲突校验；设置新增 shortcuts / globalShortcuts 字符串映射。
+- 保留参考版 shortcuts 字段、closeWindow/openCommandPalette/navigateBack/Forward/togglePlayback/nextTrack/previousTrack/volumeUp/Down/toggleLiked/toggleDesktopLyrics ID 与别名格式。
+- 默认应用内：Cmd+W/K、Cmd+[/]、Cmd+,、Space、Cmd+方向键、Cmd+L/R；后退/前进遵循本仓库 UI 规范，区别于参考版 Alt+方向键；新增 openSettings。
+- 全局八项默认未绑定（参考版无全局默认组），含 showMainWindow；普通键要求 Cmd/Ctrl/Option，F1–F20 允许无修饰；重复、跨组及系统/编辑保留键冲突拒绝。
+- `haiku-macos::shortcuts::GlobalShortcuts` + SystemShortcuts；复用 Carbon RegisterEventHotKey，AppKit 主队列操作；其他平台 no-op，界面隐藏全局组。
+- 整组校验后才改注册；注册中途失败清除候选并恢复完整旧组；落盘失败也回滚注册；假后端测试覆盖成功替换、部分失败与完整恢复。
+- 原生 shortcuts.event 沿现有 channel 回 Core；播放/切歌/音量走 Controller，喜欢走 Collections 并更新 revision，显示窗口走 AppKit；桌面歌词按任务留 no-op。
+- `core.shortcuts` 文档化 API：snapshot()、apply([{id,scope,chord}])、resetOne("app:id"/"global:id")、resetAll()、onChange(callback) → Stop；另有供应用内命令共用的 trigger(id)。
+- snapshot 含 supported/bindings/defaults/labels；apply 原子替换完整两组，成功后持久化并通知；常规 settings.update 拒绝直接改快捷键，避免绕过注册校验。
+- 设置新增应用内/全局两组、录制、内联冲突、单项与全部恢复；NSH 无原始 keydown，录制期间临时绑定支持的物理键组合，退出时释放。
+- AboutContent 共用于设置“其他”和应用菜单；版本读 nsh.json，框架 0.4.0；许可证与第三方声明入口含 Iconoir MIT、unDraw 许可及 NSH Apache-2.0 信息。
+- 应用许可证未获决策，明确显示“尚未声明”；完整发行依赖声明留 M6-05 打包阶段。
+- 验收 1：cargo test --manifest-path native/Cargo.toml --workspace 一次，295 通过、0 失败、1 忽略：cargo-workspace.log。
+- Rust 覆盖裸键/Shift-only 拒绝、全部 F1–F20、别名/重复/应用内冲突、失败回滚，以及参考字段、持久化、恢复默认后移除覆盖值。
+- 验收 2：nsh check/build 首轮通过；nsh test 首轮及修复 1 均 64/65，只有 Cmd+K 命令面板用例失败；nsh-test{,-repair1}.log。
+- 修复 1 恢复 Core 初始化前的同步默认绑定，未解决；修复 2 保留未改动绑定的 ID，仅替换实际变动，避免初始订阅回调重建绑定导致排队事件失效。
+- 最终 nsh test 65/65（含录制新组合→冲突→单项恢复→全部恢复、原有 Cmd+K/Player/Search）：nsh-test-repair2.log；未修改已有测试断言。
+- 最终 nsh check/build 通过：nsh-check-repair2.log、nsh-build-repair2.log；两种修复思路后停止继续排查，Rust 自 workspace 验收后无改动。
+- 编译仅有已知 block 0.1.6 / __eh_frame 提示；Headless 下载/标签夹具另输出 File is missing a PADDING block 提示，本轮未处理（非 check/build 警告）。
+- 验收 3：shortcuts-light.png（真实校验生成冲突）与 about-light.png，浅色、隔离 Core，均已查看；run-{shortcuts,about}.log，预览截图后 Ctrl+C 退出。
+- 截图/测试前屏幕未锁：screen-lock.log、window-{shortcuts,about}.log；仅 CGSession/CGWindow 只读查询和 screencapture，无 GUI 自动化。
+- 全部证据：.artifacts/m6-01/；根入口 AboutPreview.tsx / ShortcutsPreview.tsx 仅挂载 src/pages/fixtures/ShortcutsFixture.tsx。
+- 未覆盖/待人工：真实全局按键、系统占用冲突、菜单“关于”点击、非 macOS 编译；桌面歌词动作待 M6-03。
+- 已知限制：备份热恢复目前只刷新 SettingsService，尚未通知 ShortcutsService 或重做快捷键注册；恢复含快捷键覆盖的备份后需重启应用，本轮未补此接线。
+- 待审阅者决定：应用许可证；确认全局默认未绑定及后退/前进沿用 Cmd+[/] 的可逆默认选择。无新增依赖，无架构变更。
+- 保留全部改动，未提交 git，未修改 Rex 会话/窗格、参考版、NSH 或依赖源码；任务文件原有审阅修改保留。

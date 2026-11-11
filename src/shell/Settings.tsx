@@ -8,6 +8,7 @@ import { DownloadSettings } from "./DownloadSettings";
 import { AccountSettings } from "./AccountSettings";
 import { SyncSettings } from "./SyncSettings";
 import { StorageSettings } from "./StorageSettings";
+import { ShortcutSettings } from "./ShortcutSettings";
 import { OtherSettings } from "./Diagnostics";
 import { Scroll, signal, Text, View } from "nsh";
 import { type createAppearance } from "../ui/theme";
@@ -28,7 +29,7 @@ const categories = [
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
   const selected = signal(props.initialCategory ?? "外观");
   const settings = createSettings();
   const plugins = createPlugins();
@@ -73,8 +74,9 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <View class="w-full max-w-2xl" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
           <View class="w-full max-w-5xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
           <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
+          <If when={selected() === "快捷键" && !!settings.core()}><View class="w-full max-w-2xl"><ShortcutSettings core={settings.core()!} initialConflict={props.initialShortcutConflict} /></View></If>
           <If when={selected() === "其他" && !!settings.core()}><OtherSettings core={settings.core()!} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} /></If>
-          <View class="flex-col" style={{ display: ["账户", "外观", "播放", "歌词", "下载", "存储", "来源", "插件", "开发者", "其他", "同步"].includes(selected()) ? "none" : "flex" }}>
+          <View class="flex-col" style={{ display: ["账户", "外观", "播放", "歌词", "下载", "存储", "来源", "插件", "开发者", "其他", "同步", "快捷键"].includes(selected()) ? "none" : "flex" }}>
             <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
           </View>
         </Scroll>

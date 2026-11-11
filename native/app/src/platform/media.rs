@@ -14,10 +14,16 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             }
         }
     });
+    let shortcut_bridge=Rc::downgrade(&bridge);
     let controller = bridge.controller.clone();
     let collections = bridge.collections.clone();
     spawn(async move {
         while let Some(event) = rx.recv().await {
+            if event.name == "shortcuts.event" {
+                if let Some(id)=event.data["id"].as_str() {
+                    if let Some(bridge)=shortcut_bridge.upgrade() {if let Err(e)=crate::shortcuts::dispatch(&bridge,id).await {log::warn!("Global shortcut: {e}");}}
+                }
+            }
             if event.name == "media.event" {
                 if event.data["kind"].as_str() == Some("favorite") {
                     if let Some(track) = controller.state().current {
@@ -33,11 +39,29 @@ pub(super) fn initialize(bridge: Rc<CoreBridge>) {
             }
         }
     });
+    let (shortcut_updates,mut shortcut_pending)=tokio::sync::mpsc::unbounded_channel::<Vec<haiku_store::shortcuts::Binding>>();
+    spawn(async move {
+        use haiku_macos::shortcuts::GlobalShortcuts;
+        while let Some(bindings)=shortcut_pending.recv().await {
+            let _=blocking(move || {
+                let backend=haiku_macos::shortcuts::SystemShortcuts{native:true};
+                if let Err(e)=backend.replace(&bindings) {log::warn!("Global shortcut registration: {e}");}
+            }).await;
+        }
+    });
+    let shortcut_settings=bridge.settings;
     let ready = signal(haiku_macos::lifecycle::native_host());
     set_interval(Duration::from_millis(200), move || {
         if !ready.get_untracked() && haiku_macos::lifecycle::native_host() {
             ready.set(true);
         }
+    });
+    let registered=stored(false);
+    effect(move || {
+        if !ready.get() || registered.get() {return;}
+        registered.replace(true);
+        let s=shortcut_settings.get_untracked();
+        let _=shortcut_updates.send(haiku_store::shortcuts::effective(&s.shortcuts,&s.global_shortcuts));
     });
     // One consumer preserves main-queue ordering, including rapid pause/seek/close.
     enum Update {

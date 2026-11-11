@@ -6,7 +6,7 @@
 
 - `specs/MACOS.md` §4（全局快捷键）、§7（其他平台 no-op）、§8；`specs/UI.md` 键盘一条与设置“快捷键”“其他”分组；`specs/DATA.md` §6 关于页。
 - 已有代码：`haiku-macos::{system,lifecycle}`、应用内快捷键与 keymap（`src/shell` 中的 `shortcuts`/`keymap`）、`haiku-store::settings`、设置“快捷键”分组占位、设置“其他”中已有的关于区块（M5-05 截图可见）。
-- 参考版（只读，本机 `~/Project/GPUI/haiku`）：`native/src/shortcuts.rs` 及设置中快捷键字段名与默认绑定（D5）。
+- 参考版（只读，本机 `~/Project/haiku-gpuix`）：`native/src/shortcuts.rs` 及设置中快捷键字段名与默认绑定（D5）。
 - **M5-01 教训**：effect 内 spawn 的任务会在 effect 重跑时被取消。不新增依赖 Rust `animated_value` 的界面。跑 nsh test 与截图前确认未锁屏。
 
 ## 1. 全局快捷键（Rust，`haiku-macos`）

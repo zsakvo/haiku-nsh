@@ -30,6 +30,7 @@ mod plugin_tools;
 mod presentation;
 mod seek_bar;
 mod settings;
+mod shortcuts;
 mod track_list;
 mod track_source;
 pub use core::{Core, CoreBridge};

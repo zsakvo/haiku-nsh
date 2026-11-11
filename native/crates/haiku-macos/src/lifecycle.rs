@@ -106,3 +106,12 @@ pub fn set_exit_handler(handler: fn()) {
         });
     });
 }
+
+/// Restore the existing NSH window and activate Haiku on AppKit's main queue.
+pub fn show_main_window() {
+    dispatch::Queue::main().exec_async(|| {
+        let app=NSApplication::sharedApplication(MainThreadMarker::new().expect("GCD main queue"));
+        if let Some(window)=app.mainWindow().or_else(||app.windows().firstObject()) {window.makeKeyAndOrderFront(None);}
+        #[allow(deprecated)] app.activateIgnoringOtherApps(true);
+    });
+}

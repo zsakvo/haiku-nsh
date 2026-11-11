@@ -10,3 +10,5 @@ mod document;
 pub mod history;
 pub mod stats;
 pub mod logs;
+
+pub mod shortcuts;

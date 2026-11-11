@@ -28,7 +28,6 @@ tokio.workspace = true
 futures.workspace = true
 reqwest.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
 haiku-macos = { path = "../crates/haiku-macos" }
 
 [dev-dependencies]

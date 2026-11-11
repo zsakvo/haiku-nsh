@@ -20,6 +20,9 @@ import type { SearchRequest } from "../state/search";
 import { SourceDetailPage } from "../pages/SourceDetailPage";
 import { createPlugins } from "../state/plugins";
 import { NotificationCenter } from "./Diagnostics";
+import { AboutContent } from "./About";
+import { nshChord, type ShortcutBinding } from "../state/shortcuts";
+import { Dialog } from "../ui/Surfaces";
 import { Button } from "../ui/Button";
 import { Menu, MenuItem } from "../ui/Surfaces";
 import { createCoreState } from "../state/core";
@@ -31,7 +34,7 @@ import { LyricsSearch } from "./LyricsSearch";
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialDownloadDirectory?: string;
-  initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
+  initialSettingsCategory?: string; initialShortcutConflict?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
   backupPath?: string; initialBackupDialog?: "export" | "import";
@@ -48,6 +51,8 @@ export function AppShell(props: {
   const nowPlaying = signal(props.initialNowPlaying ?? false);
   const lyricsSearch = signal(props.initialLyricsSearch ?? false);
   const notifications = signal(props.initialNotifications ?? false);
+  const about = signal(false);
+  const settingsCategory=signal(props.initialSettingsCategory ?? "外观");
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
   const showSettings = () => { notifications.set(false); nowPlaying.set(false); overlay.set("settings"); };
   const showCommands = () => { notifications.set(false); nowPlaying.set(false); overlay.set("command"); };
@@ -56,12 +61,35 @@ export function AppShell(props: {
   const goBack = () => { if (!overlay() && !nowPlaying()) nav.back(); };
   const goForward = () => { if (!overlay() && !nowPlaying()) nav.forward(); };
   const shortcuts = { back: "mod+[", forward: "mod+]", commands: "mod+k", settings: "mod+," };
-  // Bindings and menu items dispatch the same commands. Keymap owns these keys;
-  // the menu's shortcut is their matching native display/fallback.
-  keymap.bind(shortcuts.back, goBack, { when: "always" });
-  keymap.bind(shortcuts.forward, goForward, { when: "always" });
-  keymap.bind(shortcuts.commands, showCommands, { when: "always" });
-  keymap.bind(shortcuts.settings, showSettings, { when: "always" });
+  const appBindings = signal<Record<string,string>>({});
+  const installed=new Map<string,{chord:string;stop:()=>void}>();
+  const handlers:Record<string,()=>void>={navigateBack:goBack,navigateForward:goForward,openCommandPalette:showCommands,openSettings:showSettings,closeWindow:()=>Window.close()};
+  function reconcileBindings(bindings:ShortcutBinding[]) {
+    const app=bindings.filter(b=>b.scope==="app");
+    for(const b of app) {
+      const chord=nshChord(b.chord),previous=installed.get(b.id);
+      // Initial onChange delivery and settings refresh must retain unchanged IDs:
+      // a platform KeyCommand may already be queued against one of those IDs.
+      if(previous && keymap.label(previous.chord)===keymap.label(chord)) continue;
+      previous?.stop();
+      const stop=keymap.bind(chord,handlers[b.id]??(()=>void core()?.shortcuts.trigger(b.id).catch(console.error)),
+        {when:["closeWindow","openCommandPalette","navigateBack","navigateForward","openSettings"].includes(b.id)?"always":"notEditing"});
+      installed.set(b.id,{chord,stop});
+    }
+    appBindings.set(Object.fromEntries(app.map(b=>[b.id,nshChord(b.chord)])));
+  }
+  reconcileBindings([
+    {id:"navigateBack",scope:"app",chord:shortcuts.back},
+    {id:"navigateForward",scope:"app",chord:shortcuts.forward},
+    {id:"openCommandPalette",scope:"app",chord:shortcuts.commands},
+    {id:"openSettings",scope:"app",chord:shortcuts.settings},
+    {id:"closeWindow",scope:"app",chord:"mod+w"},
+  ]);
+  cleanup(()=>{for(const binding of installed.values())binding.stop();});
+  effect(() => {
+    const c=core(); if(c) cleanup(c.shortcuts.onChange(s=>reconcileBindings((s as {bindings:ShortcutBinding[]}).bindings)));
+  });
+  const binding=(id:string,fallback:string)=>appBindings()[id]??fallback;
   effect(() => {
     Core.initialize();
     Window.setTitle("Haiku");
@@ -70,22 +98,22 @@ export function AppShell(props: {
   effect(() => {
     DesktopMenu.setApplicationMenu([
       { label: "Haiku", submenu: [
-        { role: "about" }, { type: "separator" },
-        { label: "设置…", shortcut: shortcuts.settings, onSelect: showSettings },
+        { label: "关于 Haiku…", onSelect: () => { overlay.set(null); about.set(true); } }, { type: "separator" },
+        { label: "设置…", shortcut: binding("openSettings",shortcuts.settings), onSelect: showSettings },
         { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "showAll" },
         { type: "separator" }, { role: "quit" },
       ] },
       { label: "编辑", submenu: [ { role: "undo" }, { role: "redo" }, { type: "separator" },
         { role: "cut" }, { role: "copy" }, { role: "paste" }, { role: "selectAll" } ] },
       { label: "视图", submenu: [
-        { label: "后退", shortcut: shortcuts.back, disabled: !nav.canBack() || !!overlay(), onSelect: goBack },
-        { label: "前进", shortcut: shortcuts.forward, disabled: !nav.canForward() || !!overlay(), onSelect: goForward },
-        { type: "separator" }, { label: "命令面板…", shortcut: shortcuts.commands, onSelect: showCommands },
+        { label: "后退", shortcut: binding("navigateBack",shortcuts.back), disabled: !nav.canBack() || !!overlay(), onSelect: goBack },
+        { label: "前进", shortcut: binding("navigateForward",shortcuts.forward), disabled: !nav.canForward() || !!overlay(), onSelect: goForward },
+        { type: "separator" }, { label: "命令面板…", shortcut: binding("openCommandPalette",shortcuts.commands), onSelect: showCommands },
         { label: "通知中心…", onSelect: showNotifications },
         { role: "toggleFullScreen" },
       ] },
       { label: "窗口", submenu: [ { role: "minimize" }, { role: "zoom" }, { type: "separator" },
-        { label: "关闭窗口", role: "close", shortcut: "mod+w" } ] },
+        { label: "关闭窗口", role: "close", shortcut: binding("closeWindow","mod+w") } ] },
     ]);
   });
   cleanup(() => DesktopMenu.setApplicationMenu(null));
@@ -101,13 +129,13 @@ export function AppShell(props: {
   return <ShellFrame>
     <ShellSidebar>
       <SidebarChrome>
-        <IconButton sidebar icon="left" label="后退" hint={`后退 · ${keymap.label(shortcuts.back)}`}
+        <IconButton sidebar icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
           disabled={!nav.canBack()} onPress={goBack} />
-        <IconButton sidebar icon="right" label="前进" hint={`前进 · ${keymap.label(shortcuts.forward)}`}
+        <IconButton sidebar icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
           disabled={!nav.canForward()} onPress={goForward} />
       </SidebarChrome>
       <SidebarSearch>
-        <CommandTrigger shortcut={keymap.label(shortcuts.commands)} onPress={showCommands} />
+        <CommandTrigger shortcut={keymap.label(binding("openCommandPalette",shortcuts.commands))} onPress={showCommands} />
       </SidebarSearch>
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
         {["发现", "音乐库"].map((group) => <View class="gap-(--navigation-row-gap)">
@@ -128,7 +156,7 @@ export function AppShell(props: {
       <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-(--dock-clearance)">
         <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
           selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
-        <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(shortcuts.settings)}`} onPress={showSettings} />
+        <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(binding("openSettings",shortcuts.settings))}`} onPress={showSettings} />
       </View>
     </ShellSidebar>
     <WindowPanel>
@@ -187,7 +215,8 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
       <NowPlaying open={nowPlaying() && !lyricsSearch()}
@@ -202,7 +231,7 @@ export function AppShell(props: {
     <CommandPalette core={core()??undefined} initialQuery={props.initialCommandQuery} navigate={nav.navigate} search={openSearch} open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
       items={[
         ...destinations.map((page) => ({ id: page.id, label: `前往${page.label}`, group: "导航" })),
-        { id: "settings", label: "打开设置…", group: "应用", shortcut: shortcuts.settings },
+        { id: "settings", label: "打开设置…", group: "应用", shortcut: binding("openSettings",shortcuts.settings) },
         ...modes.map((mode) => ({ id: `mode:${mode.id}`, label: `外观：${mode.label}`, group: "外观", checked: appearance.mode() === mode.id })),
       ]} />
   </ShellFrame>;

@@ -59,6 +59,7 @@ impl SettingsService {
     }
     /// Atomically merge fields, clamp valid numeric values, apply DSP/cache settings, then notify mirrors.
     pub async fn update(this: Instance<Self>, patch: JsonValue) -> Result<JsonValue, String> {
+        if patch.get("shortcuts").is_some() || patch.get("globalShortcuts").is_some() { return Err("请通过 core.shortcuts.apply 修改快捷键".into()); }
         let (store, bridge, serial, listeners, downloads) = this.with(|s| {
             (
                 s.store.clone(),

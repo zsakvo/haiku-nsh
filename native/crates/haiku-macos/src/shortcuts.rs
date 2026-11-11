@@ -167,26 +167,14 @@ mod mac {
             }
             let mut current = BINDINGS.lock().unwrap();
             let previous: Vec<Binding> = current.iter().map(|x| x.binding.clone()).collect();
-            for item in current.drain(..) {
-                UnregisterEventHotKey(item.reference as Ref);
-            }
-            match register(&bindings) {
-                Ok(new) => {
-                    *current = new;
-                    Ok(current.len())
+            replace_group(&previous, &bindings, |group| {
+                for item in current.drain(..) {
+                    UnregisterEventHotKey(item.reference as Ref);
                 }
-                Err(error) => {
-                    match register(&previous) {
-                        Ok(old) => *current = old,
-                        Err(restore) => {
-                            return Err(format!(
-                                "{error}; restoring previous shortcuts failed: {restore}"
-                            ))
-                        }
-                    };
-                    Err(error)
-                }
-            }
+                *current = register(group)?;
+                Ok(())
+            })?;
+            Ok(current.len())
         })
     }
 }
@@ -209,7 +197,7 @@ pub fn set(bindings: Vec<Binding>) -> Result<usize, String> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = bindings;
-        Err("Global shortcuts unsupported on this platform".into())
+        Ok(0)
     }
 }
 #[cfg(test)]
@@ -217,18 +205,22 @@ mod tests {
     use super::*;
     #[test]
     fn refuses_typing_keys() {
-        assert!(flags(&Binding {
-            id: "play".into(),
-            key_code: 35,
-            modifiers: vec![]
-        })
-        .is_err());
-        assert!(flags(&Binding {
-            id: "play".into(),
-            key_code: 35,
-            modifiers: vec!["shift".into()]
-        })
-        .is_err());
+        assert!(
+            flags(&Binding {
+                id: "play".into(),
+                key_code: 35,
+                modifiers: vec![]
+            })
+            .is_err()
+        );
+        assert!(
+            flags(&Binding {
+                id: "play".into(),
+                key_code: 35,
+                modifiers: vec!["shift".into()]
+            })
+            .is_err()
+        );
     }
     #[test]
     fn permits_explicit_modifier() {
@@ -241,5 +233,99 @@ mod tests {
             .unwrap(),
             0x300
         );
+    }
+}
+
+/// Validated, all-or-nothing registration boundary. Other platforms keep a no-op backend.
+pub trait GlobalShortcuts: Send + Sync {
+    fn supported(&self) -> bool;
+    fn replace(&self, bindings: &[haiku_store::shortcuts::Binding]) -> Result<(), String>;
+}
+/// Carbon registrations in the native host; fixtures skip system registration explicitly.
+pub struct SystemShortcuts {
+    pub native: bool,
+}
+impl GlobalShortcuts for SystemShortcuts {
+    fn supported(&self) -> bool {
+        cfg!(target_os = "macos")
+    }
+    fn replace(&self, bindings: &[haiku_store::shortcuts::Binding]) -> Result<(), String> {
+        let bindings = haiku_store::shortcuts::validate(bindings)?;
+        if !self.native || !self.supported() {
+            return Ok(());
+        }
+        let group = bindings
+            .into_iter()
+            .filter(|b| b.scope == "global" && !b.chord.is_empty())
+            .map(|b| {
+                let parts: Vec<_> = b.chord.split('+').collect();
+                Binding {
+                    id: b.id,
+                    key_code: haiku_store::shortcuts::key_code(parts.last().unwrap()).unwrap(),
+                    modifiers: parts[..parts.len() - 1]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                }
+            })
+            .collect();
+        set(group).map(|_| ())
+    }
+}
+/// Both the Carbon backend and fake backend exercise this replacement/rollback protocol.
+#[cfg(any(target_os = "macos", test))]
+fn replace_group<T>(
+    previous: &[T],
+    next: &[T],
+    mut install: impl FnMut(&[T]) -> Result<(), String>,
+) -> Result<(), String> {
+    if let Err(error) = install(next) {
+        install(previous).map_err(|restore| format!("{error}; 恢复先前快捷键失败：{restore}"))?;
+        return Err(error);
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod transaction_tests {
+    use super::*;
+    #[test]
+    fn rejected_system_registration_restores_entire_previous_group() {
+        let mut live = vec![1, 2];
+        let previous = live.clone();
+        let mut attempts = Vec::new();
+        let result = replace_group(&previous, &[3, 9, 4], |group| {
+            attempts.push(group.to_vec());
+            live.clear();
+            for id in group {
+                if *id == 9 {
+                    live.clear();
+                    return Err("system rejected 9".into());
+                }
+                live.push(*id);
+            }
+            Ok(())
+        });
+        assert!(result.is_err());
+        assert_eq!(live, previous);
+        assert_eq!(attempts, vec![vec![3, 9, 4], vec![1, 2]]);
+        replace_group(&previous, &[5, 6], |group| {
+            live = group.to_vec();
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(live, vec![5, 6]);
+    }
+    #[test]
+    fn all_function_keys_are_valid_carbon_bindings() {
+        for n in 1..=20 {
+            assert!(
+                flags(&Binding {
+                    id: "play".into(),
+                    key_code: haiku_store::shortcuts::key_code(&format!("f{n}")).unwrap(),
+                    modifiers: vec![]
+                })
+                .is_ok()
+            );
+        }
     }
 }
