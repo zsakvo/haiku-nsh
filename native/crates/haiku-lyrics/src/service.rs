@@ -47,6 +47,12 @@ pub struct Snapshot {
     pub error: Option<String>,
     pub source_errors: BTreeMap<String, String>,
 }
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchReport {
+    pub candidates: Vec<Candidate>,
+    pub source_errors: BTreeMap<String, String>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Cached {
@@ -95,6 +101,7 @@ pub struct Service {
     state: watch::Sender<Snapshot>,
     gate: Arc<Mutex<u64>>,
     cancel: watch::Sender<u64>,
+    preview_cancel: watch::Sender<u64>,
     pub source_timeout: Duration,
     pub total_timeout: Duration,
 }
@@ -114,6 +121,7 @@ impl Service {
             state: watch::channel(Snapshot::default()).0,
             gate: Arc::new(Mutex::new(0)),
             cancel: watch::channel(0).0,
+            preview_cancel: watch::channel(0).0,
             source_timeout: Duration::from_secs(8),
             total_timeout: Duration::from_secs(25),
         }
@@ -377,6 +385,15 @@ impl Service {
         filter: Option<Vec<String>>,
         o: Options,
     ) -> Result<Vec<Candidate>> {
+        Ok(self.search_report(q, filter, o).await?.candidates)
+    }
+    /// Keep successful candidates and report failures independently for each source.
+    pub async fn search_report(
+        &self,
+        q: Query,
+        filter: Option<Vec<String>>,
+        o: Options,
+    ) -> Result<SearchReport> {
         let generation = *self.gate.lock().unwrap();
         let mut cancel = self.cancel.subscribe();
         let work = async {
@@ -391,21 +408,24 @@ impl Service {
                 .map(|p| {
                     let q = q.clone();
                     async move {
-                        tokio::time::timeout(self.source_timeout, p.search(q))
+                        let result = tokio::time::timeout(self.source_timeout, p.search(q))
                             .await
-                            .ok()
-                            .and_then(std::result::Result::ok)
-                            .unwrap_or_default()
+                            .map_err(|_| "Lyrics source timeout (8 seconds)".to_string())
+                            .and_then(|r| r);
+                        (p.id().to_string(), result)
                     }
                 });
-            providers::rank(
-                &q,
-                futures::future::join_all(jobs)
-                    .await
-                    .into_iter()
-                    .flatten()
-                    .collect(),
-            )
+            let mut report = SearchReport::default();
+            for (id, result) in futures::future::join_all(jobs).await {
+                match result {
+                    Ok(candidates) => report.candidates.extend(candidates),
+                    Err(error) => {
+                        report.source_errors.insert(id, error);
+                    }
+                }
+            }
+            report.candidates = providers::rank(&q, report.candidates);
+            report
         };
         let result = tokio::select! {_=cancel.changed()=>return Err("Lyrics request cancelled".into()),
         result=tokio::time::timeout(self.total_timeout,work)=>result.map_err(|_|"Lyrics search timeout".to_string())?};
@@ -413,6 +433,27 @@ impl Service {
             return Err("Lyrics request replaced".into());
         }
         Ok(result)
+    }
+    /// Reserve synchronously before scheduling a preview; changing candidates drops old work.
+    pub fn cancel_preview(&self) -> u64 {
+        let mut ticket = 0;
+        self.preview_cancel.send_modify(|v| {
+            *v += 1;
+            ticket = *v;
+        });
+        ticket
+    }
+    pub async fn preview(&self, c: Candidate, o: Options, ticket: u64) -> Result<Text> {
+        let mut cancel = self.preview_cancel.subscribe();
+        let mut track_cancel = self.cancel.subscribe();
+        if *cancel.borrow_and_update() != ticket {
+            return Err("Lyrics preview cancelled".into());
+        }
+        tokio::select! {
+            _ = cancel.changed() => Err("Lyrics preview cancelled".into()),
+            _ = track_cancel.changed() => Err("Track changed".into()),
+            result = self.resolve(c, o) => result,
+        }
     }
     pub async fn resolve(&self, c: Candidate, o: Options) -> Result<Text> {
         if let Some(text) = c.inline_result {

@@ -2,6 +2,7 @@ import { createPlugins } from "../state/plugins";
 import { SourcesSettings, PluginsSettings, DeveloperSettings } from "./PluginSettings";
 import { createSettings } from "../state/settings";
 import { PlaybackSettings } from "./PlaybackSettings";
+import { LyricsSettings } from "./LyricsSettings";
 import { StorageSettings } from "./StorageSettings";
 import { OtherSettings } from "./Diagnostics";
 import { Scroll, signal, Text, View } from "nsh";
@@ -53,6 +54,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
             <AppearanceOptions appearance={props.appearance} />
           </View></If>
           <If when={!!settings.value()}>
+            <If when={selected() === "歌词"}><View class="w-full max-w-2xl"><LyricsSettings settings={settings} /></View></If>
             <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
             <View class="w-full max-w-2xl" style={{ display: selected() === "存储" ? "flex" : "none" }}><StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} /></View>
           </If>
@@ -62,7 +64,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <View class="w-full max-w-5xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
           <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
           <If when={selected() === "其他" && !!settings.core()}><OtherSettings core={settings.core()!} initialLogs={props.initialLogs} /></If>
-          <View class="flex-col" style={{ display: ["外观", "播放", "存储", "来源", "插件", "开发者", "其他"].includes(selected()) ? "none" : "flex" }}>
+          <View class="flex-col" style={{ display: ["外观", "播放", "歌词", "存储", "来源", "插件", "开发者", "其他"].includes(selected()) ? "none" : "flex" }}>
             <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
           </View>
         </Scroll>

@@ -95,7 +95,12 @@ pub trait Provider: Send + Sync {
     }
 }
 pub fn clean_title(s: &str) -> String {
-    let re=regex::Regex::new(r"(?i)\s*[\(\[][^\)\]]*(?:official|video|audio|lyrics?|visualizer|hd|hq|4k|remaster|remix|live|acoustic|version|edit|extended|radio|clean|explicit)[^\)\]]*[\)\]]|\s*【.*?】|\s*\|.*$|\s*(?:feat\.|ft\.).*$").unwrap();
+    let re = regex::Regex::new(concat!(
+        r"(?i)\s*[\(\[][^\)\]]*(?:official|video|audio|lyrics?|visualizer|hd|hq|4k|",
+        r"remaster|remix|live|acoustic|version|edit|extended|radio|clean|explicit)",
+        r"[^\)\]]*[\)\]]|\s*【.*?】|\s*\|.*$|\s*(?:feat\.|ft\.).*$"
+    ))
+    .unwrap();
     re.replace_all(s, "").trim().into()
 }
 pub fn clean_artist(s: &str) -> String {
@@ -428,7 +433,15 @@ impl Remote {
                 Ok(vec![])
             }
             "betterlyrics" => {
-                let j=h.json("https://lyrics-api.boidu.dev/getLyrics",json!({"s":q.title,"a":q.artist,"al":q.album,"d":(q.duration_sec>0.).then_some(q.duration_sec)})).await?;
+                let j = h
+                    .json(
+                        "https://lyrics-api.boidu.dev/getLyrics",
+                        json!({
+                            "s": q.title, "a": q.artist, "al": q.album,
+                            "d": (q.duration_sec > 0.).then_some(q.duration_sec)
+                        }),
+                    )
+                    .await?;
                 let raw = Text {
                     text: string(&j, "ttml"),
                     format: "ttml".into(),
@@ -459,7 +472,9 @@ impl Remote {
                         .map(|a| format!(" {a}"))
                         .unwrap_or_default()
                 );
-                let songs=h.json("https://mobileservice.kugou.com/api/v3/search/song",json!({"version":"9108","plat":0,"pagesize":8,"showtype":0,"keyword":keyword})).await?;
+                let songs = h.json("https://mobileservice.kugou.com/api/v3/search/song", json!({
+                    "version": "9108", "plat": 0, "pagesize": 8, "showtype": 0, "keyword": keyword
+                })).await?;
                 let mut raw = vec![];
                 for song in songs["data"]["info"].as_array().into_iter().flatten() {
                     if q.duration_sec > 0.
@@ -479,7 +494,18 @@ impl Remote {
                     }
                 }
                 if raw.is_empty() {
-                    raw=h.json("https://lyrics.kugou.com/search",json!({"ver":1,"man":"yes","client":"pc","keyword":keyword,"duration":(q.duration_sec>0.).then_some(q.duration_sec*1000.)})).await?["candidates"].as_array().cloned().unwrap_or_default();
+                    raw = h
+                        .json(
+                            "https://lyrics.kugou.com/search",
+                            json!({
+                                "ver": 1, "man": "yes", "client": "pc", "keyword": keyword,
+                                "duration": (q.duration_sec > 0.).then_some(q.duration_sec * 1000.)
+                            }),
+                        )
+                        .await?["candidates"]
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default();
                 }
                 let mut seen = std::collections::BTreeSet::new();
                 Ok(raw
@@ -518,7 +544,18 @@ impl Remote {
                     "https://lyricsplus.prjktla.my.id",
                     "https://lyricsplus-seven.vercel.app",
                 ] {
-                    let Ok(j)=h.json(&format!("{base}/v2/lyrics/get"),json!({"title":q.title,"artist":q.artist,"album":q.album,"duration":(q.duration_sec>0.).then_some(q.duration_sec)})).await else{continue};
+                    let Ok(j) = h
+                        .json(
+                            &format!("{base}/v2/lyrics/get"),
+                            json!({
+                                "title": q.title, "artist": q.artist, "album": q.album,
+                                "duration": (q.duration_sec > 0.).then_some(q.duration_sec)
+                            }),
+                        )
+                        .await
+                    else {
+                        continue;
+                    };
                     let mut lines = vec![];
                     let mut trans = vec![];
                     for l in j["lyrics"].as_array().into_iter().flatten() {
@@ -573,11 +610,33 @@ impl Remote {
                         break;
                     }
                 }
-                if let Ok(j)=h.json("https://lyrics-api.binimum.org/",json!({"track":q.title,"artist":q.artist,"album":q.album,"duration":(q.duration_sec>0.).then_some(q.duration_sec)})).await {
-                    if let Some(url)=j["results"].as_array().into_iter().flatten().find_map(|r|r["lyricsUrl"].as_str()) {
-                        if let Ok(text)=h.get(url,Value::Null,&BTreeMap::new()).await {
-                            let t=Text{text,format:"ttml".into(),..Default::default()};
-                            if t.quality()>0&&best.as_ref().is_none_or(|b|t.quality()>=b.quality()){best=Some(t);}
+                if let Ok(j) = h
+                    .json(
+                        "https://lyrics-api.binimum.org/",
+                        json!({
+                            "track": q.title, "artist": q.artist, "album": q.album,
+                            "duration": (q.duration_sec > 0.).then_some(q.duration_sec)
+                        }),
+                    )
+                    .await
+                {
+                    if let Some(url) = j["results"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .find_map(|r| r["lyricsUrl"].as_str())
+                    {
+                        if let Ok(text) = h.get(url, Value::Null, &BTreeMap::new()).await {
+                            let t = Text {
+                                text,
+                                format: "ttml".into(),
+                                ..Default::default()
+                            };
+                            if t.quality() > 0
+                                && best.as_ref().is_none_or(|b| t.quality() >= b.quality())
+                            {
+                                best = Some(t);
+                            }
                         }
                     }
                 }
@@ -631,7 +690,10 @@ impl Remote {
                 q.album.as_deref().unwrap_or("")
             ),
         ] {
-            let body=h.get("https://amp-api.music.apple.com/v1/catalog/us/search",json!({"term":term,"types":"songs","limit":25,"l":"en-US","platform":"web","format[resources]":"map","include[songs]":"artists","extend":"artistUrl"}),&headers).await?;
+            let body = h.get("https://amp-api.music.apple.com/v1/catalog/us/search", json!({
+                "term": term, "types": "songs", "limit": 25, "l": "en-US", "platform": "web",
+                "format[resources]": "map", "include[songs]": "artists", "extend": "artistUrl"
+            }), &headers).await?;
             let j: Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
             let mut list = vec![];
             for s in j["results"]["songs"]["data"]
@@ -664,7 +726,19 @@ impl Remote {
         }
         if self.id == "kugou" {
             for format in ["krc", "lrc"] {
-                let Ok(j)=self.http.json("https://lyrics.kugou.com/download",json!({"fmt":format,"charset":"utf8","client":"pc","ver":1,"id":c.candidate_id,"accesskey":c.resolve_data["accesskey"]})).await else {continue};
+                let Ok(j) = self
+                    .http
+                    .json(
+                        "https://lyrics.kugou.com/download",
+                        json!({
+                            "fmt": format, "charset": "utf8", "client": "pc", "ver": 1,
+                            "id": c.candidate_id, "accesskey": c.resolve_data["accesskey"]
+                        }),
+                    )
+                    .await
+                else {
+                    continue;
+                };
                 let Ok(bytes) =
                     base64::engine::general_purpose::STANDARD.decode(string(&j, "content"))
                 else {

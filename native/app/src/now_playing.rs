@@ -13,6 +13,8 @@ pub struct NowPlayingProps {
 /// Overlay lifecycle requests, independent of navigation history.
 #[derive(Clone, Debug, PartialEq, Event)]
 pub enum NowPlayingEvent {
+    /// Open the shell's manual lyrics search dialog for the current track.
+    FindLyrics,
     /// Follow dismissal from Escape or the close control.
     #[args(open)]
     OpenChange(bool),
@@ -84,7 +86,13 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
                                 .text_sm().text_color(move ||theme().color("now-playing-muted").unwrap()))
                             .child(text(move ||track.with(|t|t.as_ref().and_then(|t|t.album.as_ref()).map(|a|a.title.clone()).unwrap_or_default()))
                                 .text_sm().text_color(move ||theme().color("now-playing-muted").unwrap())))
-                        .child(crate::collections::like_button(true))
+                        .child(view().flex_row().items_center().gap_3()
+                            .child(crate::collections::like_button(true))
+                            .child(nsh_base::button()
+                                .accessibility_label("查找歌词…")
+                                .app_class("min-h-8 px-3 py-1.5 justify-center rounded-(--radius) hover:bg-now-playing-surface active:opacity-80 focus-visible:outline-2 focus-visible:outline-ring")
+                                .on_press(move || cx.emit(NowPlayingEvent::FindLyrics))
+                                .child(text("查找歌词…").text_sm().text_color(move || theme().color("now-playing-foreground").unwrap()))))
                         .child(lyrics_view(p.clone()))))
         }))
 }

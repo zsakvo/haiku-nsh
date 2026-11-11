@@ -1,5 +1,5 @@
 //! Engine adapter for the Rust lyrics authority; TSX receives low-frequency snapshots only.
-use crate::core::{CoreBridge, decode};
+use crate::core::{decode, CoreBridge};
 use futures::future::BoxFuture;
 use haiku_lyrics::{
     providers::{Candidate, Query, Text},
@@ -7,9 +7,9 @@ use haiku_lyrics::{
 };
 use haiku_model::Track;
 use nsh_core::{
-    JsonValue,
     element::{Trace, Tracer},
     prelude::*,
+    JsonValue,
 };
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc, time::Duration};
 
@@ -145,13 +145,41 @@ impl LyricsService {
         .map_err(|e| JsError::Error(e.to_string()))?
         .map_err(JsError::Error)
     }
-    /// Resolve a candidate into the same parsed line/word structure used by the Rust view.
-    pub async fn resolve(this: Instance<Self>, candidate: JsonValue) -> Result<JsonValue, JsError> {
-        let c: Candidate = decode(candidate)?;
+    /// Search enabled sources, returning {candidates, sourceErrors} including partial failures.
+    pub async fn search_report(
+        this: Instance<Self>,
+        query: JsonValue,
+        providers: Option<Vec<String>>,
+    ) -> Result<JsonValue, JsError> {
+        let q: Query = decode(query)?;
         let (service, o) = this.with(|s| (s.bridge.lyrics.clone(), options(&s.bridge)));
         background(async move {
             service
-                .resolve(c, o)
+                .search_report(q, providers, o)
+                .await
+                .map(|r| serde_json::to_value(r).unwrap())
+        })
+        .await
+        .map_err(|e| JsError::Error(e.to_string()))?
+        .map_err(JsError::Error)
+    }
+    /// Cancel the independent preview on selection changes or dialog dismissal.
+    pub fn cancel_preview(&self) {
+        self.bridge.lyrics.cancel_preview();
+    }
+    /// Resolve a candidate into the same parsed line/word structure used by the Rust view.
+    pub async fn resolve(this: Instance<Self>, candidate: JsonValue) -> Result<JsonValue, JsError> {
+        let c: Candidate = decode(candidate)?;
+        let (service, o, ticket) = this.with(|s| {
+            (
+                s.bridge.lyrics.clone(),
+                options(&s.bridge),
+                s.bridge.lyrics.cancel_preview(),
+            )
+        });
+        background(async move {
+            service
+                .preview(c, o, ticket)
                 .await
                 .map(|r| serde_json::to_value(r.parsed()).unwrap())
         })

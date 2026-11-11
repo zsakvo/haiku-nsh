@@ -25,12 +25,14 @@ import { createCoreState } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
 import { CommandPalette } from "./CommandPalette";
+import { LyricsSearch } from "./LyricsSearch";
 
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
+  initialLyricsSearch?: boolean;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
   const nav = createNavigation(props.initialRoute);
@@ -41,6 +43,7 @@ export function AppShell(props: {
   const librarySources = () => plugins.value().sources.filter((s) => s.enabled
     && plugins.value().packages.some((p) => p.id === s.pluginId && p.enabled && p.capabilities.includes("library.browse")));
   const nowPlaying = signal(props.initialNowPlaying ?? false);
+  const lyricsSearch = signal(props.initialLyricsSearch ?? false);
   const notifications = signal(props.initialNotifications ?? false);
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
   const showSettings = () => { notifications.set(false); nowPlaying.set(false); overlay.set("settings"); };
@@ -183,7 +186,10 @@ export function AppShell(props: {
     <Settings open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} onLibrary={() => nav.navigate({kind: "library"})} />
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
-      <NowPlaying open={nowPlaying()} onOpenChange={(event) => nowPlaying.set(event.open)} />
+      <NowPlaying open={nowPlaying() && !lyricsSearch()}
+        onFindLyrics={() => lyricsSearch.set(true)}
+        onOpenChange={(event) => nowPlaying.set(event.open)} />
+      <LyricsSearch core={core()!} open={lyricsSearch()} onClose={() => lyricsSearch.set(false)} />
       <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {
         nowPlaying.set(event.open);
         if (event.open) closeOverlay();

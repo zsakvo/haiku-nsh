@@ -91,6 +91,71 @@ fn options() -> Options {
     }
 }
 
+struct PreviewSource(Arc<AtomicUsize>);
+impl Provider for PreviewSource {
+    fn id(&self) -> &str {
+        "preview"
+    }
+    fn search(&self, _: Query) -> BoxFuture<'_, Result<Vec<Candidate>, String>> {
+        Box::pin(async { Err("Fixture offline".into()) })
+    }
+    fn resolve(&self, _: Candidate) -> BoxFuture<'_, Result<Option<Text>, String>> {
+        Box::pin(async {
+            struct Dropped(Arc<AtomicUsize>);
+            impl Drop for Dropped {
+                fn drop(&mut self) {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+            let _guard = Dropped(self.0.clone());
+            std::future::pending().await
+        })
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn partial_search_errors_and_preview_replacement_drop_requests() {
+    let dir = tempfile::tempdir().unwrap();
+    let dropped = Arc::new(AtomicUsize::new(0));
+    let service = Service::with_providers(
+        dir.path().into(),
+        vec![
+            provider("ok", "[00:01]good", 0, Arc::default()),
+            Arc::new(PreviewSource(dropped.clone())),
+        ],
+        Http::default(),
+    );
+    let report = service
+        .search_report(Query::default(), None, options())
+        .await
+        .unwrap();
+    assert_eq!(report.candidates.len(), 1);
+    assert_eq!(report.source_errors["preview"], "Fixture offline");
+    let candidate = Candidate {
+        provider_id: "preview".into(),
+        ..Default::default()
+    };
+    for clear_track in [false, true] {
+        let ticket = service.cancel_preview();
+        let work = service.preview(candidate.clone(), options(), ticket);
+        tokio::pin!(work);
+        assert!(futures::poll!(&mut work).is_pending());
+        if clear_track {
+            service.clear(None);
+        } else {
+            service.cancel_preview();
+        }
+        assert!(work.await.is_err());
+    }
+    assert_eq!(dropped.load(Ordering::SeqCst), 2);
+    // An invalidated ticket never starts its HTTP work.
+    let ticket = service.cancel_preview();
+    service.cancel_preview();
+    assert!(service.preview(candidate, options(), ticket).await.is_err());
+    assert_eq!(dropped.load(Ordering::SeqCst), 2);
+    assert!(service.snapshot().lyrics.is_none());
+}
+
 #[test]
 fn formats_krc_ttml_yrc_and_reference_scoring() {
     use std::io::Write;

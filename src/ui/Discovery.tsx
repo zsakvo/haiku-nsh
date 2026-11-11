@@ -26,7 +26,7 @@ export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:
   </BaseButton>;
 }
 export function CardShelf(props:{items:any[];open:(item:any)=>void}) {
-  return <Scroll horizontal class="h-44 shrink-0" contentClass="flex-row gap-3 pb-2">
+  return <Scroll horizontal class="h-44 shrink-0" contentClass="flex-row gap-1 pb-2">
     <Each of={props.items} key={e=>JSON.stringify(e.reference)}>{e=><Card title={e().title} cover={e().cover} onPress={()=>props.open(e())} />}</Each>
   </Scroll>;
 }

@@ -2,7 +2,10 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 pub struct Server {
     pub url: String,
@@ -16,6 +19,7 @@ impl Server {
             listener.local_addr().map_err(|e| e.to_string())?
         );
         let audio = Arc::new(tone());
+        let lyrics_calls = Arc::new(AtomicUsize::new(0));
         let thread = std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { break };
@@ -27,9 +31,23 @@ impl Server {
                     break;
                 }
                 let audio = audio.clone();
+                let lyrics_calls = lyrics_calls.clone();
                 let cover = cover();
                 std::thread::spawn(move || {
-                    let (body, mime) = if request.contains("/cover.png") {
+                    let (body, mime) = if request.contains("/lyrics-count") {
+                        (
+                            lyrics_calls.load(Ordering::SeqCst).to_string().into_bytes(),
+                            "text/plain",
+                        )
+                    } else if request.contains("/lyrics-error") {
+                        (b"not valid JSON".to_vec(), "application/json")
+                    } else if request.contains("/lyrics") {
+                        lyrics_calls.fetch_add(1, Ordering::SeqCst);
+                        let body = serde_json::json!({
+                            "text": "[00:00]<00:00>潮汐<00:02>之间<00:04>\n[00:05]<00:05>听见<00:07>远方<00:09>\n[00:10]<00:10>风吹过<00:12>森林<00:14>\n[00:15]<00:15>向着<00:17>光亮<00:19>",
+                        });
+                        (body.to_string().into_bytes(), "application/json")
+                    } else if request.contains("/cover.png") {
                         (cover, "image/png")
                     } else {
                         ((*audio).clone(), "audio/flac")

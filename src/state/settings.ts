@@ -9,6 +9,35 @@ export interface SettingsSnapshot {
   schemaVersion: number; themeMode: "light" | "dark" | "system"; brandColor: string;
   audioEffects: AudioEffects; volumeNormalization: boolean; preventScreenSleepOnPlayer: boolean;
   mediaCacheEnabled: boolean; mediaCacheMaxBytes: number;
+  lyricsAutoSearch: boolean; lyricsProviderOrder: string[]; lyricsProvidersDisabled: string[];
+  lyricsCustomProviders: CustomLyricsProvider[];
+}
+export interface CustomLyricsProvider {
+  id: string; name: string; urlTemplate: string; responseType: string;
+  jsonPath: string; headers: Record<string, string>;
+}
+export function withLyricsDefaults(settings: SettingsSnapshot): SettingsSnapshot {
+  return {
+    ...settings,
+    lyricsAutoSearch: settings.lyricsAutoSearch ?? true,
+    lyricsProviderOrder: settings.lyricsProviderOrder ?? [],
+    lyricsProvidersDisabled: settings.lyricsProvidersDisabled ?? ["lyricsplus"],
+    lyricsCustomProviders: settings.lyricsCustomProviders ?? [],
+  };
+}
+export function lyricsProviders(settings: SettingsSnapshot) {
+  const all = [
+    { id: "betterlyrics", name: "Better Lyrics" }, { id: "lrclib", name: "LRCLIB" },
+    { id: "kugou", name: "Kugou" }, { id: "paxsenix", name: "Paxsenix" },
+    { id: "lyricsplus", name: "LyricsPlus" }, ...settings.lyricsCustomProviders,
+  ];
+  return all.sort((a, b) => {
+    const index = (id: string) => {
+      const i = settings.lyricsProviderOrder.indexOf(id);
+      return i < 0 ? all.length : i;
+    };
+    return index(a.id) - index(b.id);
+  });
 }
 /** Rust is the writer; this signal mirrors only durable, applied settings. */
 export function createSettings() {
@@ -18,8 +47,8 @@ export function createSettings() {
   cleanup(() => stop?.());
   const core = resource(async () => {
     const c = await Core.open();
-    value.set(c.settings.get() as SettingsSnapshot);
-    stop = c.settings.onChange((next) => value.set(next as SettingsSnapshot));
+    value.set(withLyricsDefaults(c.settings.get() as SettingsSnapshot));
+    stop = c.settings.onChange((next) => value.set(withLyricsDefaults(next as SettingsSnapshot)));
     return c;
   });
   async function update(patch: unknown) {

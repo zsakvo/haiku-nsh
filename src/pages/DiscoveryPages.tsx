@@ -77,6 +77,7 @@ export function CategoriesPage(props:Props) {
   let epoch=0,closed=false;cleanup(()=>{closed=true;epoch++;});
   effect(()=>{const r=props.route;if(r.kind==="categories"&&r.source){state.selected.set(r.source);category.set(r.category??"");title.set(r.category??"");}});
   const groups=resource(()=>props.active&&state.selected()?state.selected():undefined,async s=>await props.core.sources.categories(s) as Categories);
+  effect(()=>{const match=groups()?.groups.flatMap(g=>g.items).find(c=>c.id===category());if(match)title.set(match.title);});
   effect(()=>{const sorts=groups()?.sorts??[];if(!sorts.some((s:any)=>s.id===sort()))sort.set(sorts[0]?.id??"");});
   const identity=()=>props.active&&state.selected()&&category()?JSON.stringify([state.selected(),category(),sort()]):undefined;
   const result=resource(identity,async key=>{
@@ -134,7 +135,7 @@ export function RadioPage(props:Props) {
       <Text role="header" class="text-lg font-semibold text-foreground">频道</Text>
       <If when={channels.loading()}><Skeleton label="正在加载频道…" /></If>
     </View><List testID="radio-channels" each={channels()??[]} keyExtractor={c=>c.id} estimatedItemSize={44} class="flex-1">
-      {c=><View class="px-(--content-inset) py-1 items-start"><Button label={c().title} selected={radio()?.channel===c().id} variant={radio()?.channel===c().id?"primary":"ghost"} onPress={()=>void start(c().id)} /></View>}
+      {c=><View class="px-(--content-inset) py-1 items-start"><Button label={c().title} selected={radio()?.channel===c().id} variant={radio()?.channel===c().id?"primary":"secondary"} onPress={()=>void start(c().id)} /></View>}
     </List></If>
   </View>;
 }

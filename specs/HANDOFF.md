@@ -34,6 +34,14 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M4-04 已验收并提交
+
+- 第一部分 `1dfae04`：来源链（手动 > 缓存 > 本地 > 插件 > 提供方）、六个内置提供方、`core.lyrics`、`<data>/lyrics/` 缓存。第二部分：查找歌词对话框（正在播放上的“查找歌词…”直达按钮）、设置“歌词”分组、M4-03 三项 UI 小项。
+- 审阅定位：NowPlaying 条件挂载会破坏常驻（已撤回）；`initialNowPlaying=true` 初始即打开时组件事件不到达 AppShell（仅夹具路径，Dock 打开正常），列为已知问题。`service::set_track` 中冗余的 `cancel_preview()` 导致切歌后本地歌词不加载，由审阅者删除（一行，preview 已监听曲目取消）。
+- 审阅者复跑：workspace 252 通过/1 忽略，check/build 通过，完整 nsh test 33/33；五张浅色截图。
+- 遗留：Paxsenix 专用评分/令牌重取/content 兜底、Kugou 署名裁剪；initialNowPlaying 事件问题。待人工确认：真实歌词上游可用性。
+- Codex 周额度剩约 3%，下一步 M4-05（远端收藏刷新、刮削 UI）需等额度恢复。
+
 ## 2026-11-11 更新：M4-03 已验收并提交
 
 - Codex 修复：推荐页 tracks 货架 TrackList 补 `flex-1 min-h-0`（高度塌陷）；电台频道在来源描述符加载前请求导致永久为空。审阅者复跑完整 nsh test 29/29；workspace 247 通过/1 忽略；check/build 通过；五张浅色截图（推荐、分类 tag 墙、分类歌单网格、电台、命令面板“标题 · 歌手”）已审阅。

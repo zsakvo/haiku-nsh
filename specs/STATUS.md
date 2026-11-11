@@ -22,11 +22,11 @@
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
 | F02 插件包与来源生命周期 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/{host,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | workspace 228 通过/1 忽略；QQ CLI 契约 34/34；tsc、nsh check/build、nsh test 17/17；`.artifacts/m2-05/` | 目录监听为 500ms 内容哈希轮询；record/live 仍为基础实现；系统文件选择器与真实热重载体验待人工确认 |
 | F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
-| F04 推荐、发现与分类 | 部分实现（推荐/分类/电台，M4-03 已验收） | `native/app/src/discovery.rs`、`native/crates/haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | workspace 247 通过/1 忽略、check/build 通过；审阅者复跑完整 nsh test 29/29（Search Escape 用例单跑 2/2 ×2，判为满载偶发）；五张浅色截图 | 真实来源首页/电台待人工确认；分类标题显示原始 ID、电台未选频道无按钮样式待 UI 小项 |
+| F04 推荐、发现与分类 | 部分实现（推荐/分类/电台，M4-03 已验收） | `native/app/src/discovery.rs`、`native/crates/haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | M4-03 审阅复跑29/29；M4-04 Discovery回归通过，分类显示名/电台secondary/推荐货架间距已改；分类歌单与电台浅色截图齐全；恢复NowPlaying常驻后Search含Escape定向及完整均通过 | 真实来源首页/电台待人工确认 |
 | F05 搜索 | 部分实现（搜索页与命令面板；M4-02 fixture 验收完成，待审阅） | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | M4-02：workspace 244 通过/1 忽略；最终 nsh check/build 通过，nsh test 25/25；五张浅色实机截图齐全 | 五种实体、来源筛选、分页、历史、防旧结果覆盖、280ms 面板预览与完整第一页起播已实现；真实来源搜索与实机键盘体验待人工确认 |
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
-| F08 歌词与正在播放 | 部分实现（本地/远端来源链、提供方、core.lyrics） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs` | M4-04：workspace 251通过/1忽略；nsh check/build通过、nsh test 30/30；导出预览/采用/重开恢复/切歌隔离/恢复自动通过 | 手动查找对话框、歌词设置分组、截图及提供方细节差异未完成；既有入场动画问题留后续 |
+| F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
 | F11 喜欢、歌单与远端收藏 | 部分实现（本地与远端收藏，M4-01 待审阅） | `haiku-store::collections`、`native/app/src/{collections,plugins}.rs`、`src/pages/{SourceDetailPage,CollectionsBrowser}.tsx` | M4-01：来源歌单收藏写入既有远端镜像；nsh test 22/22，含收藏后侧栏/按钮状态与歌单历史回访；真实来源曲目 Dock 实心喜欢截图通过 | 真实来源收藏刷新、取消收藏操作及媒体命令实机交互仍待人工确认 |
@@ -697,30 +697,35 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 五张真实浅色截图齐：home.png、categories-tags.png、categories-playlists.png、radio.png、command-tracks.png；已逐张查看，运行日志 run-*-final*.log 等保留。
 - 所有证据 .artifacts/m4-03/；预览与测试使用 openIsolated/loopback，无真实上游；截图无 GUI 自动化。
 - 待人工：真实来源首页/分类分页/电台连续播放与听感。小项：直接路由分类标题显示原始ID（如cn），tag点击显示中文，未做名称反查。
-- 未完成：完整nsh test全绿，需后续处理命令面板Escape回归；按额度与验证边界停止扩展排查。无新增架构待决事项；在线歌词/远端收藏刷新/下载留后续。
+- 审阅者定位 Player 失败：service::set_track 中新增的 cancel_preview() 调用导致切歌后本地歌词不加载；preview 已监听曲目 cancel，该调用冗余，审阅者删除后完整 nsh test 33/33、workspace 252 通过（review-*.log）。遗留：Paxsenix 专用评分/401令牌重取/content结构兜底、Kugou署名裁剪。
 
-## 2026-11-11 M4-04：远端歌词核心（部分交付，待审阅）
+## 2026-11-11 M4-04：远端歌词与界面续作（已验收）
 
-- 主仓库内实现，未提交git；未修改参考版/NSH/依赖源码/其他specs，按额度优先交付Rust来源链及导出。
-- haiku-lyrics 新增 formats/providers/service；app lyrics.rs 负责本地文件/当前来源插件适配，presentation将结果推送既有Rust歌词视图与Cursor。
-- 来源链：手动覆盖→匹配指纹的自动缓存→本地文件→track.lyrics→设置排序/禁用后的提供方；纯文本保留兜底并继续寻找同步歌词，内置逐字优于逐行。
-- 单源8秒、总计25秒；切歌/元数据/generation/歌词设置变化先clear并取消旧future，发布与写盘均检查generation；插件调用drop时Cancellation.cancel。
-- 本地读取沿用sidecar/内嵌、编码和1MiB规则；暂停恢复同样加载，封面读取独立于歌词网络请求。
-- 缓存 <data>/lyrics/<SHA256(JSON.stringify([sourceId,id]))>.json，原子写；{result,source,manual,fingerprint,savedAt}兼容参考字段，savedAt毫秒。
-- fingerprint为JSON.stringify([title,artists,album,duration])；自动结果仅mediaCacheEnabled时写入，手动始终保存且不受元数据指纹变更影响。
-- TTML/YRC统一到现有Lyrics/Word；TTML保留嵌套词、命名空间x-translation及lyricOffset；缓存转增强LRC+平行译文，避免参考版旧解析器读取原始XML。
-- 提供方：Kugou歌曲/hash/关键词检索、KRC解密及LRC回退；LRCLIB五种参数回退/时长过滤；Better Lyrics TTML；LyricsPlus镜像/逐字/译文/补充TTML。
-- Paxsenix已实现Apple网页令牌发现、搜索、TTML/eLRC/plain；自定义HTTP支持模板编码、headers、JSON点路径/数组下标；端点均可注入。
-- 通用score/rank沿用参考标题/歌手/时长/逐字/翻译/官方推荐/纯文本扣分及推荐/星级，字符串距离按JS UTF-16计算。
-- 尚有提供方差异：Paxsenix采用通用评分，未移植scoreApple专用权重、令牌401重取和content结构化兜底；Kugou LRC尚未裁剪署名行。
-- core.lyrics：snapshot、onChange→Stop、search({title,artist,album?,durationSec},providers?)、resolve(candidate)、adopt(candidate)、resetToAuto()，均带导出注释。
-- snapshot含loading/track/generation/source/lyrics/error/sourceErrors；来源链记录各源错误；手动search目前将失败来源作为空结果，尚未逐源回报其错误。
-- Core.openIsolated显式写lyricsAutoSearch=false，自动链不访问公共歌词上游；正常Core默认仍自动查找，fixture可显式配置；不依赖进程级路径。
-- Rust四项新增测试覆盖优先级/缓存开关/手动跨实例/指纹/禁用排序/纯文本后逐字/8秒与25秒/取消及迟到版本、KRC/TTML/YRC、评分、自定义JSON路径及五提供方loopback请求。
-- workspace首轮因误用Cancellation.abort编译失败，改用既有cancel后251 passed/1 ignored；TTML/YRC缓存规范化补回归后repair2同样通过。
-- 日志 .artifacts/m4-04/cargo-test-workspace{,-repair1,-repair2}.log，保留失败；未换工具链。
-- nsh check/build各一次通过；nsh test 30/30，通过原本地歌词/切歌/seek及新增导出预览→采用→重开Core恢复→换曲不串→恢复自动→空来源搜索。
-- 日志 nsh-{check,build,test}.log；运行前IOConsoleLocked=No，证据screen-lock-before-test.log；仅已知工具链/host警告。
-- 未完成：手动查找对话框、候选/预览UI、设置歌词分组与自定义来源编辑、Headless设置禁用后请求计数断言、第0步三项UI小修、全部5张真实截图。
-- 未覆盖：真实上游可用性/返回格式变化、真实暂停会话的远端逐字截图；手动候选resolve仅有单次8秒超时，切歌后adopt会拒绝但独立预览请求未主动取消。
-- 按额度停在核心导出与验证，不将本任务标为完成；无新增架构待决事项，后续需补上述提供方细节/UI/截图再完整验收。
+- 主仓库内工作，未提交git；未修改参考版、NSH、依赖源码或其他specs。
+- 已验收核心：haiku-lyrics::{formats,providers,service}；app lyrics.rs适配本地/插件，presentation推送既有Rust歌词视图及Cursor。
+- 来源链：手动覆盖→指纹缓存→本地文件→track.lyrics→排序/禁用后的提供方；单源8秒/总计25秒，纯文本兜底，逐字优先，generation防串与取消。
+- 缓存 <data>/lyrics/<SHA256(JSON.stringify([sourceId,id]))>.json，原子写；{result,source,manual,fingerprint,savedAt}兼容参考版，TTML/YRC规范化增强LRC+译文。
+- fingerprint为JSON.stringify([title,artists,album,duration])；自动遵守媒体缓存开关，手动始终保存。
+- core.lyrics保留snapshot/onChange→Stop/search/resolve/adopt/resetToAuto；新增searchReport→{candidates,sourceErrors}、cancelPreview，带导出注释。
+- 搜索保留成功候选并逐源记录失败；关闭/换候选/切歌取消独立预览，不清空播放歌词，Rust回归证明drop旧future及失效ticket不发请求。
+- LyricsSearch.tsx：关键词/歌手、来源筛选、评分/推荐/逐字/翻译、虚拟候选列表、预览、采用及恢复自动，带陈旧结果保护。
+- 按审阅决定保留ghost“查找歌词…”直达按钮，nsh_base::button发送FindLyrics，“恢复自动”位于对话框。
+- 按审阅结论撤回条件挂载，AppShell恢复常驻NowPlaying，open={nowPlaying() && !lyricsSearch()}，保留FindLyrics/OpenChange事件。
+- RemoteLyrics夹具移除initialNowPlaying；Headless从Dock“显示歌词”打开，覆盖Escape关闭→Dock重开→关闭按钮，以及查找→预览→采用→恢复自动。
+- 已知夹具问题：initialNowPlaying=true初始即打开时组件事件不到达AppShell；审阅review-diag2.log确认，按决定本轮不修；正常Dock打开路径通过。
+- LyricsSettings.tsx：自动查找、提供方启停/排序、自定义HTTP名称/URL/响应类型/JSON路径/headers增删改与校验。
+- 设置Headless验证禁用后0候选/0请求及自定义来源增删改；所有夹具openIsolated，网络只用loopback。
+- 第0步：分类显示“华语”而非cn、电台未选频道secondary、推荐横向货架gap收紧；Discovery回归通过，分类/电台已截图检查。
+- providers.rs原8条超过160字符的行已拆分并rustfmt；未改变提供方请求语义。
+- 前轮workspace252 passed/1 ignored：cargo-test-workspace-ui.log；此前check修复后通过、build通过，本轮未重复。
+- 本轮三个定向各一次：RemoteLyrics3/3、Player1/2、Search2/2；日志nsh-test-resident-{remote-lyrics,player,search}.log。
+- 本轮完整nsh test一次32/33：nsh-test-resident-full.log；RemoteLyrics与Search含Escape均通过，未修改Player/Search断言。
+- 唯一失败：Player暂停Beta后覆盖层已打开，但显示“暂无本地歌词”，等待label:Beta middle五秒超时；恢复常驻后定向与完整仍复现，根因未定位。
+- 旧失败与诊断保留；nsh-test-final.log的31/33属于已撤回条件挂载版本，不代表当前结果。
+- 本轮定向及完整测试前IOConsoleLocked=No：screen-lock-before-resident-{tests,full}.log；仅已知host/工具链警告。
+- 真实浅色主题截图5张均逐张检查：remote-word-lyrics.png、lyrics-search.png、lyrics-settings.png、category-playlists.png、radio.png。
+- NowPlaying图为暂停恢复的远端逐字歌词，区域沿用封面派生暗色；查找图含候选/预览/逐源错误，设置图含启停/排序/HTTP来源。
+- 截图与日志均在.artifacts/m4-04/；本轮仅调整挂载/打开路径，无视觉改动，复查正在播放及查找原图后保留五张截图；预览进程均已关闭。
+- 提供方覆盖沿用首部分：Kugou KRC/LRC、LRCLIB、Better Lyrics TTML、LyricsPlus、Paxsenix、HTTP模板/headers/JSON点路径。
+- 未完成：完整nsh test全绿（上述Player一项失败）；Paxsenix专用评分/401令牌重取/content结构兜底、Kugou署名裁剪仍遗留。
+- 真实上游可用性与返回格式变化需人工确认；无新增架构待决事项。
