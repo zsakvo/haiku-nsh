@@ -25,6 +25,17 @@ pub struct SettingsService {
     next: u64,
 }
 impl SettingsService {
+    pub(crate) async fn refresh(this: Instance<Self>) -> Result<(), String> {
+        let (settings, bridge, listeners) = this.with(|s| (s.store.get(), s.bridge.clone(), s.listeners.clone()));
+        let cache = settings.clone();
+        blocking(move || apply_cache(&cache)).await.map_err(|e| e.to_string())?;
+        bridge.controller.execute(haiku_playback::Command::Configure(settings.clone()))
+            .await.map_err(|e| e.message)?;
+        bridge.settings.set(settings.clone());
+        let value = serde_json::to_value(settings).unwrap();
+        for callback in listeners.0.borrow().values() { callback.post(value.clone()); }
+        Ok(())
+    }
     pub(crate) fn new(
         store: Arc<SettingsStore>,
         bridge: Rc<CoreBridge>,

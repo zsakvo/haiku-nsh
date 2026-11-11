@@ -250,6 +250,22 @@ impl Collections {
     pub fn flush(&self) -> Result<(), String> {
         save(&self.0.state, &self.0.path)
     }
+    /// Reopen the authoritative file after replacement; preserve subscriptions and query handles.
+    pub fn reload(&self) -> Result<(), String> {
+        let mut state = self.0.state.lock().unwrap();
+        let next = match std::fs::read(&self.0.path) {
+            Ok(bytes) => PlaylistCore::from_snapshot(&bytes)?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => PlaylistCore::new(),
+            Err(e) => return Err(e.to_string()),
+        };
+        next.ensure_liked_playlist("喜欢");
+        let ids = state.core.playlists().into_iter().chain(next.playlists())
+            .map(|p| p.id).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+        state.core = next;
+        state.changed(ids);
+        drop(state);
+        self.flush()
+    }
     pub fn is_liked(&self, key: &EntityRef) -> bool {
         key.kind == "track"
             && self

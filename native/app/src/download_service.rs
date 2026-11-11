@@ -60,6 +60,7 @@ struct State {
     retry_at: BTreeMap<String, Instant>,
     stopped: bool,
     migrating: bool,
+    restoring: bool,
 }
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,6 +127,7 @@ impl Service {
     pub fn snapshot(&self) -> Vec<Item> {
         self.state.lock().unwrap().items.clone()
     }
+    pub(crate) fn flush(&self) -> Result<()> { self.save(&self.state.lock().unwrap()) }
     pub fn subscribe(&self) -> watch::Receiver<Vec<Item>> {
         self.events.subscribe()
     }
@@ -262,7 +264,7 @@ impl Service {
     pub fn pump(self: &Arc<Self>) {
         let concurrency = self.settings.get().download_concurrency as usize;
         let mut state = self.state.lock().unwrap();
-        while !state.stopped && !state.migrating && state.active.len() < concurrency {
+        while !state.stopped && !state.migrating && !state.restoring && state.active.len() < concurrency {
             let next = state.items.iter().position(|i| {
                 i.status == "queued"
                     && !state.active.contains_key(&i.key)
@@ -752,6 +754,27 @@ impl Service {
             }
             events.changed().await.map_err(|e| e.to_string())?;
         }
+    }
+    pub(crate) async fn suspend_restore(&self) -> Result<()> {
+        let _serial = self.management.lock().await;
+        let mut events = self.subscribe();
+        {
+            let mut state = self.state.lock().unwrap();
+            state.restoring = true;
+            for active in state.active.values() { active.cancel.cancel(); }
+            for item in &mut state.items {
+                if active_status(&item.status) { item.status = "queued".into(); }
+            }
+            self.save(&state)?;
+        }
+        while !self.state.lock().unwrap().active.is_empty() {
+            events.changed().await.map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+    pub(crate) fn resume_restore(self: &Arc<Self>) {
+        self.state.lock().unwrap().restoring = false;
+        self.pump();
     }
 }
 async fn cancelled(token: &CancelToken) {

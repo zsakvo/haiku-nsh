@@ -34,6 +34,7 @@ export function AppShell(props: {
   initialSettingsCategory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
+  backupPath?: string; initialBackupDialog?: "export" | "import";
   initialLyricsSearch?: boolean;
 } = {}) {
   const appearance = createAppearance(props.initialMode);
@@ -186,7 +187,7 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={props.initialSettingsCategory} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
       <NowPlaying open={nowPlaying() && !lyricsSearch()}

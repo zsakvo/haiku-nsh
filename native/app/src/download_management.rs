@@ -156,6 +156,7 @@ impl Service {
     /// Reconcile complete durable snapshots; remote refresh already commits atomically.
     pub(super) async fn reconcile_auto(self: &Arc<Self>, collections: &Collections) -> Result<()> {
         let _serial = self.management.lock().await;
+        if self.state.lock().unwrap().restoring { return Err("正在恢复备份".into()); }
         let settings = self.settings.get();
         let revision = collections.revision();
         let metadata = collections.list();

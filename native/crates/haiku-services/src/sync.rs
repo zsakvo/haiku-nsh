@@ -578,6 +578,30 @@ impl Service {
         let _gate = self.gate.lock().await;
         self.collections.flush()
     }
+    /// Rebuild restored credentials/binding after shutdown, keeping status subscriptions alive.
+    pub fn resume_after_restore(self: &Arc<Self>) -> Result<()> {
+        let token = self.secrets.read()?.unwrap_or_default();
+        let gist = self.settings.get().gist_id;
+        let progress = json_file::read(&self.root.join("haiku_state/album-progress.json"))
+            .map_err(|e| e.to_string())?.unwrap_or_default();
+        {
+            let mut state = self.state.lock().unwrap();
+            state.closed = false;
+            state.session.epoch += 1;
+            state.session.token = token.clone();
+            state.session.gist = gist.clone();
+            state.progress = progress;
+            state.status = Status {
+                provider: "gist".into(), connected: !token.is_empty(), username: String::new(),
+                busy: false, last_synced: 0, error: String::new(), paused: false,
+                revision: json!(0), gist_id: gist, retry_at: None,
+            };
+            self.config.send_modify(|v| *v += 1);
+            self.publish(&state);
+        }
+        self.start();
+        Ok(())
+    }
 }
 impl Drop for Service {
     fn drop(&mut self) {

@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { localDateTime } from "../ui/dateTime";
+import { BackupSettings } from "./BackupSettings";
 
 /** Filtered pages and redaction come from Rust; copying and saving are explicit actions. */
 export function LogsView(props: { core: Core }) {
@@ -66,10 +67,11 @@ export function LogsView(props: { core: Core }) {
   </View>;
 }
 /** Logs and software identification live in Settings → Other. */
-export function OtherSettings(props: { core: Core; initialLogs?: boolean }) {
+export function OtherSettings(props: { core: Core; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import" }) {
   const logs = signal(props.initialLogs ?? false);
   return <View class="gap-5">
     <Text role="header" class="text-xl font-semibold text-foreground">其他</Text>
+    <BackupSettings core={props.core} fixturePath={props.backupPath} initialDialog={props.initialBackupDialog} />
     <Button label="日志查看器…" onPress={() => logs.set(true)} />
     <Dialog open={logs()} onOpenChange={(e) => logs.set(e.open)}
       class="w-240 max-w-full self-center mt-24 p-5 gap-4">

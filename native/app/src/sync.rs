@@ -27,6 +27,7 @@ pub struct SyncService {
     _exit: crate::exit::ExitGuard,
 }
 impl SyncService {
+    pub(crate) fn authority(&self) -> Arc<Service> { self.service.clone() }
     pub(crate) fn new(service: Arc<Service>, isolated: bool) -> Instance<Self> {
         let listeners = Listeners::default();
         let callbacks = listeners.clone();

@@ -169,7 +169,7 @@ impl PluginService {
         .await
         .map_err(|e| e.to_string())?
     }
-    async fn changed(this: &Instance<Self>) -> Result<JsonValue, String> {
+    pub(crate) async fn changed(this: &Instance<Self>) -> Result<JsonValue, String> {
         let value = Self::snapshot(Self::host(this)).await?;
         Self::notify(this, &value);
         Ok(value)

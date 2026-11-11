@@ -195,6 +195,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    backup: Instance<crate::backup::BackupService>,
     sync: Instance<crate::sync::SyncService>,
     account: Instance<crate::account::AccountService>,
     downloads: Instance<crate::downloads::DownloadService>,
@@ -397,6 +398,12 @@ impl Core {
             )).await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
             crate::sync::SyncService::new(service, isolated)
         };
+        let backup_runtime = crate::backup::Runtime {
+            root: bridge._root.path.clone(), secrets: bridge._root.sync_secrets.clone(),
+            controller: bridge.controller.clone(), host: plugins.clone(), settings: settings.clone(),
+            collections: bridge.collections.clone(), history: bridge.history.clone(), stats: bridge.stats.clone(),
+            sync: sync.with(|s| s.authority()), downloads: downloads.clone(),
+        };
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
@@ -407,7 +414,12 @@ impl Core {
             .owner
             .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
+        let plugins = crate::plugins::PluginService::new(
+            plugins, plugin_logs, bridge.collections.clone(), bridge._root.path.join("cache/home"),
+        );
+        let backup = crate::backup::BackupService::new(backup_runtime, settings.clone(), plugins.clone());
         let core = Instance::new(Self {
+            backup,
             sync,
             account,
             downloads,
@@ -415,12 +427,7 @@ impl Core {
             lyrics,
             activity,
             collections,
-            plugins: crate::plugins::PluginService::new(
-                plugins,
-                plugin_logs,
-                bridge.collections.clone(),
-                bridge._root.path.join("cache/home"),
-            ),
+            plugins,
             settings,
             library,
             player: Instance::new(PlayerService {
@@ -492,6 +499,11 @@ impl Core {
     #[getter]
     pub fn sync(&self) -> Instance<crate::sync::SyncService> {
         self.sync.clone()
+    }
+    /// Validated .haikubak exports, previews, safety backups and hot restoration.
+    #[getter]
+    pub fn backup(&self) -> Instance<crate::backup::BackupService> {
+        self.backup.clone()
     }
     /// Offline download queue, resumable transfers and durable records.
     #[getter]

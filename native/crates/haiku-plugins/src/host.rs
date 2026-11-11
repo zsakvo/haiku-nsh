@@ -282,6 +282,42 @@ impl Host {
     pub fn records(&self) -> Vec<SourceRecord> {
         self.registry.lock().unwrap().sources.clone()
     }
+    /// KV writes are immediate; persist each current credential snapshot before export.
+    pub fn flush(&self) -> Result<()> {
+        for source in self.sources.lock().unwrap().values() { source.persist_credentials()?; }
+        Ok(())
+    }
+    /// Cancel calls and drain their runtime guards before backup replacement.
+    pub async fn quiesce(&self) -> Result<()> {
+        let _transaction = self.transaction.lock().await;
+        let sources = self.sources.lock().unwrap().values().cloned().collect::<Vec<_>>();
+        for source in &sources { source.cancel_all(); }
+        for source in sources {
+            let _runtime = source.runtime.write().await;
+            source.persist_credentials()?;
+        }
+        Ok(())
+    }
+    /// Reload packages and instances in place, so resolvers and UI retain the same host.
+    pub async fn reload(&self) -> Result<()> {
+        let _transaction = self.transaction.lock().await;
+        self.sources.lock().unwrap().clear();
+        self.errors.lock().unwrap().clear();
+        let registry: Registry = json_file::read(&self.root.join("sources.json"))?.unwrap_or_default();
+        *self.registry.lock().unwrap() = registry;
+        for record in self.records().into_iter().filter(|r| r.enabled) {
+            let result = async {
+                valid_path(&record.source_id)?;
+                let descriptor = self.package(&record.plugin_id)?.descriptor;
+                Source::open(&self.root, &record, descriptor, self.replay_base.as_deref()).await
+            }.await;
+            match result {
+                Ok(source) => { self.sources.lock().unwrap().insert(record.source_id, Arc::new(source)); }
+                Err(error) => { self.errors.lock().unwrap().insert(record.source_id, error); }
+            }
+        }
+        Ok(())
+    }
     pub fn source(&self, id: &str) -> Result<Arc<Source>> {
         self.sources
             .lock()

@@ -2005,6 +2005,7 @@ dependencies = [
  "futures",
  "haiku-library",
  "haiku-model",
+ "haiku-plugins",
  "haiku-store",
  "lofty",
  "reqwest",
@@ -2013,6 +2014,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "zip",
 ]
 
 [[package]]

@@ -33,7 +33,7 @@
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
 | F14 Haiku 账号 | 已实现（M5-03 界面待审阅） | `haiku-services::account`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | Rust 第一部分已验收；本轮 check/build 通过、账户 Headless 1/1、完整 nsh test 62/62；两张浅色截图已检查 | 真实服务端与 Keychain 实机待确认 |
-| F15 同步与备份 | 部分实现（Gist 已实现，待审阅） | `haiku-services::sync`、`native/app/src/sync.rs`、`src/shell/SyncSettings.tsx` | 同步 Rust 4/4、Headless 专项 1/1、完整 nsh test 63/63；check/build 通过；两张浅色截图已查看；workspace 被 Subsonic 既有测试夹具失败中断 | 真实 GitHub/Keychain 待人工确认；备份留 M5-05；详见 M5-04 |
+| F15 同步与备份 | 已验证（M5 范围，备份待审阅） | `haiku-services::{sync,backup}`、`native/app/src/{sync,backup}.rs`、`src/shell/{SyncSettings,BackupSettings}.tsx` | M5-04 已验收；M5-05 备份 Rust 5/5，workspace 291 通过/1 忽略，check/build 通过，Headless 专项 1/1，完整 nsh test 64/64；两张浅色截图已查看 | 真实 GitHub/Keychain、原生备份选择器与真实跨平台备份待人工确认；详见 M5-04/M5-05 |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
 
 ## 2026-11-09 实施文档
@@ -914,3 +914,30 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 待人工：真实 GitHub PAT 权限/大文件 raw URL/跨设备往返、Keychain 授权和应用重启恢复；未专项验证 UI 绑定/错误/清除 PAT 路径及深色画面。
 - 待决定：是否在后续小轮修复 Subsonic 测试夹具的空/分段读取处理，并补齐 workspace 全量验收；本轮功能范围无其他待决项。
 - 审阅者：已验收。复跑 workspace 286 通过/0 失败/1 忽略（cargo-workspace-reviewer.log），Codex 一次中断为 Subsonic 夹具单次 read 解析偶发（tests.rs:369），非本任务回归，列入 M5-05 顺带修复；完整 nsh test 63/63；两张截图已审阅。
+
+## 2026-11-11 M5-05：`.haikubak` 备份与热恢复（待审阅）
+
+- 新增 haiku-services::{backup,backup_tests}、native/app/src/backup.rs 与 core.backup；设置“其他”接入 BackupSettings、三个独立根预览入口和 Headless。
+- API：export(path,{includeGithubToken})、inspect(path)、import(path)、safetyBackups()；带文档，另有原生 pickExport/pickImport。
+- 读参考版 schema 1/2，写 schema 2；backup-meta.json 标明 Haiku NSH 1.0.0，保留 createdAt/platform/includesToken/includes 字段。
+- ZIP 条目兼容 haiku_state/{settings.json,likes.json,playlists.loro,sources.json}、cjrt_plugin_pkgs、cjrt_plugins 和可选 secrets.json。
+- 本地映射保持 DATA.md：设置和 Loro 位于数据根，来源/包/实例位于 plugins/；不导出音频、缓存、字体、历史或 Haiku 账户令牌。
+- GitHub PAT 默认不含，显式选中才导出；备份与恢复文件原子写入，Unix 权限 0600；导出对话框明示“包含明文登录凭据”。
+- inspect 检查 ZIP 目录/体积/CRC/JSON/Loro/格式版本，拒绝绝对路径、反斜杠、冒号、空路径段、点路径、..、符号链接、重复条目及白名单外路径。
+- inspect 保留已检查的字节，确认时不重读被替换的文件；未预览不允许 import。
+- 导入前冲刷播放会话、Collections、历史、统计、插件凭据与下载记录；写入前保存 backups/pre-restore-*.haikubak，最多保留 3 份，安全备份默认不含 PAT。
+- 热恢复：清空播放队列→停并等待同步→暂停/排空下载→插件调用排空→写入→重载插件→读取设置→重开 Loro→重建同步→恢复下载→推送设置/来源/刮削器视图。
+- 写入或暂停失败也执行全部 reload/resume；保持现有 Core、Host、SettingsStore、Collections 和订阅身份，避免页面持有失效服务。
+- v1 包/实例不恢复，在预览与结果列出需安装新版本的插件；Subsonic 尝试从嵌套 storage/JSON 字符串迁移 baseUrl/username/password，按 v2 身份算法派生 sourceId，提示重新验证连接。
+- 旧 likes.json 在尚未迁移时导入 __liked__，标记 migratedLikesToPlaylist；跨平台导入保留本机 downloadDir/localScanRoots。
+- Subsonic 测试夹具改为循环读取至请求头结束和完整 Content-Length，忽略空/未完成连接；未改断言。
+- cargo test -p haiku-services backup::tests 首轮 5/5：cargo-backup.log；覆盖 schema 1/2、往返、PAT、v1/连接迁移、恶意路径、版本、符号链接、轮转和部分写入失败后的重载。
+- cargo test --manifest-path native/Cargo.toml --workspace 一次 291 通过/1 忽略：cargo-workspace.log，含加强后的真实 Collections 重载断言及修复后的 Subsonic 用例；无需修复轮次。
+- nsh check/build 各一次通过：nsh-check.log、nsh-build.log；备份 Headless 专项 1/1：nsh-test-backup.log。
+- 完整 nsh test 一次 64/64：nsh-test.log；Headless 覆盖确认导出→导入预览/取消→确认覆盖→结果→关闭设置后显示恢复歌单，Player/Search 回归通过。
+- 两张浅色截图已查看：backup-export.png、backup-import.png；nsh-run-{export,import}.log；预览均已关闭。
+- nsh test/截图前均确认 IOConsoleLocked=No：screen-lock-*.log；仅只读窗口查询与 screencapture，window-{export,import}.log。
+- 全部证据位于 .artifacts/m5-05/；仅既有 block/target-dir/__eh_frame 提示；git diff --check 通过；未提交 git。
+- 待人工：原生打开/保存选择器、真实用户备份与跨平台往返、Keychain PAT 导入授权；未做大体积和并发安装/目录迁移压力验证。
+- 任务范围无未完成项，无需新增审阅决策；v2 插件保留 NSH descriptor/plugin.ts，不尝试在参考版 v1 宿主运行，符合 D9。
+- 审阅者：已验收。恶意路径测试覆盖绝对路径/../反斜杠/符号链接/未来 schema；新增依赖 zip 8.6.0（备份 ZIP 格式所需）认可；workspace 291 通过/1 忽略，nsh test 64/64；两张截图已审阅。M5 完成。

@@ -34,6 +34,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M5-05 已验收并提交，M5 完成
+
+- `.haikubak` 备份：`haiku-services::backup` 与 `core.backup`；读 schema 1/2、写 schema 2；拒绝恶意路径/符号链接/未来 schema；安全备份 `<dataRoot>/backups/` 保留 3 份；v1 插件跳过并列出，Subsonic 连接字段迁移。入口在设置“其他 → 备份与恢复”。顺带修复 Subsonic 测试夹具读取。workspace 291 通过/1 忽略，nsh test 64/64。
+- 待人工确认：原生文件选择器、真实备份往返、Keychain PAT 导入授权。
+- 下一步 M6（MILESTONES.md）：菜单栏、桌面歌词、全局快捷键、玻璃底栏、快捷键设置与关于页、打包、F01–F16 全量审计。
+
 ## 2026-11-11 更新：M5-04 已验收并提交
 
 - Gist 同步：`haiku-services::sync` 与 `core.sync`；Gist 文件 `playlists.loro.b64` + `sync-meta.json`（HAIKU_SYNC_2 gzip/base64，兼容读取参考版旧格式）；PAT 存 Keychain `Haiku NSH / github_pat`。workspace 286 通过/1 忽略，nsh test 63/63。

@@ -20,6 +20,9 @@ lofty.workspace = true
 base64.workspace = true
 flate2 = "1"
 chrono = "0.4"
+zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
+tempfile.workspace = true
+haiku-plugins = { path = "../haiku-plugins" }
 
 [dev-dependencies]
 tempfile.workspace = true

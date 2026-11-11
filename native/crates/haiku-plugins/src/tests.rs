@@ -354,9 +354,30 @@ impl Server {
             .unwrap();
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
-                let mut data = [0; 8192];
-                let n = stream.read(&mut data).unwrap();
-                let text = String::from_utf8_lossy(&data[..n]).to_string();
+                let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+                let mut data = Vec::new();
+                let mut chunk = [0; 8192];
+                let mut expected = None;
+                loop {
+                    let n = stream.read(&mut chunk).unwrap_or(0);
+                    if n == 0 { break; }
+                    data.extend_from_slice(&chunk[..n]);
+                    if expected.is_none() {
+                        if let Some(end) = data.windows(4).position(|w| w == b"\r\n\r\n") {
+                            let head = String::from_utf8_lossy(&data[..end]);
+                            let length = head.lines().find_map(|line| {
+                                let (key, value) = line.split_once(':')?;
+                                key.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().ok()).flatten()
+                            }).unwrap_or(0);
+                            expected = Some(end + 4 + length);
+                        }
+                    }
+                    if expected.is_some_and(|length| data.len() >= length) { break; }
+                    if data.len() > 1024 * 1024 { break; }
+                }
+                if !expected.is_some_and(|length| data.len() >= length) { continue; }
+                let text = String::from_utf8_lossy(&data).to_string();
                 if text.contains("/stop") {
                     let _ = stream.write_all(
                         b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
