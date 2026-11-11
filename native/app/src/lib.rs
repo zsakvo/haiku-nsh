@@ -7,6 +7,7 @@ mod collections;
 mod activity;
 mod library;
 mod lyrics_view;
+mod lyrics;
 mod now_playing;
 mod platform;
 mod player_controls;

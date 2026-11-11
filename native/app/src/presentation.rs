@@ -7,7 +7,7 @@ use haiku_lyrics::{Cursor, Lyrics};
 use haiku_model::Track;
 use haiku_palette::{Color, RequestVersion};
 use nsh_core::prelude::*;
-use std::{cell::RefCell, collections::VecDeque, io::Read, path::PathBuf, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::VecDeque, io::Read, rc::Rc, sync::Arc};
 
 #[derive(Clone)]
 struct Cover {
@@ -87,17 +87,6 @@ fn load_cover(path: String) -> Option<Cover> {
         ),
     })
 }
-fn parse_local(path: Option<String>) -> Lyrics {
-    let Some(local) = path.and_then(|p| haiku_library::local_scan::read_lyrics(&PathBuf::from(p)))
-    else {
-        return Lyrics::default();
-    };
-    let mut parsed = haiku_lyrics::parse(&local.text);
-    if let Some(translation) = local.translation {
-        haiku_lyrics::merge_translation(&mut parsed, &translation);
-    }
-    parsed
-}
 pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
     let owner = Owner::detached();
     let p = owner.run(|| {
@@ -135,13 +124,50 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 track.set(effective);
             }
         });
+        let lyric_key = stored(String::new());
+        let weak = Rc::downgrade(&p);
+        effect(move || {
+            let Some(p) = weak.upgrade() else { return };
+            let selected = p.track.get();
+            let playback_generation = p.bridge.state.with(|s| s.generation);
+            let options: haiku_lyrics::service::Options =
+                serde_json::from_value(serde_json::to_value(p.bridge.settings.get()).unwrap())
+                    .unwrap_or_default();
+            let key = serde_json::json!([selected, playback_generation, options]).to_string();
+            if lyric_key.get() == key {
+                return;
+            }
+            lyric_key.replace(key);
+            let service = p.bridge.lyrics.clone();
+            let generation = service.clear(selected.clone());
+            p.lyrics.set(Arc::new(Lyrics::default()));
+            p.line.set(None);
+            if let Some(t) = selected {
+                let origin = Arc::new(crate::lyrics::Sources(p.bridge.source_host.clone()));
+                spawn(async move {
+                    let _ = background(async move {
+                        service
+                            .load_generation(t, options, origin, generation)
+                            .await;
+                    })
+                    .await;
+                });
+            }
+        });
+        let weak = Rc::downgrade(&p);
+        let mut lyric_events = p.bridge.lyrics.subscribe();
+        spawn(async move {
+            while lyric_events.changed().await.is_ok() {
+                let Some(p) = weak.upgrade() else { return };
+                let state = lyric_events.borrow_and_update().clone();
+                p.lyrics.set(Arc::new(state.lyrics.unwrap_or_default()));
+            }
+        });
         let weak = Rc::downgrade(&p);
         effect(move || {
             let selected = track.get();
             let Some(p) = weak.upgrade() else { return };
             let version = p.request.borrow_mut().advance();
-            p.lyrics.set(Arc::new(Lyrics::default()));
-            p.line.set(None);
             let art = selected.as_ref().and_then(cover_path);
             let key = art.as_deref().map(cover_key);
             let cached = key.as_ref().and_then(|key| {
@@ -160,7 +186,6 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             crate::player_theme::apply(
                 &palette.unwrap_or_else(crate::player_theme::accent_palette),
             );
-            let path = selected.as_ref().and_then(|t| t.local_path.clone());
             let host = p.bridge.source_host.clone();
             let root = p.bridge.artwork_root.clone();
             let weak = Rc::downgrade(&p);
@@ -177,19 +202,12 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 } else {
                     None
                 };
-                let result = blocking(move || {
-                    let lyrics = parse_local(path);
-                    let cover = disk_art.and_then(load_cover);
-                    (lyrics, cover)
-                })
-                .await;
+                let result = blocking(move || disk_art.and_then(load_cover)).await;
                 let Some(p) = weak.upgrade() else { return };
                 if !p.request.borrow().accepts(version) {
                     return;
                 }
-                if let Ok((lyrics, cover)) = result {
-                    log::info!("M1-04 local lyrics loaded: {} lines", lyrics.lines.len());
-                    p.lyrics.set(Arc::new(lyrics));
+                if let Ok(cover) = result {
                     if let Some(cover) = cover {
                         if let Some(key) = key {
                             p.remember(key, cover.clone());

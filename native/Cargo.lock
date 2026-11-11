@@ -1893,7 +1893,17 @@ name = "haiku-lyrics"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "flate2",
+ "futures",
+ "haiku-model",
+ "regex",
+ "reqwest",
+ "roxmltree",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

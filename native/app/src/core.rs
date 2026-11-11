@@ -63,6 +63,7 @@ impl Core {
 
 /// Engine-thread adapter; its position/buffer signals are for Rust components only.
 pub struct CoreBridge {
+    pub(crate) lyrics: Arc<haiku_lyrics::service::Service>,
     pub(crate) source_host: Arc<haiku_plugins::Host>,
     pub(crate) artwork_root: std::path::PathBuf,
     pub(crate) controller: Controller,
@@ -153,6 +154,10 @@ impl CoreBridge {
         });
         crate::platform::install_exit_hook();
         Rc::new(Self {
+            lyrics: Arc::new(haiku_lyrics::service::Service::new(
+                root.path.join("lyrics"),
+                Default::default(),
+            )),
             source_host,
             artwork_root: root.path.join("artwork"),
             _root: root,
@@ -173,6 +178,7 @@ impl CoreBridge {
 }
 impl Drop for CoreBridge {
     fn drop(&mut self) {
+        self.lyrics.clear(None);
         self.owner.dispose();
         if let Err(e) = self.collections.flush() {
             log::error!("Collections exit flush: {e}");
@@ -187,6 +193,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    lyrics: Instance<crate::lyrics::LyricsService>,
     activity: Instance<crate::activity::ActivityService>,
     collections: Instance<crate::collections::CollectionsService>,
     plugins: Instance<crate::plugins::PluginService>,
@@ -344,8 +351,12 @@ impl Core {
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
         let activity = crate::activity::ActivityService::new(bridge.clone());
+        let lyrics = bridge
+            .owner
+            .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            lyrics,
             activity,
             collections,
             plugins: crate::plugins::PluginService::new(
@@ -378,7 +389,8 @@ impl Core {
         })
         .await
     }
-    /// Create a unique temporary Core for one test or preview, retained through close/open.
+    /// Create a temporary Core retained through close/open. Automatic lyrics lookup defaults off;
+    /// offline fixtures may opt in with explicit provider configuration.
     pub async fn open_isolated() -> Result<Instance<Self>, JsError> {
         let base = std::env::temp_dir().join("haiku-m1-03-fixtures");
         std::fs::create_dir_all(&base).map_err(|e| JsError::Error(e.to_string()))?;
@@ -390,6 +402,11 @@ impl Core {
             .path()
             .canonicalize()
             .map_err(|e| JsError::Error(e.to_string()))?;
+        haiku_store::json_file::write(
+            &path.join("settings.json"),
+            &serde_json::json!({"lyricsAutoSearch":false}),
+        )
+        .map_err(|e| JsError::Error(e.to_string()))?;
         Self::select_root(DataRoot {
             path,
             _temporary: Some(Arc::new(dir)),
@@ -405,6 +422,11 @@ impl Core {
     #[getter]
     pub fn collections(&self) -> Instance<crate::collections::CollectionsService> {
         self.collections.clone()
+    }
+    /// Current lyrics, provider search, previews and durable manual selections.
+    #[getter]
+    pub fn lyrics(&self) -> Instance<crate::lyrics::LyricsService> {
+        self.lyrics.clone()
     }
     /// Local playback, playlist browsing and search history.
     #[getter]
@@ -503,12 +525,29 @@ impl PlayerService {
 #[class]
 impl PlayerService {
     /// Start a continuous queue for one source; omitted channel selects private FM.
-    pub async fn start_radio(this: Instance<Self>, source:String, channel:Option<String>) -> Result<(),JsError> {
-        let host=this.with(|p|p.bridge.source_host.clone());
-        let provider=host.source(&source).map_err(|e|JsError::Error(e.to_string()))?;
-        if !provider.descriptor().capabilities.iter().any(|c|c=="radio.next") {return Err(JsError::Error("来源不支持电台".into()));}
-        let radio=Arc::new(crate::sources::SourceRadio{host,source:source.clone(),channel:channel.clone()});
-        Self::send(this,Command::StartRadio(source,channel,radio)).await
+    pub async fn start_radio(
+        this: Instance<Self>,
+        source: String,
+        channel: Option<String>,
+    ) -> Result<(), JsError> {
+        let host = this.with(|p| p.bridge.source_host.clone());
+        let provider = host
+            .source(&source)
+            .map_err(|e| JsError::Error(e.to_string()))?;
+        if !provider
+            .descriptor()
+            .capabilities
+            .iter()
+            .any(|c| c == "radio.next")
+        {
+            return Err(JsError::Error("来源不支持电台".into()));
+        }
+        let radio = Arc::new(crate::sources::SourceRadio {
+            host,
+            source: source.clone(),
+            channel: channel.clone(),
+        });
+        Self::send(this, Command::StartRadio(source, channel, radio)).await
     }
     /// Replace the queue with SDK tracks (plus source/localPath), and play at index.
     pub async fn play(

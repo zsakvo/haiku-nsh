@@ -26,7 +26,7 @@
 | F05 搜索 | 部分实现（搜索页与命令面板；M4-02 fixture 验收完成，待审阅） | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | M4-02：workspace 244 通过/1 忽略；最终 nsh check/build 通过，nsh test 25/25；五张浅色实机截图齐全 | 五种实体、来源筛选、分页、历史、防旧结果覆盖、280ms 面板预览与完整第一页起播已实现；真实来源搜索与实机键盘体验待人工确认 |
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
-| F08 歌词与正在播放 | 部分实现（本地歌词） | `haiku-lyrics::Cursor`、`native/app/src/{presentation,lyrics_view,now_playing,player_theme}.rs` | M1-04：本地优先级/编码/上限、Cursor、配色版本测试通过；Headless 歌词点行/切歌及布局边界通过；真实日志证明行推进；静态覆盖层封面/歌词/Dock 截图通过 | 入场动画未实现：真实 host 的 Rust animated_value timing 不推进，Headless 正常，原因待后续复核；网络与手动歌词留 M4 |
+| F08 歌词与正在播放 | 部分实现（本地/远端来源链、提供方、core.lyrics） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs` | M4-04：workspace 251通过/1忽略；nsh check/build通过、nsh test 30/30；导出预览/采用/重开恢复/切歌隔离/恢复自动通过 | 手动查找对话框、歌词设置分组、截图及提供方细节差异未完成；既有入场动画问题留后续 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
 | F11 喜欢、歌单与远端收藏 | 部分实现（本地与远端收藏，M4-01 待审阅） | `haiku-store::collections`、`native/app/src/{collections,plugins}.rs`、`src/pages/{SourceDetailPage,CollectionsBrowser}.tsx` | M4-01：来源歌单收藏写入既有远端镜像；nsh test 22/22，含收藏后侧栏/按钮状态与歌单历史回访；真实来源曲目 Dock 实心喜欢截图通过 | 真实来源收藏刷新、取消收藏操作及媒体命令实机交互仍待人工确认 |
@@ -698,3 +698,29 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 所有证据 .artifacts/m4-03/；预览与测试使用 openIsolated/loopback，无真实上游；截图无 GUI 自动化。
 - 待人工：真实来源首页/分类分页/电台连续播放与听感。小项：直接路由分类标题显示原始ID（如cn），tag点击显示中文，未做名称反查。
 - 未完成：完整nsh test全绿，需后续处理命令面板Escape回归；按额度与验证边界停止扩展排查。无新增架构待决事项；在线歌词/远端收藏刷新/下载留后续。
+
+## 2026-11-11 M4-04：远端歌词核心（部分交付，待审阅）
+
+- 主仓库内实现，未提交git；未修改参考版/NSH/依赖源码/其他specs，按额度优先交付Rust来源链及导出。
+- haiku-lyrics 新增 formats/providers/service；app lyrics.rs 负责本地文件/当前来源插件适配，presentation将结果推送既有Rust歌词视图与Cursor。
+- 来源链：手动覆盖→匹配指纹的自动缓存→本地文件→track.lyrics→设置排序/禁用后的提供方；纯文本保留兜底并继续寻找同步歌词，内置逐字优于逐行。
+- 单源8秒、总计25秒；切歌/元数据/generation/歌词设置变化先clear并取消旧future，发布与写盘均检查generation；插件调用drop时Cancellation.cancel。
+- 本地读取沿用sidecar/内嵌、编码和1MiB规则；暂停恢复同样加载，封面读取独立于歌词网络请求。
+- 缓存 <data>/lyrics/<SHA256(JSON.stringify([sourceId,id]))>.json，原子写；{result,source,manual,fingerprint,savedAt}兼容参考字段，savedAt毫秒。
+- fingerprint为JSON.stringify([title,artists,album,duration])；自动结果仅mediaCacheEnabled时写入，手动始终保存且不受元数据指纹变更影响。
+- TTML/YRC统一到现有Lyrics/Word；TTML保留嵌套词、命名空间x-translation及lyricOffset；缓存转增强LRC+平行译文，避免参考版旧解析器读取原始XML。
+- 提供方：Kugou歌曲/hash/关键词检索、KRC解密及LRC回退；LRCLIB五种参数回退/时长过滤；Better Lyrics TTML；LyricsPlus镜像/逐字/译文/补充TTML。
+- Paxsenix已实现Apple网页令牌发现、搜索、TTML/eLRC/plain；自定义HTTP支持模板编码、headers、JSON点路径/数组下标；端点均可注入。
+- 通用score/rank沿用参考标题/歌手/时长/逐字/翻译/官方推荐/纯文本扣分及推荐/星级，字符串距离按JS UTF-16计算。
+- 尚有提供方差异：Paxsenix采用通用评分，未移植scoreApple专用权重、令牌401重取和content结构化兜底；Kugou LRC尚未裁剪署名行。
+- core.lyrics：snapshot、onChange→Stop、search({title,artist,album?,durationSec},providers?)、resolve(candidate)、adopt(candidate)、resetToAuto()，均带导出注释。
+- snapshot含loading/track/generation/source/lyrics/error/sourceErrors；来源链记录各源错误；手动search目前将失败来源作为空结果，尚未逐源回报其错误。
+- Core.openIsolated显式写lyricsAutoSearch=false，自动链不访问公共歌词上游；正常Core默认仍自动查找，fixture可显式配置；不依赖进程级路径。
+- Rust四项新增测试覆盖优先级/缓存开关/手动跨实例/指纹/禁用排序/纯文本后逐字/8秒与25秒/取消及迟到版本、KRC/TTML/YRC、评分、自定义JSON路径及五提供方loopback请求。
+- workspace首轮因误用Cancellation.abort编译失败，改用既有cancel后251 passed/1 ignored；TTML/YRC缓存规范化补回归后repair2同样通过。
+- 日志 .artifacts/m4-04/cargo-test-workspace{,-repair1,-repair2}.log，保留失败；未换工具链。
+- nsh check/build各一次通过；nsh test 30/30，通过原本地歌词/切歌/seek及新增导出预览→采用→重开Core恢复→换曲不串→恢复自动→空来源搜索。
+- 日志 nsh-{check,build,test}.log；运行前IOConsoleLocked=No，证据screen-lock-before-test.log；仅已知工具链/host警告。
+- 未完成：手动查找对话框、候选/预览UI、设置歌词分组与自定义来源编辑、Headless设置禁用后请求计数断言、第0步三项UI小修、全部5张真实截图。
+- 未覆盖：真实上游可用性/返回格式变化、真实暂停会话的远端逐字截图；手动候选resolve仅有单次8秒超时，切歌后adopt会拒绝但独立预览请求未主动取消。
+- 按额度停在核心导出与验证，不将本任务标为完成；无新增架构待决事项，后续需补上述提供方细节/UI/截图再完整验收。

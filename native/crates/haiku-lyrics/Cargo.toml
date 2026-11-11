@@ -7,3 +7,16 @@ publish = false
 [dependencies]
 base64.workspace = true
 serde_json.workspace = true
+serde.workspace = true
+tokio.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+haiku-model.workspace = true
+tempfile.workspace = true
+sha2 = "0.10"
+regex = "1"
+flate2 = "1"
+roxmltree = "0.21"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
