@@ -1,4 +1,4 @@
-# 交接记录（2026-11-11）
+# 交接记录（2026-11-12）
 
 换电脑继续时先读本文件，再读 `specs/SPEC.md`（决策 D1–D18）、`specs/MILESTONES.md`、`specs/STATUS.md`、`specs/tasks/README.md`。
 
@@ -8,7 +8,7 @@
 - 每个任务都遵守 `specs/tasks/README.md` 的通用约定：只做列出的验收、每项跑一次、不做 GUI 自动化、失败最多两次修复（审阅者可追加授权）、STATUS 小节有篇幅上限。Codex 不提交 git；**审阅通过后由 Claude 在 main 本地提交（不推送）**，提交信息末尾加 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`（用户已授权）。
 - 用户要求 Claude 派发后**自动监听 Codex 并自动推进**：后台每 30s `rex capture` 窗格末尾 25 行，连续 3 次无 “esc to interrupt” 视为空闲（只看末尾十几行会误报）。仅架构决策或人工验证才停下问用户。
 - 派发时不要让 Codex 用 `/new`（会切到 `~/.codex/worktrees/` 工作树），消息里写明“在主仓库 /Users/zsakvo/Project/GPUI/haiku-nsh 工作”；Codex 状态栏显示 worktree 路径但实际改动落在主仓库。Codex 发送后有时需再补一次 `rex send-key enter`。
-- 本机已确认 Codex 在当前 Rex 会话 `session:01a18a85-6562-735f-9af5-41e1a0ea8fc2` 的右侧窗格 `block:01a1c2f7-c4a0-7591-bd83-d40c4e0a846e`；派发方式是 `rex send` + `rex send-key enter`，随后 capture 确认已进入执行。换会话或机器时重新检查，不复用旧窗格 ID。
+- 另一台机器（参考版在 `~/Project/haiku-gpuix`）上 Codex 在 Rex 会话 `haiku-nsh-codex-drive`（`session:01a178bf-9825-790c-997c-ade5bdd0bdae`）的右侧窗格 `block:01a1c02b-d08d-738a-a94b-ad3ed5076c11`；派发方式是 `rex send` + `rex send-key enter`，随后 capture 确认已进入执行。换会话或机器时重新检查，不复用旧窗格 ID。
 - 执行者不得修改 Rex 会话名称或布局。
 
 ## 环境
@@ -17,16 +17,17 @@
 - 参考项目（只读，业务与行为依据）：路径随机器不同——MacBook Air（Rex 会话 Mono）为 `~/Project/GPUI/haiku`，另一台为 `~/Project/haiku-gpuix`；派发任务时按当前机器改写任务文件里的路径。原 Flutter 版 `~/Project/Flutter/haiku`。
 - 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交；推送由用户自行决定（截至 `625319a` 已推送；2026-11-11 交接时本地领先 origin 约 17 个提交，换机前需用户推送）。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
 
-## 当前进度（2026-11-11 交接时）
+## 当前进度（2026-11-12 暂停时）
 
-- **M0–M5 全部完成并本地提交**（最新 `e71b2f4` M5-05，随后 `a057c6e` 为 M6 拆分与 M6-01 任务文件）。工作树干净，无未提交改动。
-- **下一步 M6-01**：任务文件 `specs/tasks/M6-01-global-shortcuts-and-about.md` 已写好并提交。交接前曾派发给 Codex，但刚开始即被中断（无改动），新机器上**重新派发即可**。M6 拆分见 `specs/MILESTONES.md`（M6-01 快捷键与关于页 → M6-02 菜单栏 → M6-03 桌面歌词 → M6-04 玻璃底栏与 UI 小项 → M6-05 打包 → M6-06 F01–F16 审计）。
-- 新机器派发时：把任务文件里的参考版路径改为 `~/Project/haiku-gpuix`；先 `rex whoami --json` / `rex list` 找到 Codex 窗格，不复用本机窗格 ID。Codex 周额度在交接时约 99%。
-- 审阅惯例：Codex 汇报后，审阅者自己复跑完整 `nsh test`（及必要时 workspace）确认；能自行定位的小问题（如测试选择器）审阅者直接修；已知偶发：Search 命令面板 Escape、jsrt 并发用例在满载全量中偶尔超时。
-- **重要经验**：NSH 中 effect 重跑会取消其内 spawn 的任务，effect 只能读真正决定请求的信号（M5-01 歌词回归）；Headless 中菜单项角色是 `role:menuitem`，`role:button[文字]` 可能命中同名侧栏按钮。
-- 累积待人工确认（给用户汇总）：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3 控制中心 favorite、真实 Cmd+Q 冲刷；M4 真实来源首页/分类/电台、真实歌词与刮削上游、标签写回、远端收藏刷新；M5 真实下载上游与默认目录权限、Finder 显示文件、Haiku 账号真实登录、GitHub Gist 跨设备同步、Keychain 授权、备份真实往返。
-- **待做优化点**：`KaraokeLayer`（CoreText + Core Animation 逐字填充）用户决定暂不实现但保留，见 MACOS.md §5；M6-04 实测 debug CPU 平均 14.3%。
-- 小项待 M6-04：二维码过期置灰；开发者结果树空 `warnings` 展开箭头；分类歌单标题显示原始 ID；电台未选频道样式；推荐货架间距；刮削审阅列表居中、年份差异空白、来源显示内部 ID；`download_management::watch_collections` 100ms 轮询改为等待变更通道；参考版 albumProgress 未接入播放器；Rust `animated_value` 真实 host 不推进（未查明）。
+- **M0–M5、M6-01～M6-05 全部完成并本地提交**（M6-05 为 `ea3c032`；随后 `d5e5504` 提交 M6-06 任务文件）。工作树干净。本地领先 origin 较多，推送由用户决定。
+- **下一步 M6-06 第一步（只审计）**：任务文件 `specs/tasks/M6-06-f01-f16-audit.md` 已提交。已派发给 Codex，但刚开始就被中断，无改动，**重新派发即可**。第一步产出 `specs/AUDIT.md` 与缺口清单后停下，审阅者确认后再另派第二步补缺口。
+- 换机器派发时：任务文件中的参考版路径按本机改写；先 `rex whoami --json` / `rex block list` 找到 Codex 窗格，不复用旧 ID。
+- 审阅惯例：Codex 汇报后，审阅者复跑 workspace 与完整 `nsh test`；能自行定位的小问题审阅者直接修。已知满载偶发：Search 命令面板 Escape、jsrt 并发用例、Core 启动 5s 超时（`core_open_installs_readable_builtin_descriptor`、`engines_own_independent_temporary_data_roots`），单跑通过即视为偶发。
+- **重要经验**：NSH 中 effect 重跑会取消其内 spawn 的任务，effect 只能读真正决定请求的信号；Headless 中菜单项角色是 `role:menuitem`；Codex 写 FFI 时核对 SDK 头文件类型（M6-01 曾把 `ItemCount`/`ByteCount` 写成 u32）；截图要求只截应用窗口/面板。
+- **需用户决定**：应用自身许可证（关于页与第三方声明里显示“尚未声明”）；应用图标是否换成带 macOS 圆角/留白的版本（当前 `assets/app-icon.png` 为满版方图，NSH 不加圆角）。
+- **待做优化点**：`KaraokeLayer` 暂不实现但保留（MACOS.md §5，debug CPU 平均 14.3%）。
+- **遗留（交给 M6-06 审计归类）**：参考版 albumProgress 未接入播放器；Rust `animated_value` 真实 host 不推进；备份热恢复后快捷键注册不刷新（需重启）；打包 strip 步骤缺 libLLVM.dylib 的警告。
+- 累积待人工确认：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3 控制中心 favorite、真实 Cmd+Q 冲刷；M4 真实来源首页/分类/电台、真实歌词与刮削上游、标签写回、远端收藏刷新；M5 真实下载上游与默认目录权限、Finder 显示文件、Haiku 账号登录、Gist 跨设备同步、Keychain 授权、备份真实往返；M6 真实全局按键与系统快捷键冲突、菜单“关于”、菜单栏按钮/菜单点击与暂停/seek 同步、桌面歌词悬停解锁/拖动/工具栏/字体面板、玻璃随系统外观与辅助功能偏好、`.app` Finder 双击/Gatekeeper/Dock 图标观感。
 
 ## 已完成
 
