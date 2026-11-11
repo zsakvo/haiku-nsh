@@ -10,7 +10,7 @@ import { SyncSettings } from "./SyncSettings";
 import { StorageSettings } from "./StorageSettings";
 import { ShortcutSettings } from "./ShortcutSettings";
 import { OtherSettings } from "./Diagnostics";
-import { Scroll, signal, Text, View } from "nsh";
+import { effect, Scroll, signal, Text, View } from "nsh";
 import { type createAppearance } from "../ui/theme";
 import { SidebarItem } from "../ui/Navigation";
 import { SearchField } from "../ui/SearchField";
@@ -29,11 +29,12 @@ const categories = [
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; categoryRequest?: number; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
   const selected = signal(props.initialCategory ?? "外观");
   const settings = createSettings();
   const plugins = createPlugins();
   const query = signal("");
+  effect(()=>{if(props.categoryRequest){selected.set(props.initialCategory ?? "歌词");query.set("");}});
   return <Overlay open={props.open} onClose={props.onClose}>
     <ShellFrame>
       <ShellSidebar>

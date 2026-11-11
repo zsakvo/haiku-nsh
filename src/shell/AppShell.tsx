@@ -52,6 +52,7 @@ export function AppShell(props: {
   const lyricsSearch = signal(props.initialLyricsSearch ?? false);
   const notifications = signal(props.initialNotifications ?? false);
   const about = signal(false);
+  const settingsRequest=signal(0);
   const settingsCategory=signal(props.initialSettingsCategory ?? "外观");
   const overlay = signal<"settings" | "command" | null>(props.initialOverlay ?? null);
   const showSettings = () => { notifications.set(false); nowPlaying.set(false); overlay.set("settings"); };
@@ -88,6 +89,11 @@ export function AppShell(props: {
   cleanup(()=>{for(const binding of installed.values())binding.stop();});
   effect(() => {
     const c=core(); if(c) cleanup(c.shortcuts.onChange(s=>reconcileBindings((s as {bindings:ShortcutBinding[]}).bindings)));
+  });
+  effect(()=>{
+    const c=core();if(c) cleanup(c.settings.onOpenLyrics(()=>{
+      settingsCategory.set("歌词");settingsRequest.update(v=>v+1);showSettings();
+    }));
   });
   const binding=(id:string,fallback:string)=>appBindings()[id]??fallback;
   effect(() => {
@@ -215,7 +221,7 @@ export function AppShell(props: {
         </If>
       </View>
     </WindowPanel>
-    <Settings initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />

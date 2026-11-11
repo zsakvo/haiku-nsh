@@ -32,6 +32,7 @@ mod seek_bar;
 mod settings;
 mod shortcuts;
 mod menubar;
+mod desktop_lyrics;
 mod track_list;
 mod track_source;
 pub use core::{Core, CoreBridge};

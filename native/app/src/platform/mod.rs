@@ -8,6 +8,8 @@ pub fn initialize() {
 mod media;
 #[cfg(target_os = "macos")]
 mod menubar;
+#[cfg(target_os="macos")]
+mod desktop_lyrics;
 pub(crate) fn initialize_media(
     bridge: std::rc::Rc<crate::core::CoreBridge>,
     settings: nsh_core::prelude::Instance<crate::settings::SettingsService>,
@@ -20,7 +22,7 @@ pub(crate) fn initialize_media(
 }
 pub(crate) fn clear_media() {
     #[cfg(target_os = "macos")]
-    haiku_macos::system::shutdown_async();
+    {haiku_macos::system::shutdown_async();haiku_macos::desktop_lyrics_api::hide();}
 }
 
 /// Install the Core durability barrier even when no media session has ever existed.

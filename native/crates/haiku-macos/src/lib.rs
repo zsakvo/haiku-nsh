@@ -1,9 +1,7 @@
 //! Haiku macos domain boundary.
 
 
-#[cfg(target_os = "macos")]
 pub mod desktop_lyrics;
-#[cfg(target_os = "macos")]
 pub mod desktop_lyrics_api;
 #[cfg(target_os = "macos")]
 pub mod events;

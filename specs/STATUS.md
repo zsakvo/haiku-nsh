@@ -27,7 +27,7 @@
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
-| F09 桌面集成 | 部分实现（媒体中心、全局快捷键已验收；M6-02 菜单栏待审阅） | `haiku-macos::{shortcuts,lifecycle,system,menubar,menubar_api}`、`native/app/src/{menubar,platform/*}.rs` | M6-02 单例安装、逐字歌词、按钮/菜单回 Core、原子过期队列拒绝与设置持久化；workspace 298 通过/1 忽略，nsh test 68/68，check/build 通过；真实播放、菜单栏截图及原生快照齐全 | 按钮/菜单真实点击与原生暂停/seek 待人工；其他平台 no-op 未编译验证；M6-03～05 未覆盖；详见 M6-02 |
+| F09 桌面集成 | 部分实现（媒体中心、全局快捷键、M6-02 菜单栏已验收；M6-03 证据补齐待审阅） | `haiku-macos::{shortcuts,lifecycle,system,menubar,menubar_api,desktop_lyrics,desktop_lyrics_api}`、`native/app/src/{menubar,desktop_lyrics,platform/*}.rs` | M6-03 桌面歌词单例、变化/行边界推送、工具栏/快捷键/设置接线；workspace 303 通过/1 忽略，check/build 通过；原 nsh test 71/73，Core 超时经审阅者复核为满载偶发；真实播放、仅面板截图及原生快照已补齐 | 原生交互待人工，其他平台未编译；M6-04～05 未覆盖；详见 M6-03 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
@@ -997,3 +997,36 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 编译仅已知 block 0.1.6 / __eh_frame 提示；Headless runner 报 1 warning（非 verbose 未展开），既有标签夹具另有 PADDING block 提示。
 - 未覆盖/待人工：真实按钮与菜单选择/命中、原生暂停/seek/后台同步、其他平台编译；桌面歌词窗口/锁定留 M6-03。
 - 无失败修复轮次、无架构决策待定；保留改动，未提交 git，未修改 Rex 会话/窗格、参考版、NSH 或依赖源码。
+
+## 2026-11-11 M6-03：桌面歌词（真实窗口证据补齐，待审阅）
+
+- 复用已有 NSPanel；desktop_lyrics_api 改为主队列 OnceLock 单例，事件转发至已有 events channel，不另建 Core 事件订阅。
+- native/app::desktop_lyrics 负责纯投影、变化去重与事件映射；platform/desktop_lyrics 单一稳定 worker 执行原生调用。
+- effect 只读播放/歌词/设置/收藏信号并入队；NSH timer 仅在下一句边界唤醒，不逐帧轮询；隐藏时不设歌词定时器。
+- 换句/换歌、暂停/恢复、seek 重锚逐字进度；重新显示时重推完整状态；无歌词显示歌名/艺术家。
+- 工具栏上一首/播放/下一首/喜欢复用 Controller/Collections；锁定/隐藏走 SettingsService，设置按钮打开已有覆盖层的“歌词”分组。
+- M6-01 toggleDesktopLyrics 快捷键与菜单栏显示/锁定项已接通；isolated fixture 在创建面板 worker 前返回，Headless 无原生宿主不安装。
+- 设置新增强类型 desktopLyrics，兼容参考字段/默认值并保留未知字段；visible/locked 同处持久设置。
+- 可逆扩展：shadow 为可选独立字段；旧设置缺省时沿用 outline 联动，新设置可分别控制描边/阴影；原生窗口阴影保持关闭。
+- 设置界面复用现有控件：显示、锁定、四布局、NSFontPanel、字号 14–60、字重、颜色、描边、阴影、译文及三种背景。
+- 字体选择经 channel 落盘后再应用；反复请求歌词设置可从已打开的其他分组重新定位。
+- 保留 layout::build 纯函数及各模式/长句字号缩小后平移测试；新增 geometry::constrain 覆盖断开显示器、负坐标、小屏和无效数值。
+- 位置由 Core 保存至其数据根 haiku_state/desktop-lyrics-position.json（center_x/y/width，默认宽 600pt），安装前限制到连接屏幕内。
+- debug snapshot 读取已应用可见/锁定/文本/帧/window_id；nsh-run.log 已保存真实原生快照。
+- 验收 1 首轮编译失败：worker 初始化引用了尚未声明的 ready；修复思路 1 将初始化移至 ready 创建后，未改测试断言。
+- workspace 重跑通过：303 通过、0 失败、1 忽略；cargo-workspace.log、cargo-workspace-repair1.log。
+- Rust 新增覆盖投影去重/重锚、元数据回退、无隐藏唤醒、假后端工具栏映射、位置持久化与参考设置兼容。
+- 验收 2：nsh check -v、nsh build -v 各一次通过；nsh-check.log、nsh-build.log；仅已知 block 0.1.6 / __eh_frame 警告。
+- 完整 nsh test -v 一次失败：73 项中 71 通过、2 失败；nsh-test.log。38 个 TSX 用例全通过，含新增 2 个桌面歌词用例。
+- 新 Headless 覆盖开关/快捷键、锁定、布局/字重/颜色/描边/阴影/译文/背景重开持久化，以及重复原生设置请求。
+- 失败为 core::plugin_host_tests::core_open_installs_readable_builtin_descriptor 和 core::tests::engines_own_independent_temporary_data_roots，均等待 Core 启动超过 5s。
+- 审阅者已确认两例为全量满载偶发：单跑通过，审阅者复跑完整 nsh test 时两例通过；仅剩已知偶发 Search Escape，单跑也通过。
+- 未改 timeout/断言/并发；本次按授权仅补验收 3，未重跑 workspace、check/build 或 nsh test，不将原失败日志改记为全绿。
+- 测试/真实运行前均确认未锁屏：screen-lock.log、screen-lock-run.log；证据均在 .artifacts/m6-03/。
+- 验收 3：nsh run DesktopLyricsRun.tsx --target macos --window-size 1200x900 -v 一次；nsh-run.log，显式 data/ 数据根，loopback 测试音频真实播放。
+- 日志确认音频 position 递增、buffered=1、playing=true；原生快照 visible=true、locked=false、favorite=true、classic、solid，歌词随行边界更新。
+- desktop-lyrics.png 通过 screencapture -x -o -l 仅截 NSPanel（600×129pt，图像 1200×258px），已查看，无其他应用窗口；screenshot.log 记录窗口 ID。
+- 截图后 Ctrl+C 停止 nsh run；无自动点击、鼠标移动、字体面板或其他 GUI 自动化。
+- 待人工：锁定后悬停解锁、拖动保存/恢复、八按钮真实点击、NSFontPanel；其他平台 no-op 未编译验证。
+- 验收 3 无未完成项；完整测试偶发已由审阅者复核并要求停止排查；无新增架构决策。
+- 保留全部改动，未提交 git；未做 GUI 自动化，未修改 Rex 会话/窗格、参考版、NSH、依赖源码或其他 specs 文件。

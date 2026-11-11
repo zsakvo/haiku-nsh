@@ -26,7 +26,9 @@ pub(super) fn initialize(
             if event.name == "shortcuts.event" {
                 if let Some(id) = event.data["id"].as_str() {
                     if let Some(bridge) = shortcut_bridge.upgrade() {
-                        if let Err(e) = crate::shortcuts::dispatch(&bridge, id).await {
+                        if let Err(e) =
+                            crate::shortcuts::dispatch(&bridge, id, settings.clone()).await
+                        {
                             log::warn!("Global shortcut: {e}");
                         }
                     }
@@ -60,6 +62,23 @@ pub(super) fn initialize(
                                 )
                                 .await?;
                             }
+                            crate::menubar::HostAction::ToggleDesktopLyrics => {
+                                let visible =
+                                    bridge.settings.get_untracked().desktop_lyrics.visible;
+                                crate::settings::SettingsService::update(
+                                    settings.clone(),
+                                    serde_json::json!({"desktopLyrics":{"visible":!visible}}),
+                                )
+                                .await?;
+                            }
+                            crate::menubar::HostAction::ToggleDesktopLock => {
+                                let locked = bridge.settings.get_untracked().desktop_lyrics.locked;
+                                crate::settings::SettingsService::update(
+                                    settings.clone(),
+                                    serde_json::json!({"desktopLyrics":{"locked":!locked}}),
+                                )
+                                .await?;
+                            }
                             crate::menubar::HostAction::None => {}
                         }
                         Ok::<_, String>(())
@@ -67,6 +86,39 @@ pub(super) fn initialize(
                     .await;
                     if let Err(e) = result {
                         log::warn!("Menubar command: {e}");
+                    }
+                }
+                continue;
+            }
+            if event.name == "desktopLyrics.event" || event.name == "desktopLyrics.font_changed" {
+                if let Some(bridge) = shortcut_bridge.upgrade() {
+                    let result=async {
+                        let action=if event.name=="desktopLyrics.font_changed" {
+                            let size=event.data["font_size"].as_f64().filter(|v|v.is_finite()).ok_or("Invalid font size")?;
+                            let weight=event.data["font_weight"].as_f64().filter(|v|v.is_finite()).ok_or("Invalid font weight")?;
+                            crate::desktop_lyrics::Action::Patch(serde_json::json!({"desktopLyrics":{
+                                "font":event.data["font_family"].as_str().ok_or("Invalid font family")?,
+                                "fontName":event.data["font_name"].as_str().ok_or("Invalid font name")?,
+                                "fontSize":size,"fontWeight":haiku_store::desktop_lyrics::nearest_weight(weight)}}))
+                        }else{
+                            crate::desktop_lyrics::dispatch(&bridge.controller,&bridge.collections,serde_json::from_value(event.data).map_err(|e|e.to_string())?).await?
+                        };
+                        bridge.collections_revision.set(bridge.collections.revision());
+                        use crate::desktop_lyrics::Action;
+                        match action {
+                            Action::Patch(patch)=>{crate::settings::SettingsService::update(settings.clone(),patch).await?;},
+                            Action::ShowApp=>haiku_macos::lifecycle::show_main_window(),
+                            Action::Settings=>crate::settings::SettingsService::open_lyrics_settings(settings.clone()),
+                            Action::Position(position)=>{
+                                let path=bridge.data_root().join("haiku_state/desktop-lyrics-position.json");
+                                blocking(move ||haiku_store::json_file::write(&path,&position)).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())?;
+                            },
+                            Action::None=>{},
+                        }
+                        Ok::<_,String>(())
+                    }.await;
+                    if let Err(e) = result {
+                        log::warn!("Desktop lyrics command: {e}");
                     }
                 }
                 continue;
@@ -108,6 +160,7 @@ pub(super) fn initialize(
         }
     });
     super::menubar::initialize(bridge.clone(), ready, native_enabled);
+    super::desktop_lyrics::initialize(bridge.clone(), ready, native_enabled);
     let registered = stored(false);
     effect(move || {
         if !ready.get() || registered.get() {

@@ -182,6 +182,8 @@ pub(crate) fn project(
             },
             true,
         ),
+        item("lyrics:show",if settings.desktop_lyrics.visible {"隐藏桌面歌词"}else{"显示桌面歌词"},true),
+        item("lyrics:lock",if settings.desktop_lyrics.locked {"解锁桌面歌词"}else{"锁定桌面歌词"},settings.desktop_lyrics.visible),
         item("app:quit", "退出 Haiku", true),
     ];
     let highlight = settings
@@ -209,6 +211,8 @@ pub(crate) enum HostAction {
     None,
     ShowWindow,
     ToggleLyrics,
+    ToggleDesktopLyrics,
+    ToggleDesktopLock,
     Quit,
 }
 /// Execute playback/collection actions via the same authorities as the UI.
@@ -231,6 +235,8 @@ pub(crate) async fn dispatch(
             match id.as_str() {
                 "window:show" => return Ok(HostAction::ShowWindow),
                 "menubar:lyrics" => return Ok(HostAction::ToggleLyrics),
+                "lyrics:show"=>return Ok(HostAction::ToggleDesktopLyrics),
+                "lyrics:lock"=>return Ok(HostAction::ToggleDesktopLock),
                 "app:quit" => return Ok(HostAction::Quit),
                 _ => {}
             }

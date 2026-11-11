@@ -140,11 +140,11 @@ impl ShortcutsService {
     }
     /// Dispatch an app binding through the same Controller/collections path as global events and UI.
     pub async fn trigger(this: Instance<Self>, id: String) -> Result<(), String> {
-        let bridge = this.with(|s| s.bridge.clone());
-        dispatch(&bridge, &id).await
+        let (bridge,settings) = this.with(|s| (s.bridge.clone(),s.settings.clone()));
+        dispatch(&bridge, &id, settings).await
     }
 }
-pub(crate) async fn dispatch(bridge: &Rc<CoreBridge>, id: &str) -> Result<(), String> {
+pub(crate) async fn dispatch(bridge: &Rc<CoreBridge>, id: &str, settings:Instance<SettingsService>) -> Result<(), String> {
     use haiku_playback::Command;
     let command = match id {
         "togglePlayback" => Command::Toggle,
@@ -166,7 +166,11 @@ pub(crate) async fn dispatch(bridge: &Rc<CoreBridge>, id: &str) -> Result<(), St
             haiku_macos::lifecycle::show_main_window();
             return Ok(());
         }
-        "toggleDesktopLyrics" => return Ok(()),
+        "toggleDesktopLyrics" => {
+            let visible=bridge.settings.get_untracked().desktop_lyrics.visible;
+            SettingsService::update(settings,serde_json::json!({"desktopLyrics":{"visible":!visible}})).await?;
+            return Ok(());
+        },
         _ => return Err("未知快捷键操作".into()),
     };
     bridge

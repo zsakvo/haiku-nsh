@@ -12,6 +12,11 @@ use std::sync::mpsc::Sender;
 
 // ===================== 跨平台共享类型 =====================
 
+pub mod geometry;
+use geometry::Position;
+
+#[derive(Debug,serde::Serialize,serde::Deserialize)]
+#[serde(rename_all="snake_case")]
 pub enum DesktopLyricsEvent {
     Prev,
     Toggle,
@@ -22,12 +27,15 @@ pub enum DesktopLyricsEvent {
     ShowApp,
     Settings,
     Close,
+    Position(Position),
 }
 
+#[derive(Clone,Debug,PartialEq)]
 pub struct Style {
     pub text_color: Option<(f64, f64, f64)>,
     pub highlight_color: Option<(f64, f64, f64)>,
     pub outline: bool,
+    pub shadow: bool,
     pub background: String,
     pub font_size: f64,
     pub font_family: String,
@@ -39,6 +47,7 @@ pub struct Style {
     pub show_translation: bool,
 }
 
+#[derive(Clone,Debug,PartialEq)]
 pub struct LyricLine {
     pub text: String,
     pub translation: String,
@@ -46,7 +55,7 @@ pub struct LyricLine {
 }
 
 /// Pure layout policy, shared by rendering and the geometry tests below.
-mod layout {
+pub mod layout {
     use super::{LyricLine, Style};
 
     pub const PAD_X: f64 = 16.0;
@@ -190,6 +199,7 @@ mod layout {
                 text_color: None,
                 highlight_color: None,
                 outline: true,
+                shadow: true,
                 background: "none".into(),
                 font_size: 28.0,
                 font_family: String::new(),
@@ -311,14 +321,14 @@ mod layout {
 
 #[cfg(not(target_os = "macos"))]
 mod imp {
-    use super::{DesktopLyricsEvent, LyricLine, Sender, Style};
+    use super::{DesktopLyricsEvent, LyricLine, Sender, Style, Position};
 
     #[derive(Clone)]
     pub struct DesktopLyricsHandle;
 
     impl DesktopLyricsHandle {
         pub fn show(&self, _visible: bool) {}
-        pub fn set_lines(&self, _current: Option<LyricLine>, _next: Option<LyricLine>) {}
+        pub fn set_lines(&self, _current: Option<LyricLine>, _next: Option<LyricLine>, _start:f64, _pos:f64, _paused:bool) {}
         pub fn set_progress(&self, _pos: f64, _paused: bool) {}
         pub fn set_playing(&self, _playing: bool) {}
         pub fn set_favorite(&self, _fav: bool) {}
@@ -337,7 +347,7 @@ mod imp {
         }
     }
 
-    pub fn install(_tx: Sender<DesktopLyricsEvent>) -> DesktopLyricsHandle {
+    pub fn install(_tx: Sender<DesktopLyricsEvent>, _position:Option<Position>) -> DesktopLyricsHandle {
         DesktopLyricsHandle
     }
 }
@@ -359,13 +369,11 @@ mod imp {
     use objc::runtime::{Class, Object, Sel, BOOL};
     use objc::{class, msg_send, sel, sel_impl};
 
-    use super::{DesktopLyricsEvent, LyricLine, Sender, Style};
+    use super::{DesktopLyricsEvent, LyricLine, Sender, Style, Position};
 
     use super::layout::{self, LineKind, Row};
 
     const WINDOW_W: f64 = 600.0;
-    const WINDOW_MIN_W: f64 = 420.0;
-    const WINDOW_MAX_W: f64 = 900.0;
     const WINDOW_H: f64 = 90.0;
     const SYMBOL_SIZE: f64 = 16.0;
     const TOOLBAR_W: f64 = 256.0;
@@ -568,7 +576,7 @@ mod imp {
                     "supported":true,"visible":visible!=NO,"window_id":window_id,
                     "locked":st.locked,"ignores_mouse_events":ignores_mouse_events!=NO,"hovered":st.hovered,
                     "playing":st.playing,"paused":st.paused,"favorite":st.favorite,"layout":st.style.layout,
-                    "background":st.style.background,"show_translation":st.style.show_translation,
+                    "background":st.style.background,"outline":st.style.outline,"shadow":st.style.shadow,"show_translation":st.style.show_translation,
                     "font_family":st.style.font_family,"font_name":st.style.font_name,"font_size":st.style.font_size,"font_weight":st.style.font_weight,
                     "x":frame.origin.x,"y":frame.origin.y,"width":frame.size.width,"height":frame.size.height,
                     "coordinate_system":"AppKit bottom-left, local rects in points",
@@ -585,7 +593,7 @@ mod imp {
             Queue::main().exec_sync(move || unsafe {
                 let _: () = msg_send![window as id,setFrameOrigin:NSPoint::new(x,y)];
                 constrain_position(window as id);
-                save_position(window as id);
+                send_position(window as id);
             });
         }
         pub fn show(&self, visible: bool) {
@@ -610,7 +618,7 @@ mod imp {
             });
         }
 
-        pub fn set_lines(&self, current: Option<LyricLine>, next: Option<LyricLine>) {
+        pub fn set_lines(&self, current: Option<LyricLine>, next: Option<LyricLine>, start:f64, pos:f64, paused:bool) {
             let view = self.view;
             Queue::main().exec_async(move || unsafe {
                 if view == 0 {
@@ -618,11 +626,8 @@ mod imp {
                 }
                 let obj = &*(view as *const Object);
                 let st = state_of(obj);
-                if st.current.as_ref().map(|line| &line.text)
-                    != current.as_ref().map(|line| &line.text)
-                {
-                    st.line_start_pos = st.current_pos();
-                }
+                st.song_pos=pos;st.pos_at=Instant::now();st.paused=paused;
+                st.line_start_pos=start;
                 st.current = current;
                 st.next = next;
                 rebuild_all(view as id);
@@ -637,14 +642,10 @@ mod imp {
                 }
                 let obj = &*(view as *const Object);
                 let st = state_of(obj);
-                let jumped = (pos - st.current_pos()).abs() > 0.35;
-                let flipped = paused != st.paused;
                 st.song_pos = pos;
                 st.pos_at = Instant::now();
                 st.paused = paused;
-                if flipped || jumped || paused {
-                    apply_timeline(view as id);
-                }
+                apply_timeline(view as id);
             });
         }
 
@@ -771,7 +772,7 @@ mod imp {
         }
     }
 
-    pub fn install(tx: Sender<DesktopLyricsEvent>) -> DesktopLyricsHandle {
+    pub fn install(tx: Sender<DesktopLyricsEvent>, position:Option<Position>) -> DesktopLyricsHandle {
         unsafe {
             let style_mask = NS_BORDERLESS | NS_NONACTIVATING_PANEL;
             let content = rect(0.0, 0.0, WINDOW_W, WINDOW_H);
@@ -797,7 +798,10 @@ mod imp {
             let _: () = msg_send![panel, setAcceptsMouseMovedEvents: YES];
 
             place_initial(panel);
-            restore_position(panel);
+            if let Some(position)=position {
+                constrain_to_position(panel,position,WINDOW_H);
+            }
+            constrain_position(panel);
 
             let view = new_view(content);
             let host: id = msg_send![view, layer];
@@ -824,6 +828,7 @@ mod imp {
                     text_color: None,
                     highlight_color: None,
                     outline: true,
+                shadow: true,
                     background: "none".to_string(),
                     font_size: 28.0,
                     font_family: String::new(),
@@ -1032,7 +1037,7 @@ mod imp {
         1 | 2 | 4 // Face, size and collections; colors/shadows use dedicated settings.
     }
 
-    extern "C" fn change_font(this: &Object, _: Sel, manager: id) {
+    extern "C" fn change_font(_this: &Object, _: Sel, manager: id) {
         unsafe {
             let selected: id = msg_send![manager, selectedFont];
             if selected == nil {
@@ -1054,15 +1059,9 @@ mod imp {
             } else {
                 msg_send![weight_number, doubleValue]
             };
-            let st = state_of(this);
-            st.style.font_family = rust_string(family);
-            st.style.font_name = rust_string(name);
-            st.style.font_size = size;
-            st.style.font_weight = weight;
-            let data = serde_json::json!({"font_family":st.style.font_family,"font_name":st.style.font_name,"font_size":size,"font_weight":weight});
-            let normalized: id = msg_send![manager, convertFont: font toSize: size];
-            let _: () = msg_send![manager, setSelectedFont: normalized isMultiple: NO];
-            rebuild_all(this as *const Object as id);
+            let data = serde_json::json!({"font_family":rust_string(family),"font_name":rust_string(name),"font_size":size,"font_weight":weight});
+            let normalized:id=msg_send![manager,convertFont:font toSize:size];
+            let _:()=msg_send![manager,setSelectedFont:normalized isMultiple:NO];
             let _ = crate::events::emit("desktopLyrics.font_changed", data);
         }
     }
@@ -1187,7 +1186,7 @@ mod imp {
             let st = state_of(this);
             if st.dragging {
                 constrain_position(st.window as id);
-                save_position(st.window as id);
+                send_position(st.window as id);
             }
             st.dragging = false;
         }
@@ -1420,6 +1419,7 @@ mod imp {
                     font,
                     text_color(st),
                     st.style.outline,
+                    st.style.shadow,
                     0.0,
                     0.0,
                     scale,
@@ -1449,8 +1449,8 @@ mod imp {
         scale: f64,
     ) {
         let (x, y) = (0.0, 0.0);
-        let base_attrs = text_attrs(font, text_color(st));
-        let hi_attrs = text_attrs(font, highlight_color(st));
+        let base_attrs = styled_attrs(font, text_color(st), st.style.outline);
+        let hi_attrs = styled_attrs(font, highlight_color(st), st.style.outline);
 
         let size = text_size(text, base_attrs);
         let tw = size.width;
@@ -1458,7 +1458,7 @@ mod imp {
         st.current_height = th;
 
         let base = new_text_layer(attr_string(text, base_attrs), tw, th, x, y, scale);
-        apply_text_shadow(base, st.style.outline);
+        apply_text_shadow(base, st.style.shadow);
         let _: () = msg_send![container, addSublayer: base];
 
         let has_words = matches!(&st.current, Some(c) if !c.words.is_empty());
@@ -1481,11 +1481,12 @@ mod imp {
         font: id,
         fg: id,
         outline: bool,
+        shadow: bool,
         x: f64,
         y: f64,
         scale: f64,
     ) -> id {
-        let attrs = text_attrs(font, fg);
+        let attrs = styled_attrs(font, fg, outline);
         let size = text_size(text, attrs);
         let l = new_text_layer(
             attr_string(text, attrs),
@@ -1495,7 +1496,7 @@ mod imp {
             y,
             scale,
         );
-        apply_text_shadow(l, outline);
+        apply_text_shadow(l, shadow);
         l
     }
 
@@ -1683,6 +1684,8 @@ mod imp {
     extern "C" {
         static NSFontAttributeName: id;
         static NSForegroundColorAttributeName: id;
+        static NSStrokeWidthAttributeName:id;
+        static NSStrokeColorAttributeName:id;
         static NSFontFamilyAttribute: id;
         static NSFontTraitsAttribute: id;
         static NSFontWeightTrait: id;
@@ -1926,13 +1929,22 @@ mod imp {
         msg_send![class!(NSFont), systemFontOfSize: size weight: weight]
     }
 
-    /// 文字属性。这里只保留字体和颜色；可读性完全交给图层阴影，不再给每个笔画
-    /// 加黑色描边（笔画内描边会显得脏）。
+    /// Base metrics stay independent of the separately configured stroke and layer shadow.
     unsafe fn text_attrs(font: id, fg: id) -> id {
         let dict: id = msg_send![class!(NSMutableDictionary), dictionary];
         let _: () = msg_send![dict, setObject: font forKey: NSFontAttributeName];
         let _: () = msg_send![dict, setObject: fg forKey: NSForegroundColorAttributeName];
         dict
+    }
+
+    unsafe fn styled_attrs(font:id,fg:id,outline:bool)->id {
+        let attrs=text_attrs(font,fg);
+        if outline {
+            let stroke:id=msg_send![class!(NSNumber),numberWithDouble:-2.0f64];
+            let _:()=msg_send![attrs,setObject:stroke forKey:NSStrokeWidthAttributeName];
+            let _:()=msg_send![attrs,setObject:color(0.,0.,0.,0.85) forKey:NSStrokeColorAttributeName];
+        }
+        attrs
     }
 
     unsafe fn text_size(text: &str, attrs: id) -> NSSize {
@@ -2009,71 +2021,28 @@ mod imp {
         2.0
     }
 
-    fn position_file() -> std::path::PathBuf {
-        haiku_store::data_root().join("haiku_state/desktop-lyrics-position.json")
+    unsafe fn send_position(panel:id) {
+        let frame:NSRect=msg_send![panel,frame];
+        let view:id=msg_send![panel,contentView];
+        let st=state_of(&*view);
+        let _=st.sender.send(DesktopLyricsEvent::Position(Position {center_x:frame.origin.x+frame.size.width/2.,y:frame.origin.y,width:frame.size.width}));
     }
-    unsafe fn save_position(panel: id) {
-        let frame: NSRect = msg_send![panel, frame];
-        let path = position_file();
-        let temp = path.with_extension("tmp");
-        let value = serde_json::json!({"center_x":frame.origin.x+frame.size.width/2.0,"y":frame.origin.y,"width":frame.size.width});
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if std::fs::write(&temp, value.to_string()).is_ok() {
-            let _ = std::fs::rename(temp, path);
-        }
+    unsafe fn constrain_position(panel:id) {
+        let frame:NSRect=msg_send![panel,frame];
+        constrain_to_position(panel,Position{center_x:frame.origin.x+frame.size.width/2.,y:frame.origin.y,width:frame.size.width},frame.size.height);
     }
-    unsafe fn restore_position(panel: id) {
-        if let Ok(bytes) = std::fs::read(position_file()) {
-            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) {
-                if let (Some(cx), Some(y)) = (value["center_x"].as_f64(), value["y"].as_f64()) {
-                    if cx.is_finite() && y.is_finite() {
-                        let frame: NSRect = msg_send![panel, frame];
-                        let width = value["width"]
-                            .as_f64()
-                            .filter(|v| v.is_finite())
-                            .unwrap_or(frame.size.width)
-                            .clamp(WINDOW_MIN_W, WINDOW_MAX_W);
-                        let _: () = msg_send![panel,setFrame:rect(cx-width/2.0,y,width,frame.size.height) display:NO];
-                    }
-                }
-            }
-        }
-        constrain_position(panel);
-    }
-    unsafe fn constrain_position(panel: id) {
-        let frame: NSRect = msg_send![panel, frame];
-        let screens: id = msg_send![class!(NSScreen), screens];
-        let count: usize = msg_send![screens, count];
-        let mut best = None;
-        let mut area = -1.0;
+    unsafe fn constrain_to_position(panel:id,position:Position,height:f64) {
+        use super::geometry::{self,Frame};
+        let screens:id=msg_send![class!(NSScreen),screens];
+        let count:usize=msg_send![screens,count];
+        let mut displays=Vec::with_capacity(count);
         for i in 0..count {
-            let screen: id = msg_send![screens,objectAtIndex:i];
-            let r: NSRect = msg_send![screen, visibleFrame];
-            let w = (frame.origin.x + frame.size.width).min(r.origin.x + r.size.width)
-                - frame.origin.x.max(r.origin.x);
-            let h = (frame.origin.y + frame.size.height).min(r.origin.y + r.size.height)
-                - frame.origin.y.max(r.origin.y);
-            let overlap = w.max(0.0) * h.max(0.0);
-            if overlap > area {
-                area = overlap;
-                best = Some(r);
-            }
+            let screen:id=msg_send![screens,objectAtIndex:i];
+            let r:NSRect=msg_send![screen,visibleFrame];
+            displays.push(Frame{x:r.origin.x,y:r.origin.y,width:r.size.width,height:r.size.height});
         }
-        if let Some(r) = best {
-            let x = frame
-                .origin
-                .x
-                .max(r.origin.x)
-                .min((r.origin.x + r.size.width - frame.size.width).max(r.origin.x));
-            let y = frame
-                .origin
-                .y
-                .max(r.origin.y)
-                .min((r.origin.y + r.size.height - frame.size.height).max(r.origin.y));
-            let _: () = msg_send![panel,setFrameOrigin:NSPoint::new(x,y)];
-        }
+        let f=geometry::constrain(position,height,&displays);
+        let _:()=msg_send![panel,setFrame:rect(f.x,f.y,f.width,f.height) display:NO];
     }
     unsafe fn place_initial(panel: id) {
         let scr: id = msg_send![class!(NSScreen), mainScreen];

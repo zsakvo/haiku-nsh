@@ -1,4 +1,5 @@
 import { platform, signal, Text, View } from "nsh";
+import { DesktopLyricsSettings } from "./DesktopLyricsSettings";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/LibraryControls";
 import { SettingSelect, SettingSwitch } from "../ui/SettingsControls";
@@ -72,6 +73,7 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
         <If when={!!highlightError()}><Text class="text-sm text-destructive">{highlightError()}</Text></If>
       </View></If>
     </View></If>
+    <If when={platform.os === "macos"}><DesktopLyricsSettings settings={props.settings} /></If>
     <SettingSwitch label="自动查找远端歌词" checked={settings().lyricsAutoSearch}
       onChange={lyricsAutoSearch => void props.settings.update({ lyricsAutoSearch })} />
     <Text class="text-sm text-muted-foreground">本地文件与音乐来源优先；远端按以下顺序查找，逐字歌词优先。</Text>

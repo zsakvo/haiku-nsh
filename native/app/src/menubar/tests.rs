@@ -255,3 +255,48 @@ async fn projection_deduplicates_and_reanchors_only_line_pause_seek_changes() {
     assert_eq!(make(&state, 5.).0.line.start, 5.);
     c.execute(Command::Shutdown).await.unwrap();
 }
+
+#[tokio::test]
+async fn desktop_toolbar_uses_same_controller_collections_and_returns_durable_actions() {
+    use haiku_macos::desktop_lyrics::{DesktopLyricsEvent as E,geometry::Position};
+    use crate::desktop_lyrics::{self,Action};
+    let root=tempfile::tempdir().unwrap();let collections=Collections::open(root.path()).unwrap();
+    let (c,audio)=controller();
+    c.execute(Command::Play(vec![Track::local("/one.wav"),Track::local("/two.wav")],0)).await.unwrap();playing(&c,0).await;
+    desktop_lyrics::dispatch(&c,&collections,E::Toggle).await.unwrap();assert_eq!(c.state().status,Status::Paused);
+    desktop_lyrics::dispatch(&c,&collections,E::Toggle).await.unwrap();playing(&c,0).await;
+    desktop_lyrics::dispatch(&c,&collections,E::Next).await.unwrap();playing(&c,1).await;
+    desktop_lyrics::dispatch(&c,&collections,E::Prev).await.unwrap();playing(&c,0).await;
+    desktop_lyrics::dispatch(&c,&collections,E::ToggleFavorite).await.unwrap();assert!(collections.is_liked(&c.state().current.unwrap().entity_ref()));
+    assert!(audio.calls.lock().unwrap().contains(&"pause"));
+    for (event,expected) in [(E::Lock,serde_json::json!({"desktopLyrics":{"locked":true}})),(E::Unlock,serde_json::json!({"desktopLyrics":{"locked":false}})),(E::Close,serde_json::json!({"desktopLyrics":{"visible":false}}))] {
+        assert_eq!(desktop_lyrics::dispatch(&c,&collections,event).await.unwrap(),Action::Patch(expected));
+    }
+    assert_eq!(desktop_lyrics::dispatch(&c,&collections,E::Settings).await.unwrap(),Action::Settings);
+    assert_eq!(desktop_lyrics::dispatch(&c,&collections,E::ShowApp).await.unwrap(),Action::ShowApp);
+    let position=Position{center_x:500.,y:50.,width:600.};
+    let event=serde_json::from_value(serde_json::to_value(E::Position(position)).unwrap()).unwrap();
+    assert_eq!(desktop_lyrics::dispatch(&c,&collections,event).await.unwrap(),Action::Position(position));
+    let file=root.path().join("haiku_state/desktop-lyrics-position.json");haiku_store::json_file::write(&file,&position).unwrap();
+    assert_eq!(haiku_store::json_file::read::<Position>(&file).unwrap(),Some(position));
+    let (a,_)=project(&c.state(),None,&Lyrics::default(),&Settings::default(),&collections,0.);
+    let item=a.menu.iter().find(|i|i.id=="lyrics:show").unwrap();
+    assert_eq!(dispatch(&c,&collections,MenuBarEvent::MenuItem(item.id.clone())).await.unwrap(),HostAction::ToggleDesktopLyrics);
+    assert_eq!(dispatch(&c,&collections,MenuBarEvent::MenuItem("lyrics:lock".into())).await.unwrap(),HostAction::ToggleDesktopLock);
+    c.execute(Command::Shutdown).await.unwrap();
+}
+#[tokio::test]
+async fn desktop_projection_falls_back_to_metadata_then_follows_lyrics_and_pause() {
+    use crate::desktop_lyrics;
+    let root=tempfile::tempdir().unwrap();let collections=Collections::open(root.path()).unwrap();let (c,_)=controller();
+    let mut s=c.state();let mut track=Track::local("/one.wav");track.title="歌名".into();track.artists=vec![haiku_model::Artist::Name("艺术家".into())];s.current=Some(track);s.status=Status::Playing;
+    let mut d=haiku_store::desktop_lyrics::DesktopLyrics::default();d.visible=true;
+    let (v,wake)=desktop_lyrics::project(&s,None,&Lyrics::default(),&d,&collections,0.);assert_eq!(wake,None);
+    assert_eq!(v.current.unwrap().translation,"艺术家");
+    let lyrics=haiku_lyrics::parse("[00:01]<00:01>第一<00:03>行<00:04>\n[00:05]第二行");
+    let (v,wake)=desktop_lyrics::project(&s,None,&lyrics,&d,&collections,2.);assert_eq!(wake,Some(3.));
+    assert_eq!(v.current.unwrap().text,"第一行");assert_eq!(v.next.unwrap().text,"第二行");
+    s.status=Status::Paused;assert_eq!(desktop_lyrics::project(&s,None,&lyrics,&d,&collections,2.).1,None);
+    d.visible=false;s.status=Status::Playing;assert_eq!(desktop_lyrics::project(&s,None,&lyrics,&d,&collections,2.).1,None);
+    c.execute(Command::Shutdown).await.unwrap();
+}

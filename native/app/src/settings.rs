@@ -22,6 +22,7 @@ pub struct SettingsService {
     bridge: Rc<CoreBridge>,
     serial: Arc<tokio::sync::Mutex<()>>,
     listeners: Listeners,
+    requests: Listeners,
     next: u64,
 }
 impl SettingsService {
@@ -47,6 +48,7 @@ impl SettingsService {
             bridge,
             serial: Arc::new(tokio::sync::Mutex::new(())),
             listeners: Listeners::default(),
+            requests: Listeners::default(),
             next: 0,
         })
     }
@@ -106,6 +108,33 @@ impl SettingsService {
         Stop::new(move || {
             listeners.0.borrow_mut().remove(&id);
         })
+    }
+    /// Listen for the native toolbar's request to open the lyrics category. Stop detaches.
+    pub fn on_open_lyrics(&mut self, #[args(request)] listener:Callback<JsonValue>)->Stop {
+        self.next+=1;let id=self.next;
+        self.requests.0.borrow_mut().insert(id,listener);
+        let requests=self.requests.clone();
+        Stop::new(move ||{requests.0.borrow_mut().remove(&id);})
+    }
+    /// Open the existing settings overlay at Lyrics; repeated requests work while already open.
+    pub fn open_lyrics_settings(this:Instance<Self>) {
+        #[cfg(target_os="macos")]
+        if this.with(|s|!s.bridge.isolated()) && haiku_macos::lifecycle::native_host(){haiku_macos::lifecycle::show_main_window();}
+        this.with(|s|{for cb in s.requests.0.borrow().values(){cb.post(serde_json::Value::Null);}});
+    }
+    /// Open the non-modal NSFontPanel. Isolated fixtures and Headless never create AppKit panels.
+    pub async fn pick_desktop_font(this:Instance<Self>)->Result<bool,String> {
+        let (isolated,path,d)=this.with(|s|(s.bridge.isolated(),s.bridge.data_root().join("haiku_state/desktop-lyrics-position.json"),s.store.get().desktop_lyrics));
+        #[cfg(target_os="macos")]
+        if !isolated && haiku_macos::lifecycle::native_host(){
+            return blocking(move ||{
+                let position=haiku_store::json_file::read(&path).map_err(|e|e.to_string())?;
+                haiku_macos::desktop_lyrics_api::install(position);
+                Ok(haiku_macos::desktop_lyrics_api::pick_font(d.font.clone(),d.font_name.clone(),d.font_size,d.weight()))
+            }).await.map_err(|e|e.to_string())?;
+        }
+        let _=(isolated,path,d);
+        Ok(false)
     }
     /// Disk cache usage in bytes and complete entry count; partial files count toward bytes.
     pub async fn cache_usage() -> Result<JsonValue, String> {

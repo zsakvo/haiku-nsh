@@ -12,3 +12,5 @@ pub mod stats;
 pub mod logs;
 
 pub mod shortcuts;
+
+pub mod desktop_lyrics;

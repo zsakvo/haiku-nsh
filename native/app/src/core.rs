@@ -83,6 +83,8 @@ pub struct CoreBridge {
     pub state: Signal<PlayerState>,
 }
 impl CoreBridge {
+    pub(crate) fn data_root(&self)->&std::path::Path {&self._root.path}
+    pub(crate) fn isolated(&self)->bool {self._root._temporary.is_some()}
     fn new(
         controller: Controller,
         listeners: Listeners,

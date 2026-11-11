@@ -49,6 +49,7 @@ impl Default for AudioEffects {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    pub desktop_lyrics: crate::desktop_lyrics::DesktopLyrics,
     pub menubar_lyrics_visible: bool,
     pub menubar_lyric_highlight: String,
     pub shortcuts: BTreeMap<String, String>,
@@ -83,6 +84,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            desktop_lyrics: Default::default(),
             menubar_lyrics_visible: true,
             menubar_lyric_highlight: "system".into(),
             shortcuts: BTreeMap::new(),
@@ -124,6 +126,7 @@ fn clamp(v: f32, min: f32, max: f32, fallback: f32) -> f32 {
 }
 impl Settings {
     pub fn normalize(&mut self) {
+        self.desktop_lyrics.normalize();
         if self.menubar_lyric_highlight != "system" && !(self.menubar_lyric_highlight.len() == 7
             && self.menubar_lyric_highlight.starts_with('#')
             && self.menubar_lyric_highlight.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)) {

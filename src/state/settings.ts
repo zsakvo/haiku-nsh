@@ -5,7 +5,15 @@ export interface AudioEffects {
   customPresets: { id: string; name: string; gains: number[] }[];
   autoPreamp: boolean; preampDb: number; stereoWidth: number; balance: number; mono: boolean;
 }
+export interface DesktopLyricsSettings {
+  visible: boolean; locked: boolean; textColor: string; highlightColor: string;
+  outline: boolean; shadow?: boolean; background: "none" | "solid" | "liquid";
+  fontSize: number; font: string; fontName: string;
+  fontWeight: "light" | "regular" | "medium" | "semibold" | "bold";
+  layout: "classic" | "focus" | "left" | "stage"; showTranslation: boolean;
+}
 export interface SettingsSnapshot {
+  desktopLyrics: DesktopLyricsSettings;
   menubarLyricsVisible: boolean; menubarLyricHighlight: string;
   downloadDir: string; downloadQuality: string; downloadNaming: string; downloadLayout: string;
   downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
