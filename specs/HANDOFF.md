@@ -1,4 +1,4 @@
-# 交接记录（2026-11-10）
+# 交接记录（2026-11-11）
 
 换电脑继续时先读本文件，再读 `specs/SPEC.md`（决策 D1–D18）、`specs/MILESTONES.md`、`specs/STATUS.md`、`specs/tasks/README.md`。
 
@@ -15,16 +15,17 @@
 
 - macOS arm64，Xcode；`nsh 0.4.0`（`curl -fsSL https://nsh.dev/install.sh | sh`）；cargo 用 huacnlee/cargo（`curl -fsSL https://huacnlee.github.io/cargo/install.sh | sh`，会替换 `~/.cargo/bin/cargo`，原版留为 `cargo.rustup`）。
 - 参考项目（只读，业务与行为依据）：路径随机器不同——MacBook Air（Rex 会话 Mono）为 `~/Project/GPUI/haiku`，另一台为 `~/Project/haiku-gpuix`；派发任务时按当前机器改写任务文件里的路径。原 Flutter 版 `~/Project/Flutter/haiku`。
-- 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交；推送由用户自行决定（截至 `625319a` 已推送）。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
+- 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交；推送由用户自行决定（截至 `625319a` 已推送；2026-11-11 交接时本地领先 origin 约 17 个提交，换机前需用户推送）。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
 
-## 当前进度（2026-11-10 交接时）
+## 当前进度（2026-11-11 交接时）
 
-- M0–M3 完成（M3-02 见下方更新）。原记录：M3-01 已提交（`9a52e44`）；M3-02 当时进行中（任务 `specs/tasks/M3-02-history-stats-logs.md`）。
-- 交接时 Codex 仍在执行 M3-02（约 34 分钟，处于自查阶段），周额度剩约 11%。已有改动：`haiku-store::{history,stats,logs,document}`、`tests/activity.rs` 与参考版 `history.json`/`stats.json` fixture、`native/app/src/activity.rs`、Core/plugins/controller/track_list 等接线、`src/pages/{HistoryPage,StatsPage}.tsx`、`src/shell/Diagnostics.tsx`、`assets/icons/heart-filled.svg`、根目录 `{History,Stats,Logs,Notifications}Preview.tsx`、`Activity*.tsx`。旧机器 `.artifacts/m3-02/` 已有 workspace/nsh 日志（含 repair1/2）及 history、statistics、liked-dock 截图；日志查看器、通知中心截图尚未见到。
-- **新机器接手 M3-02**：未提交改动不会随 git 走。二选一：(a) 在旧机器等 Codex 完成、审阅、提交并推送后再拉取；(b) 直接在新机器让 Codex 按任务文件从头/续做（先 `git status` 看有无残留）。审阅要点：workspace 与 `nsh test` 全绿、5 张浅色截图（历史、统计含热图与小时分布、日志查看器、通知中心、Dock 实心爱心）、与参考版 JSON 兼容、通知入口位置、图表实现方式、STATUS F12/F16 与 ≤40 行小节；根目录 Preview 文件是否应归位到 `src/` 下需审阅。
-- M3-02 通过后：提交 “M3-02: history, local stats, logs and notifications”，HANDOFF 记 M3 完成，再按 `specs/MILESTONES.md` 拆 M4（推荐/分类/搜索/详情页、网络播放、在线歌词、在线歌单历史写入、远端收藏刷新）。
-- 累积待人工确认（给用户汇总）：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛（中继与安全码）、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3-01 控制中心 favorite、真实 Cmd+Q 冲刷。
-- 小项待后续 UI 任务：二维码过期置灰；开发者结果树空 `warnings` 不显示展开箭头；Rust `animated_value` 真实 host 不推进（未查明）。
+- **M0–M5 全部完成并本地提交**（最新 `e71b2f4` M5-05，随后 `a057c6e` 为 M6 拆分与 M6-01 任务文件）。工作树干净，无未提交改动。
+- **下一步 M6-01**：任务文件 `specs/tasks/M6-01-global-shortcuts-and-about.md` 已写好并提交。交接前曾派发给 Codex，但刚开始即被中断（无改动），新机器上**重新派发即可**。M6 拆分见 `specs/MILESTONES.md`（M6-01 快捷键与关于页 → M6-02 菜单栏 → M6-03 桌面歌词 → M6-04 玻璃底栏与 UI 小项 → M6-05 打包 → M6-06 F01–F16 审计）。
+- 新机器派发时：把任务文件里的参考版路径改为 `~/Project/haiku-gpuix`；先 `rex whoami --json` / `rex list` 找到 Codex 窗格，不复用本机窗格 ID。Codex 周额度在交接时约 99%。
+- 审阅惯例：Codex 汇报后，审阅者自己复跑完整 `nsh test`（及必要时 workspace）确认；能自行定位的小问题（如测试选择器）审阅者直接修；已知偶发：Search 命令面板 Escape、jsrt 并发用例在满载全量中偶尔超时。
+- **重要经验**：NSH 中 effect 重跑会取消其内 spawn 的任务，effect 只能读真正决定请求的信号（M5-01 歌词回归）；Headless 中菜单项角色是 `role:menuitem`，`role:button[文字]` 可能命中同名侧栏按钮。
+- 累积待人工确认（给用户汇总）：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3 控制中心 favorite、真实 Cmd+Q 冲刷；M4 真实来源首页/分类/电台、真实歌词与刮削上游、标签写回、远端收藏刷新；M5 真实下载上游与默认目录权限、Finder 显示文件、Haiku 账号真实登录、GitHub Gist 跨设备同步、Keychain 授权、备份真实往返。
+- 小项待 M6-04：二维码过期置灰；开发者结果树空 `warnings` 展开箭头；分类歌单标题显示原始 ID；电台未选频道样式；推荐货架间距；刮削审阅列表居中、年份差异空白、来源显示内部 ID；`download_management::watch_collections` 100ms 轮询改为等待变更通道；参考版 albumProgress 未接入播放器；Rust `animated_value` 真实 host 不推进（未查明）。
 
 ## 已完成
 
