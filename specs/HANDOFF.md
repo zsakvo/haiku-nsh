@@ -25,6 +25,7 @@
 - 审阅惯例：Codex 汇报后，审阅者自己复跑完整 `nsh test`（及必要时 workspace）确认；能自行定位的小问题（如测试选择器）审阅者直接修；已知偶发：Search 命令面板 Escape、jsrt 并发用例在满载全量中偶尔超时。
 - **重要经验**：NSH 中 effect 重跑会取消其内 spawn 的任务，effect 只能读真正决定请求的信号（M5-01 歌词回归）；Headless 中菜单项角色是 `role:menuitem`，`role:button[文字]` 可能命中同名侧栏按钮。
 - 累积待人工确认（给用户汇总）：M1 媒体键/控制中心/关闭隐藏后播放/Dock 恢复/Cmd+Q/防息屏/音效听感/拖动手感；M2 真实 Subsonic、飞牛、QQ/微信扫码、短信风控、系统文件选择器、编辑器保存热重载；M3 控制中心 favorite、真实 Cmd+Q 冲刷；M4 真实来源首页/分类/电台、真实歌词与刮削上游、标签写回、远端收藏刷新；M5 真实下载上游与默认目录权限、Finder 显示文件、Haiku 账号真实登录、GitHub Gist 跨设备同步、Keychain 授权、备份真实往返。
+- **待做优化点**：`KaraokeLayer`（CoreText + Core Animation 逐字填充）用户决定暂不实现但保留，见 MACOS.md §5；M6-04 实测 debug CPU 平均 14.3%。
 - 小项待 M6-04：二维码过期置灰；开发者结果树空 `warnings` 展开箭头；分类歌单标题显示原始 ID；电台未选频道样式；推荐货架间距；刮削审阅列表居中、年份差异空白、来源显示内部 ID；`download_management::watch_collections` 100ms 轮询改为等待变更通道；参考版 albumProgress 未接入播放器；Rust `animated_value` 真实 host 不推进（未查明）。
 
 ## 已完成
