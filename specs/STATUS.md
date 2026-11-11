@@ -31,7 +31,7 @@
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
-| F13 下载与媒体缓存 | 部分实现（媒体缓存与网络接线，M4-01 待审阅） | `haiku-audio::media_cache`、`haiku-playback::{backend,network}`、`src/shell/StorageSettings.tsx` | M1-05 缓存测试沿用；M4-01 workspace 通过，覆盖同音质完整缓存优先且不取地址、提前 EOF 恢复；网络后端传入缓存键，真实 loopback 解码播放日志已保存 | 真实网络落盘后第二次播放命中、实机恢复未覆盖；下载留 M5；缓存目录沿用 media-cache/ |
+| F13 下载与媒体缓存 | 部分实现（M5-01 Rust 下载服务与导出，界面未做） | `native/app/src/{download_service,downloads,presentation}.rs`、`haiku-services::downloader`、`haiku-audio::media_cache`、`haiku-store::settings` | 下载 Rust 5/5；初版 workspace 266 通过/1 忽略、check/build 通过；Player 回归已修复，新增受控歌词回归通过，Player 2/2 | 审阅者复跑完整 nsh test 50/50（Search Escape 为既有偶发）；下载界面、截图、自动歌单/迁移目录未做；详见 M5-01 小节 |
 | F14 Haiku 账号 | 未实现 | | | |
 | F15 同步与备份 | 未实现 | | | |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
@@ -762,3 +762,27 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未补齐参考版高级关键词清洗/文件名回退、专辑艺术家/碟号候选字段、刮削封面下载到本地缓存；当前封面保存候选URL。
 - 未覆盖真实上游与原生写回实机交互；重开Core的审阅UI未单独做Headless（Rust服务/曲库重开已测）。无新增架构待决事项。
 - 审阅者核对：workspace 日志 260 通过/1 忽略，完整 nsh test 43/43，check/build 无新警告；四张截图已审阅。UI 小项留后续：审阅列表项居中未左对齐、字段差异“年份”行空白、来源显示内部 ID（network.fixture#…）而非名称。
+
+## 2026-11-11 M5-01：下载 Rust 服务与 Player 回归修订（第一部分已验收）
+
+- 仅在主仓库修改，未提交 git。§1 主体已实现；本轮优先修复审阅确认的 Player 回归，未进入 §2/截图；§3 留 M5-02。
+- 下载文件 `native/app/src/{download_service,downloads,download_service_tests}.rs`；Core getter/关闭/退出接线；Cargo 仅增加已有 workspace 依赖。
+- key=`source + NUL + id`；每次尝试 UUID；并发 1–5；暂停后 worker 释放 .part 才可继续；旧事件隔离、2s/8s 自动重试、移除/清理/校验缺失。
+- streams 保留 headers；从当前 Core 根复用同音质完整缓存；Range 与响应起点校验；不同候选切换清理残片；嗅探容器、打标签并原子发布音频，再写侧车。
+- 歌词走 M4-04 来源链，下载任务使用独立 authority，共享手选/缓存；支持译文、嵌入/侧车，不改变播放器 generation。
+- `core.downloads`：enqueue（SDK 单曲/数组、远端 playlist/album/toplist EntityRef）、pause/resume/retry/cancel/remove(withFile)、clearCompleted/retryFailed/snapshot/reveal/verify/onChange→Stop。
+- 持久化 `<data>/haiku_state/downloads.json` 数组；参考字段与 sourceId/provider、字符串 album/artists；保留未知字段，haikuTrack 扩展保留 SDK 实体身份；进行中重开回 queued。
+- 设置沿用 downloadDir/Quality/Naming/Layout/Concurrency、downloadCoverMode/Hd、downloadLyricsMode/Translation、downloadReuseMediaCache、downloadWifiOnly（桌面忽略）；空目录按 ~/Music/Haiku 解析。
+- 初版 workspace 修复后 266 通过/1 忽略，下载新增 5/5；nsh check/build 通过。初版全量 Player 失败已由审阅者与基线对照确认为回归，撤回偶发判断。
+- 根因：歌词 effect 订阅整个播放状态，重跑先取消待完成的本地读取；随后旧 key 相同而直接返回，未重新加载。新增下载初始化/调度改变时序后暴露此生命周期错误。
+- `presentation.rs` 改为 computed 比较曲目/generation/歌词设置；只有实际请求变化才重跑 effect。播放/暂停、下载设置变化保留待完成读取，切歌仍取消旧请求。
+- 下载记录读取合并进 Core 原有 background 初始化；启动 pump 在下载 runtime 调度。移除全设置 effect；SettingsService 在现有更新工作中仅当下载并发改变时 pump。
+- 新增 `presentation_tests.rs`：Core.openIsolated + 受控本地读取，覆盖读取挂起时暂停/修改下载设置、读取完成、再切歌；无负载等待或超时放宽，回归通过。
+- 本轮 `nsh test Player.test.tsx` 2/2；完整测试首次及 repair1 因新增测试 Headless API/引用类型编译错误失败，已修正；最终 repair2 为 49/50，Player、下载 5 项及新增歌词回归均通过。
+- 最终唯一失败：Search.test.tsx 的命令面板用例在 Escape 后 5 秒仍未关闭；未修改断言，未扩大到 Search 修复，完整套件仍未全绿。
+- 每次 nsh test 前 `IOConsoleLocked = No`。verbose 日志确认 runner warning 为已知 __eh_frame；另有已接受 cargo target-dir 与 block future-incompat 提示。
+- 本轮证据 `.artifacts/m5-01/nsh-test-player-regression.log`、`nsh-test-regression{,-repair1,-repair2}.log`、`screen-lock-{player,full}-regression*.log`；初版 workspace/check/build 日志保留。
+- 未完成：§2 下载菜单/多选/详情入口、下载页、下载设置与对应 Headless、两张浅色截图；§3 自动歌单/跟随移除及目录迁移。
+- §1 边界沿用：固定尺寸封面尚不能重取高清；超长 Unicode 路径、损坏下载记录恢复未专测；真实上游/目录权限/Finder reveal 待人工确认。
+- 调度权威在 app Rust，复用 haiku-services 搬运器；本地歌单可传 tracks 数组。无新增架构决定；保留 Search 全量失败供审阅，不以此前通过代替最终结论。
+- 审阅者：回归根因为歌词 effect 依赖整份设置，下载设置写入导致 effect 重跑并取消挂起的本地歌词读取；改为 computed 比较请求输入。复跑完整 nsh test 50/50（nsh-test-reviewer2.log）；基线对照见 nsh-test-baseline-bcf4fa5.log。

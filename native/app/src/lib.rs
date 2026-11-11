@@ -6,6 +6,8 @@ mod exit;
 mod collections;
 mod favorite_refresh;
 mod scrape_service;
+mod download_service;
+mod downloads;
 mod scrape;
 mod activity;
 mod library;

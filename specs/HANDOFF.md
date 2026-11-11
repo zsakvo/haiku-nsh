@@ -34,6 +34,15 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M5-01 第一部分已验收并提交
+
+- 下载 Rust 服务与 `core.downloads`（`native/app/src/{download_service,downloads}.rs`）：任务记录 `<data>/haiku_state/downloads.json`（参考版格式），设置沿用参考版 `download*` 字段，默认目录 `~/Music/Haiku`。
+- 审阅发现回归：Player 切歌后本地歌词不加载。根因是歌词 effect 依赖整份设置，下载设置写入使 effect 重跑并取消挂起的读取（NSH 重跑 effect 会取消其 spawn 的任务）；Codex 改为 `computed` 比较请求输入并加受控回归测试。审阅者复跑完整 nsh test 50/50。
+- **注意**：effect 内 spawn 的任务会在 effect 重跑时被取消，effect 只能读真正决定请求的信号。
+- 未完成：§2 界面（菜单“下载”、下载页、设置分组）与两张截图；§3 自动下载歌单、更换目录（M5-02）。高清封面只处理含 `{size}` 的 URL。
+- 已知偶发：Search 命令面板 Escape、jsrt 并发用例在满载全量中偶发超时。
+- Codex 周额度剩约 2%。
+
 ## 2026-11-11 更新：M4-05 已验收并提交，M4 完成
 
 - 远端收藏刷新（`favorite_refresh.rs`：离线快照优先、完整分页原子换版、单飞/离页取消/迟到丢弃、取消收藏确认）；刮削服务 `scrape_service.rs` 与 `core.scrape`（start/cancel/jobs/review/accept/skip/undo/retry/onChange）；覆盖写 `library/overrides.json`，审阅存 `<data>/scrape_review.json`（参考版格式双向转换）；设置位于“存储 → 元数据刮削”；歌词逐源错误中文化。

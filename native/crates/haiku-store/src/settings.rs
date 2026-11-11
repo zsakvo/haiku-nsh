@@ -58,6 +58,17 @@ pub struct Settings {
     pub media_cache_enabled: bool,
     pub media_cache_max_bytes: u64,
     pub audio_quality: String,
+    pub download_dir: String,
+    pub download_quality: String,
+    pub download_naming: String,
+    pub download_layout: String,
+    pub download_cover_mode: String,
+    pub download_cover_hd: bool,
+    pub download_lyrics_mode: String,
+    pub download_lyrics_translation: bool,
+    pub download_concurrency: u32,
+    pub download_wifi_only: bool,
+    pub download_reuse_media_cache: bool,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -73,6 +84,17 @@ impl Default for Settings {
             media_cache_enabled: true,
             media_cache_max_bytes: 2 * 1024 * 1024 * 1024,
             audio_quality: "high".into(),
+            download_dir: String::new(),
+            download_quality: "lossless".into(),
+            download_naming: "{artist} - {title}".into(),
+            download_layout: "flat".into(),
+            download_cover_mode: "embed".into(),
+            download_cover_hd: true,
+            download_lyrics_mode: "both".into(),
+            download_lyrics_translation: true,
+            download_concurrency: 3,
+            download_wifi_only: true,
+            download_reuse_media_cache: true,
             extra: BTreeMap::new(),
         }
     }
@@ -100,6 +122,26 @@ impl Settings {
         }
         if !["standard", "high", "lossless", "hires"].contains(&self.audio_quality.as_str()) {
             self.audio_quality = "high".into();
+        }
+        self.download_concurrency = self.download_concurrency.clamp(1, 5);
+        if !["standard", "high", "lossless", "hires"].contains(&self.download_quality.as_str()) {
+            self.download_quality = "lossless".into();
+        }
+        if !["flat", "artist", "artist-album", "playlist", "provider"]
+            .contains(&self.download_layout.as_str())
+        {
+            self.download_layout = "flat".into();
+        }
+        for mode in [
+            &mut self.download_cover_mode,
+            &mut self.download_lyrics_mode,
+        ] {
+            if !["none", "embed", "sidecar", "both"].contains(&mode.as_str()) {
+                *mode = "none".into();
+            }
+        }
+        if self.download_naming.trim().is_empty() {
+            self.download_naming = "{artist} - {title}".into();
         }
         self.media_cache_max_bytes = self
             .media_cache_max_bytes
@@ -134,6 +176,9 @@ fn merge(target: &mut Value, patch: Value) {
 }
 // Clamp before deserializing unsigned fields so negative JSON numbers remain recoverable preferences.
 fn clamp_unsigned_fields(raw: &mut Value) {
+    if let Some(n) = raw.get("downloadConcurrency").and_then(Value::as_f64) {
+        raw["downloadConcurrency"] = Value::from(n.round().clamp(1., 5.) as u32);
+    }
     if let Some(bytes) = raw.get("mediaCacheMaxBytes").and_then(Value::as_f64) {
         raw["mediaCacheMaxBytes"] =
             Value::from(bytes.clamp(512. * 1024. * 1024., 20. * 1024. * 1024. * 1024.) as u64);

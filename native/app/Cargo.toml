@@ -5,6 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
+haiku-services = { path = "../crates/haiku-services" }
+uuid.workspace = true
 tempfile.workspace = true
 qrcode = { version = "0.14.1", default-features = false, features = ["image"] }
 image.workspace = true
@@ -30,6 +32,8 @@ reqwest.workspace = true
 haiku-macos = { path = "../crates/haiku-macos" }
 
 [dev-dependencies]
+lofty.workspace = true
+haiku-library = { workspace = true, features = ["test-support"] }
 nsh-engine = { version = "0.4.0", default-features = false, features = ["js"] }
 nsh-testing = { version = "0.4.0", default-features = false }
 haiku-jsrt = { path = "../crates/haiku-jsrt" }

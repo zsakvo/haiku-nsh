@@ -124,36 +124,27 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 track.set(effective);
             }
         });
-        let lyric_key = stored(String::new());
         let weak = Rc::downgrade(&p);
-        effect(move || {
-            let Some(p) = weak.upgrade() else { return };
-            let selected = p.track.get();
-            let playback_generation = p.bridge.state.with(|s| s.generation);
-            let options: haiku_lyrics::service::Options =
-                serde_json::from_value(serde_json::to_value(p.bridge.settings.get()).unwrap())
-                    .unwrap_or_default();
-            let key = serde_json::json!([selected, playback_generation, options]).to_string();
-            if lyric_key.get() == key {
-                return;
-            }
-            lyric_key.replace(key);
-            let service = p.bridge.lyrics.clone();
-            let generation = service.clear(selected.clone());
-            p.lyrics.set(Arc::new(Lyrics::default()));
-            p.line.set(None);
-            if let Some(t) = selected {
-                let origin = Arc::new(crate::lyrics::Sources(p.bridge.source_host.clone()));
-                spawn(async move {
-                    let _ = background(async move {
-                        service
-                            .load_generation(t, options, origin, generation)
-                            .await;
-                    })
-                    .await;
-                });
-            }
-        });
+        let reset = weak.clone();
+        bind_lyrics(
+            move || {
+                let p = weak.upgrade()?;
+                Some((
+                    p.track.get(),
+                    p.bridge.state.with(|s| s.generation),
+                    serde_json::from_value(serde_json::to_value(p.bridge.settings.get()).unwrap())
+                        .unwrap_or_default(),
+                ))
+            },
+            p.bridge.lyrics.clone(),
+            Arc::new(crate::lyrics::Sources(p.bridge.source_host.clone())),
+            move || {
+                if let Some(p) = reset.upgrade() {
+                    p.lyrics.set(Arc::new(Lyrics::default()));
+                    p.line.set(None);
+                }
+            },
+        );
         let weak = Rc::downgrade(&p);
         let mut lyric_events = p.bridge.lyrics.subscribe();
         spawn(async move {
@@ -288,3 +279,42 @@ impl Presentation {
         cache.truncate(12);
     }
 }
+
+// Effect-owned tasks are canceled before an effect reruns. Compare request inputs in a
+// memo so pause/progress or unrelated settings cannot cancel a pending local lyric read.
+fn bind_lyrics(
+    inputs: impl Fn() -> Option<(Option<Track>, u64, haiku_lyrics::service::Options)> + 'static,
+    service: Arc<haiku_lyrics::service::Service>,
+    origin: Arc<dyn haiku_lyrics::service::Origin>,
+    reset: impl Fn() + 'static,
+) {
+    let request = computed(move || {
+        inputs().map(|(track, generation, options)| {
+            (track, generation, serde_json::to_value(options).unwrap())
+        })
+    });
+    effect(move || {
+        let Some((track, _, options)) = request.get() else {
+            return;
+        };
+        let generation = service.clear(track.clone());
+        reset();
+        if let Some(track) = track {
+            let service = service.clone();
+            let origin = origin.clone();
+            let options = serde_json::from_value(options).unwrap();
+            spawn(async move {
+                let _ = background(async move {
+                    service
+                        .load_generation(track, options, origin, generation)
+                        .await;
+                })
+                .await;
+            });
+        }
+    });
+}
+
+#[cfg(test)]
+#[path = "presentation_tests.rs"]
+mod tests;

@@ -3262,8 +3262,10 @@ dependencies = [
  "haiku-palette",
  "haiku-playback",
  "haiku-plugins",
+ "haiku-services",
  "haiku-store",
  "image",
+ "lofty",
  "log",
  "nsh-base",
  "nsh-core",
@@ -3275,6 +3277,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

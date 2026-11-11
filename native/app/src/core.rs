@@ -193,6 +193,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    downloads: Instance<crate::downloads::DownloadService>,
     scrape: Instance<crate::scrape::ScrapeService>,
     lyrics: Instance<crate::lyrics::LyricsService>,
     activity: Instance<crate::activity::ActivityService>,
@@ -218,7 +219,7 @@ impl Core {
             });
         global::<Option<DataRoot>>().set(Some(selected.clone()));
         let root = selected.path.clone();
-        let (controller, library, settings, plugins, collections, history, stats, logs) =
+        let (controller, library, settings, plugins, collections, history, stats, logs, downloads) =
             background(async move {
                 std::fs::create_dir_all(&root)
                     .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
@@ -235,6 +236,8 @@ impl Core {
                 let plugins = haiku_plugins::Host::open(&root)
                     .await
                     .map_err(|e| Error::new(ErrorCode::Io, e.to_string()))?;
+                let downloads = crate::download_service::Service::open(&root, plugins.clone(), settings.clone())
+                    .map_err(|e| Error::new(ErrorCode::Io, e))?;
                 let controller = Controller::start(
                     audio,
                     Arc::new(crate::sources::SourceResolver(plugins.clone())),
@@ -321,6 +324,7 @@ impl Core {
                     history,
                     stats,
                     logs,
+                    downloads,
                 ))
             })
             .await
@@ -355,7 +359,8 @@ impl Core {
                 .await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
             crate::scrape::ScrapeService::new(service)
         };
-        let settings = crate::settings::SettingsService::new(settings, bridge.clone());
+        let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
+        let downloads = crate::downloads::DownloadService::new(downloads);
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
         let library = crate::library::LibraryService::new(library, bridge.clone());
@@ -365,6 +370,7 @@ impl Core {
             .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            downloads,
             scrape,
             lyrics,
             activity,
@@ -433,6 +439,11 @@ impl Core {
     pub fn collections(&self) -> Instance<crate::collections::CollectionsService> {
         self.collections.clone()
     }
+    /// Offline download queue, resumable transfers and durable records.
+    #[getter]
+    pub fn downloads(&self) -> Instance<crate::downloads::DownloadService> {
+        self.downloads.clone()
+    }
     /// Current lyrics, provider search, previews and durable manual selections.
     #[getter]
     pub fn lyrics(&self) -> Instance<crate::lyrics::LyricsService> {
@@ -460,6 +471,7 @@ impl Core {
     }
     /// Flush pending collections and playback, releasing the cached Core for a later open.
     pub async fn close(this: Instance<Self>) -> Result<(), String> {
+        crate::downloads::DownloadService::close(this.with(|s| s.downloads.clone())).await?;
         crate::scrape::ScrapeService::close(this.with(|s| s.scrape.clone())).await?;
         let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));
         let store = bridge.collections.clone();

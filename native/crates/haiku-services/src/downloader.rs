@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use futures::StreamExt;
-pub use haiku_library::tags::{write_tag, AudioTags};
+pub use haiku_library::tags::{AudioTags, write_tag};
 
 /// 进度节流：字节增量达到这个数就推一次。
 const PROGRESS_MIN_BYTES: u64 = 256 * 1024;
@@ -202,68 +202,80 @@ pub async fn run<F>(job: Job, cancel: Arc<CancelToken>, emit: F)
 where
     F: Fn(Update),
 {
-    if let Some(parent) = job.temp_path.parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
-            emit(Update::Error {
-                message: format!("创建半成品目录失败: {e}"),
-                received: 0,
-                total: 0,
-                cancelled: false,
-            });
-            return;
+    let mut known_total = 0;
+    let result = transfer(&job, &cancel, &emit).await;
+    let received = file_len(&job.temp_path);
+    match result {
+        Ok(content_type) => {
+            known_total = received;
+            if cancel.is_cancelled() {
+                emit(cancelled_event(&job, Some(known_total)));
+                return;
+            }
+            match finalize(
+                &job.temp_path,
+                &job.final_path,
+                job.tag.as_ref(),
+                job.candidates.first().and_then(|c| c.mime_type.as_deref()),
+                content_type.as_deref(),
+            ) {
+                Ok(done) => emit(Update::Done {
+                    final_path: done.final_path,
+                    received,
+                    total: known_total,
+                    actual_extension: done.actual_extension,
+                    warning: done.warning,
+                }),
+                Err(message) => emit(Update::Error {
+                    message,
+                    received,
+                    total: known_total,
+                    cancelled: false,
+                }),
+            }
         }
+        Err(message) => emit(Update::Error {
+            message,
+            received,
+            total: known_total,
+            cancelled: cancel.is_cancelled(),
+        }),
     }
+}
 
-    let mut known_total: Option<u64> = None;
+/// Transfer only: keep a complete `.part` for callers that reserve the sniffed destination
+/// before tagging and atomically publishing it. Errors never promote partial bytes.
+pub async fn transfer<F>(job: &Job, cancel: &CancelToken, emit: F) -> Result<Option<String>, String>
+where
+    F: Fn(Update),
+{
+    if let Some(parent) = job.temp_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建半成品目录失败: {e}"))?;
+    }
+    let mut known_total = None;
     let mut last_error = String::from("没有可用的下载地址");
-
-    for cand in &job.candidates {
-        if cancel.is_cancelled() {
-            emit(cancelled_event(&job, known_total));
-            return;
+    for (index, cand) in job.candidates.iter().enumerate() {
+        // Different candidates may encode different containers of the same duration/length.
+        if index > 0 {
+            let _ = fs::remove_file(&job.temp_path);
+            known_total = None;
         }
-        // 每个候选最多两轮：第二轮只在残片被判定不可用（Restart）后触发。
         let mut restarted = false;
         loop {
-            match attempt(&job, cand, &cancel, &emit, &mut known_total).await {
-                Ok(content_type) => {
-                    let received = file_len(&job.temp_path);
-                    match finalize(
-                        &job.temp_path,
-                        &job.final_path,
-                        job.tag.as_ref(),
-                        cand.mime_type.as_deref(),
-                        content_type.as_deref(),
-                    ) {
-                        Ok(done) => emit(Update::Done {
-                            final_path: done.final_path,
-                            received,
-                            total: known_total.unwrap_or(received),
-                            actual_extension: done.actual_extension,
-                            warning: done.warning,
-                        }),
-                        Err(e) => emit(Update::Error {
-                            message: e,
-                            received,
-                            total: known_total.unwrap_or(0),
-                            cancelled: false,
-                        }),
-                    }
-                    return;
-                }
-                Err(AttemptErr::Cancelled) => {
-                    emit(cancelled_event(&job, known_total));
-                    return;
-                }
+            if cancel.is_cancelled() {
+                return Err("已取消".into());
+            }
+            match attempt(job, cand, cancel, &emit, &mut known_total).await {
+                Ok(content_type) => return Ok(content_type),
+                Err(AttemptErr::Cancelled) => return Err("已取消".into()),
                 Err(AttemptErr::Restart(msg)) => {
-                    let _ = fs::remove_file(&job.temp_path);
+                    fs::remove_file(&job.temp_path).ok();
                     known_total = None;
                     if restarted {
                         last_error = msg;
                         break;
                     }
                     restarted = true;
-                    continue;
                 }
                 Err(AttemptErr::Failed(msg)) => {
                     last_error = msg;
@@ -272,13 +284,7 @@ where
             }
         }
     }
-
-    emit(Update::Error {
-        message: last_error,
-        received: file_len(&job.temp_path),
-        total: known_total.unwrap_or(0),
-        cancelled: false,
-    });
+    Err(last_error)
 }
 
 fn cancelled_event(job: &Job, total: Option<u64>) -> Update {
@@ -342,6 +348,18 @@ where
 
     // 服务端认了 Range 才算续传；回 200 说明它忽略了 Range，响应体是完整文件，从 0 重写。
     let resuming = have > 0 && status.as_u16() == 206;
+    if status.as_u16() == 206 {
+        let start = resp
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.strip_prefix("bytes "))
+            .and_then(|s| s.split('-').next())
+            .and_then(|s| s.parse::<u64>().ok());
+        if start != Some(have) {
+            return Err(AttemptErr::Restart("续传响应的起点不匹配".into()));
+        }
+    }
 
     let total = if let Some(range) = resp
         .headers()
@@ -489,12 +507,15 @@ fn move_file(from: &Path, to: &Path) -> Result<(), String> {
 
 // ===================== 格式探测 =====================
 
-/// 定真实扩展名（不含点）。顺序：插件 mime 提示 → Content-Type → 魔数 → lofty 兜底。
+/// 定真实扩展名（不含点）。优先实际容器，未知内容才使用 MIME 提示。
 pub fn detect_extension(
     path: &Path,
     mime_hint: Option<&str>,
     content_type: Option<&str>,
 ) -> Option<String> {
+    if let Some(e) = ext_from_magic(path).or_else(|| ext_from_probe(path)) {
+        return Some(e);
+    }
     if let Some(e) = mime_hint.and_then(ext_from_hint) {
         return Some(e);
     }
@@ -709,15 +730,17 @@ pub(crate) mod tests {
         let dir = tmp_dir("resume");
         let temp = dir.join("x.part");
         fs::write(&temp, b"HELLO").unwrap();
-        let (url, reqs) = serve(vec![concat!(
-            "HTTP/1.1 206 Partial Content\r\n",
-            "Content-Range: bytes 5-9/10\r\n",
-            "Content-Length: 5\r\n",
-            "Connection: close\r\n\r\n",
-            "WORLD"
-        )
-        .as_bytes()
-        .to_vec()]);
+        let (url, reqs) = serve(vec![
+            concat!(
+                "HTTP/1.1 206 Partial Content\r\n",
+                "Content-Range: bytes 5-9/10\r\n",
+                "Content-Length: 5\r\n",
+                "Connection: close\r\n\r\n",
+                "WORLD"
+            )
+            .as_bytes()
+            .to_vec(),
+        ]);
 
         let final_path = dir.join("out.bin");
         let updates = drive(Job {
@@ -857,19 +880,19 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn detect_extension_prefers_hint_then_content_type_then_magic() {
+    fn detect_extension_prefers_actual_container_over_mislabeled_mime() {
         let dir = tmp_dir("detect");
         let flac = dir.join("a.bin");
         fs::write(&flac, minimal_flac()).unwrap();
-        // 提示优先。
+        // 已知容器不相信错误的 MIME。
         assert_eq!(
             detect_extension(&flac, Some("audio/mpeg"), None).as_deref(),
-            Some("mp3")
+            Some("flac")
         );
-        // 裸扩展名提示也认。
+        // 裸扩展名也不能覆盖已知容器。
         assert_eq!(
             detect_extension(&flac, Some("m4a"), None).as_deref(),
-            Some("m4a")
+            Some("flac")
         );
         // 提示不可信 → Content-Type。
         assert_eq!(

@@ -18,15 +18,21 @@ unsafe impl Trace for Listeners {
 #[class]
 pub struct SettingsService {
     store: Arc<SettingsStore>,
+    downloads: Arc<crate::download_service::Service>,
     bridge: Rc<CoreBridge>,
     serial: Arc<tokio::sync::Mutex<()>>,
     listeners: Listeners,
     next: u64,
 }
 impl SettingsService {
-    pub(crate) fn new(store: Arc<SettingsStore>, bridge: Rc<CoreBridge>) -> Instance<Self> {
+    pub(crate) fn new(
+        store: Arc<SettingsStore>,
+        bridge: Rc<CoreBridge>,
+        downloads: Arc<crate::download_service::Service>,
+    ) -> Instance<Self> {
         Instance::new(Self {
             store,
+            downloads,
             bridge,
             serial: Arc::new(tokio::sync::Mutex::new(())),
             listeners: Listeners::default(),
@@ -42,18 +48,26 @@ impl SettingsService {
     }
     /// Atomically merge fields, clamp valid numeric values, apply DSP/cache settings, then notify mirrors.
     pub async fn update(this: Instance<Self>, patch: JsonValue) -> Result<JsonValue, String> {
-        let (store, bridge, serial, listeners) = this.with(|s| {
+        let (store, bridge, serial, listeners, downloads) = this.with(|s| {
             (
                 s.store.clone(),
                 s.bridge.clone(),
                 s.serial.clone(),
                 s.listeners.clone(),
+                s.downloads.clone(),
             )
         });
         let _guard = serial.lock().await;
-        let settings = blocking(move || store.update(patch))
-            .await
-            .map_err(|e| e.to_string())??;
+        let settings = blocking(move || {
+            let previous = store.get().download_concurrency;
+            let next = store.update(patch)?;
+            if next.download_concurrency != previous {
+                downloads.pump();
+            }
+            Ok::<_, String>(next)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
         let cache = settings.clone();
         blocking(move || apply_cache(&cache))
             .await
