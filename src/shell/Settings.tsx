@@ -3,6 +3,7 @@ import { SourcesSettings, PluginsSettings, DeveloperSettings } from "./PluginSet
 import { createSettings } from "../state/settings";
 import { PlaybackSettings } from "./PlaybackSettings";
 import { LyricsSettings } from "./LyricsSettings";
+import { ScrapeSettings } from "./ScrapeSettings";
 import { StorageSettings } from "./StorageSettings";
 import { OtherSettings } from "./Diagnostics";
 import { Scroll, signal, Text, View } from "nsh";
@@ -56,7 +57,10 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <If when={!!settings.value()}>
             <If when={selected() === "歌词"}><View class="w-full max-w-2xl"><LyricsSettings settings={settings} /></View></If>
             <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
-            <View class="w-full max-w-2xl" style={{ display: selected() === "存储" ? "flex" : "none" }}><StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} /></View>
+            <View class="w-full max-w-2xl flex-col" style={{ display: selected() === "存储" ? "flex" : "none" }}>
+              <StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} />
+              <ScrapeSettings settings={settings} plugins={plugins} />
+            </View>
           </If>
           <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
           <View class="w-full max-w-2xl" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>

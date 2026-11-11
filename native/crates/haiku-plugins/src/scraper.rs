@@ -111,6 +111,9 @@ impl Scraper {
         sources: Vec<Arc<Source>>,
         cancel: Cancellation,
     ) -> Result<ScrapeReport> {
+        let priority = sources.iter().enumerate().map(|(index, source)| {
+            (source.record.source_id.clone(), index)
+        }).collect::<BTreeMap<_, _>>();
         let mut jobs = tokio::task::JoinSet::new();
         for source in sources {
             let (query, permits, parent, timeout) = (
@@ -124,7 +127,26 @@ impl Scraper {
                 let permit = tokio::select! { biased; _ = parent.cancelled() => return (id, Err(PluginError::new("CANCELLED", "Scraping cancelled"))), permit = permits.acquire_owned() => permit.unwrap() };
                 let api = SourceApi::new(source);
                 let token = Cancellation::default();
-                let call = api.scrape(query, Some(&token));
+                let call = async {
+                    if api.source_has_scrape() {
+                        api.scrape(query, Some(&token)).await
+                    } else {
+                        let keyword = format!("{} {}", query.title, query.artists.join(" "));
+                        let page = api.search(
+                            crate::SearchKind::Track, &keyword,
+                            crate::PageArgs { cursor: None, limit: 10 }, Some(&token),
+                        ).await?;
+                        Ok(page.items.into_iter().map(|track| ScrapeCandidate {
+                            id: track.reference.map(|r| r.id).unwrap_or_default(),
+                            title: track.title,
+                            artists: track.artists.into_iter().map(|a| match a {
+                                haiku_model::Artist::Name(name) | haiku_model::Artist::Entity { name, .. } => name,
+                            }).collect(),
+                            album: track.album.map(|a| a.title), year: track.year,
+                            cover: track.cover, duration: track.duration, track: None, extra: track.extra,
+                        }).collect())
+                    }
+                };
                 tokio::pin!(call);
                 let result = tokio::select! {
                     biased;
@@ -168,7 +190,10 @@ impl Scraper {
                             .entry(key)
                             .or_insert_with(|| (value.clone(), Default::default()));
                         entry.1.insert(id.clone());
-                        if value.score > entry.0.score {
+                        if value.score > entry.0.score
+                            || value.score == entry.0.score
+                                && priority.get(&value.source_id) < priority.get(&entry.0.source_id)
+                        {
                             entry.0 = value;
                         }
                     }
@@ -195,7 +220,7 @@ impl Scraper {
             b.score
                 .total_cmp(&a.score)
                 .then(b.source_count.cmp(&a.source_count))
-                .then(a.source_id.cmp(&b.source_id))
+                .then_with(|| priority.get(&a.source_id).cmp(&priority.get(&b.source_id)))
         });
         Ok(ScrapeReport {
             verdict: verdict(&candidates.iter().map(|v| v.score).collect::<Vec<_>>()),

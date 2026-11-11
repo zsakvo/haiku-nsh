@@ -989,6 +989,42 @@ async fn scrape_orchestration_merges_sources_scores_and_aborts_timeouts() {
 }
 
 #[tokio::test]
+async fn scrape_music_source_candidates_use_the_same_scoring_boundary() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    install(&host, "scrape.music.fixture", r#"search:{track:async()=>({items:[
+        {id:'music-track',title:'Fixture',artists:['Artist'],album:{id:'a',title:'Album'},duration:120}
+    ]})}"#).await;
+    let source = host.activate("scrape.music.fixture").await.unwrap();
+    let report = crate::scraper::Scraper::default().search(
+        crate::ScrapeQuery { title: "Fixture".into(), artists: vec!["Artist".into()],
+            album: None, duration: Some(120.) },
+        vec![source], Cancellation::default(),
+    ).await.unwrap();
+    assert_eq!(report.verdict, crate::scraper::Verdict::Auto);
+    assert_eq!(report.candidates[0].candidate.id, "music-track");
+    assert_eq!(report.candidates[0].candidate.album.as_deref(), Some("Album"));
+    install(&host, "scrape.priority.fixture", r#"scrape:{search:async()=>[
+        {id:'priority',title:'Fixture',artists:['Artist'],album:'Priority album',duration:120}
+    ]}"#).await;
+    let dedicated = host.activate("scrape.priority.fixture").await.unwrap();
+    let music = host.source("scrape.music.fixture").unwrap();
+    for (sources, expected) in [
+        (vec![dedicated.clone(), music.clone()], "Priority album"),
+        (vec![music, dedicated], "Album"),
+    ] {
+        let report = crate::scraper::Scraper::default().search(
+            crate::ScrapeQuery { title: "Fixture".into(), artists: vec!["Artist".into()],
+                album: None, duration: Some(120.) },
+            sources, Cancellation::default(),
+        ).await.unwrap();
+        assert_eq!(report.candidates.len(), 1);
+        assert_eq!(report.candidates[0].source_count, 2);
+        assert_eq!(report.candidates[0].candidate.album.as_deref(), Some(expected));
+    }
+}
+
+#[tokio::test]
 async fn contract_runs_auth_expired_refresh_and_replay() {
     let package = tempfile::tempdir().unwrap();
     std::fs::create_dir(package.path().join("fixtures")).unwrap();

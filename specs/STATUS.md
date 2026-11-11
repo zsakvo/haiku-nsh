@@ -28,8 +28,8 @@
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
-| F10 本地曲库与刮削 | 本地曲库沿用 M1；M2-03 刮削宿主已实现，待审阅 | `haiku-library/src/service.rs`、既有曲库页面、`haiku-plugins/src/scraper.rs`、`plugins/{qq-scraper,kugou-scraper}` | M1 曲库验收；M2-03 打分/阈值/领先/待审、4 并发限制、8 秒超时 abort、跨源合并及双刮削器离线契约通过 | 刮削 UI、写回与真实曲库接线留 M4；真实上游未验证；原生交互与听感待人工确认 |
-| F11 喜欢、歌单与远端收藏 | 部分实现（本地与远端收藏，M4-01 待审阅） | `haiku-store::collections`、`native/app/src/{collections,plugins}.rs`、`src/pages/{SourceDetailPage,CollectionsBrowser}.tsx` | M4-01：来源歌单收藏写入既有远端镜像；nsh test 22/22，含收藏后侧栏/按钮状态与歌单历史回访；真实来源曲目 Dock 实心喜欢截图通过 | 真实来源收藏刷新、取消收藏操作及媒体命令实机交互仍待人工确认 |
+| F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
+| F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地） | `haiku-store::{history,stats}`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M3-02：workspace 238 通过/1 忽略；参考版 JSON、有效播放边界/聚合测试通过；Headless 历史与范围切换、浅色图表截图通过 | 远程上传留 M5；在线歌单历史与搜索页接线留 M4；真实长时累计待人工确认 |
 | F13 下载与媒体缓存 | 部分实现（媒体缓存与网络接线，M4-01 待审阅） | `haiku-audio::media_cache`、`haiku-playback::{backend,network}`、`src/shell/StorageSettings.tsx` | M1-05 缓存测试沿用；M4-01 workspace 通过，覆盖同音质完整缓存优先且不取地址、提前 EOF 恢复；网络后端传入缓存键，真实 loopback 解码播放日志已保存 | 真实网络落盘后第二次播放命中、实机恢复未覆盖；下载留 M5；缓存目录沿用 media-cache/ |
 | F14 Haiku 账号 | 未实现 | | | |
@@ -729,3 +729,36 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 提供方覆盖沿用首部分：Kugou KRC/LRC、LRCLIB、Better Lyrics TTML、LyricsPlus、Paxsenix、HTTP模板/headers/JSON点路径。
 - 未完成：完整nsh test全绿（上述Player一项失败）；Paxsenix专用评分/401令牌重取/content结构兜底、Kugou署名裁剪仍遗留。
 - 真实上游可用性与返回格式变化需人工确认；无新增架构待决事项。
+
+
+## 2026-11-11 M4-05：远端收藏刷新、刮削任务与审阅（已验收）
+
+- 主仓库内工作，未提交git；未修改参考版、NSH、依赖源码或其他specs，无新增依赖。
+- favorite_refresh.rs共享按EntityRef索引的完整分页future；beginFavoriteRefresh预留lease，refreshFavorite等待结果，cancelFavoriteRefresh释放；最后一个消费者离开才取消上游。
+- collections::refresh_version/refresh_favorite在同一锁内比较版本并替换；修改/import/删除使旧请求失效，取消与提交串行，删除后迟到结果不复活收藏。
+- 收藏详情先显示离线快照，后台最多100页、游标循环与超限报错；完整成功后原子写入，refreshedAt严格递增，失败提示“刷新失败，显示离线内容”。
+- CollectionPage与SourceDetailPage均接入刷新/离页取消；取消收藏需确认，只删本地镜像。
+- 权威歌单仍为<data>/playlists.loro，镜像与(refreshedAt,version)合并沿用参考版，无格式变更。
+- scrape_service.rs复用插件Scraper的4并发/8秒、跨源合并与verdict；批量进度、取消保留已完成、自动采用/待审/跳过、手动关键词重搜。
+- 音乐来源search.track可参与候选；同分合并和排序遵守配置来源优先级，不依赖请求完成顺序。
+- core.scrape：start(ids,{mode:missing|replace})、cancel、jobs、review、accept(id,candidateIndex)、skip(id)、undo(id)、retry(id,keyword)、onChange→Stop，均带导出注释。
+- 应用到library/overrides.json的稀疏覆盖，保存previousOverride/appliedOverride；撤销拒绝覆盖后续人工修改；Core.close取消并等待任务退出。
+- 审阅持久化为<data>/scrape_review.json数组，字段沿用参考版；磁盘track转sourceId/字符串album/字符串artists，previousOverride元数据转extra；新增冲突保护字段由旧版忽略。
+- 恢复searching为pending；参考版review读写转换与采用后重开/撤销测试通过；本服务不调用write_tags，文件写回仍走既有TrackEditor明确确认路径。
+- LibraryPage单曲菜单/多选工具栏“刮削…”→模式确认→进度与可滚动审阅；候选展示评分/来源/字段差异，自动采用项标注并可撤销。
+- 设置位置：存储→元数据刮削；使用scrapersDisabled/scraperOrder/scrapeUseMusicPlugins，新增scrapeMode保存默认应用模式。
+- 偏离：音乐来源候选默认关闭（参考版默认开启，可在设置启用）；审阅采用与自动结果在同一列表以状态区分。
+- 第0步：歌词逐源错误改为中文解析/超时/不可用提示，原始错误写入app日志lyrics scope。
+- §1相关Rust4/4：cargo-test-favorite-refresh-repair2.log；初次编译/API与夹具激活修复日志保留。
+- §2相关Rust3/3：cargo-test-scrape-service-repair1.log；初次编译错误修复日志保留。
+- nsh check通过：nsh-check.log；nsh build通过：nsh-build.log；仅已知工具链/host警告。
+- workspace一次260 passed/1 ignored：cargo-test-workspace.log；完整nsh test一次43/43：nsh-test-full.log。
+- 新增Headless三项3/3：nsh-test-favorite-scrape.log，覆盖收藏完整刷新/失败快照/取消确认及批量采用、跳过、自动撤销。
+- 上述全量后收尾补充参考审阅格式适配与同分来源优先级；仅跑相关Rust：scrape_service4/4、haiku-plugins scrape4/4（cargo-test-scrape-{review-compat,provider-order}.log），未重复全量。
+- 设置截图发现外层默认横排，补flex-col并重拍；此布局类修正通过真实窗口复查，未重复构建/全量测试。
+- 测试/截图前IOConsoleLocked=No；所有夹具openIsolated，来源使用显式fixture与loopback，无真实上游请求。
+- 四张浅色截图已逐张检查：favorite-refresh.png、scrape-progress.png（2/3运行中）、scrape-review.png（候选/差异）、scrape-settings.png。
+- 证据均在.artifacts/m4-05/；run-*.log保留，所有本轮预览已关闭；git diff --check通过。
+- 未补齐参考版高级关键词清洗/文件名回退、专辑艺术家/碟号候选字段、刮削封面下载到本地缓存；当前封面保存候选URL。
+- 未覆盖真实上游与原生写回实机交互；重开Core的审阅UI未单独做Headless（Rust服务/曲库重开已测）。无新增架构待决事项。
+- 审阅者核对：workspace 日志 260 通过/1 忽略，完整 nsh test 43/43，check/build 无新警告；四张截图已审阅。UI 小项留后续：审阅列表项居中未左对齐、字段差异“年份”行空白、来源显示内部 ID（network.fixture#…）而非名称。

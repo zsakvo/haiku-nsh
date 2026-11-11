@@ -1,4 +1,4 @@
-import { cleanup, effect, resource, signal, Text, View } from "nsh";
+import { cleanup, effect, resource, signal, Text, untracked, View } from "nsh";
 import { CollectionsService, Core, TrackList } from "haiku/native";
 import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
@@ -22,7 +22,23 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const trackEditor = signal<string[] | null>(null);
   const deleting = signal(false);
   const error = signal("");
+  const refreshError = signal("");
   const collection = () => mirror.collections().find((p) => p.id === props.id);
+  effect(() => {
+    const active = props.active, id = props.id;
+    refreshError.set("");
+    const item = untracked(collection);
+    if (!active || item?.kind !== "plugin" || !item.sourceId || !item.remoteId) return;
+    const reference = JSON.stringify([item.sourceId, "playlist", item.remoteId]);
+    let live = true;
+    let lease: string;
+    try { lease = props.core.sources.beginFavoriteRefresh(reference); }
+    catch (_) { refreshError.set("刷新失败，显示离线内容"); return; }
+    cleanup(() => { live = false; props.core.sources.cancelFavoriteRefresh(lease); });
+    void props.core.sources.refreshFavorite(lease).catch(() => {
+      if (live) refreshError.set("刷新失败，显示离线内容");
+    });
+  });
   effect(() => {
     const item = collection();
     if (props.active && item && props.id !== "__liked__") {
@@ -79,9 +95,13 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
               <Button label="编辑歌单…" size="sm" onPress={() => editor.set("edit")} />
               <Button label="删除歌单…" size="sm" onPress={() => deleting.set(true)} />
             </If>
+            <If when={collection()?.kind === "plugin"}>
+              <Button label="取消收藏歌单…" size="sm" onPress={() => deleting.set(true)} />
+            </If>
           </View>
         </View>
       </View>
+      <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
       <View class="flex-row gap-2 items-center">
         <View class="flex-1"><SearchField label={liked ? "筛选喜欢" : "筛选歌单"}
           value={search()} placeholder="标题、艺术家或专辑" onChange={(value) => search.set(value)} /></View>
@@ -128,11 +148,13 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
     </If>
     <If when={!!trackEditor()}><TrackEditor core={props.core} ids={trackEditor()!} onClose={() => trackEditor.set(null)} /></If>
     <Dialog open={deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(false); }} class="w-112 p-5 gap-4">
-      <Text role="header" class="text-lg font-semibold text-foreground">删除歌单？</Text>
-      <Text class="text-sm text-muted-foreground">“{collection()?.title}”将被删除，原始音乐文件会保留。</Text>
+      <Text role="header" class="text-lg font-semibold text-foreground">{collection()?.kind === "plugin" ? "取消收藏歌单？" : "删除歌单？"}</Text>
+      <Text class="text-sm text-muted-foreground">{collection()?.kind === "plugin"
+        ? "仅移除此设备的收藏与离线快照，远端歌单保持不变。"
+        : `“${collection()?.title}”将被删除，原始音乐文件会保留。`}</Text>
       <View class="flex-row justify-end gap-2">
         <Button label="取消" onPress={() => deleting.set(false)} />
-        <Button label="确认删除歌单" variant="destructive" onPress={() => void act(() => {
+        <Button label={collection()?.kind === "plugin" ? "确认取消收藏" : "确认删除歌单"} variant="destructive" onPress={() => void act(() => {
           service.delete(props.id); deleting.set(false); props.onDeleted();
         })} />
       </View>

@@ -1,9 +1,10 @@
-import { cleanup, Image, Scroll, resource, signal, Text, View } from "nsh";
+import { cleanup, effect, Image, Scroll, resource, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
 import { Button } from "../ui/Button";
 import { SourceGrid, SourceTracks } from "./SourceContent";
+import { Dialog } from "../ui/Surfaces";
 
 /** One retained page per EntityRef. Resources reject stale loads; pagination also checks its epoch. */
 export function SourceDetailPage(props: { core: Core; reference: string; active: boolean; navigate: (route: Route) => void }) {
@@ -11,12 +12,47 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   const next = signal<string | null>(null), albumNext = signal<string | null>(null);
   const info = signal<any>(null), canFavorite = signal(false), expanded = signal(false);
   const error = signal(""), busy = signal(false);
+  const unfavorite = signal(false);
   const collections = mirrorCollections(props.core);
   let epoch = 0;
   let closed = false;
-  cleanup(() => { closed = true; epoch++; });
+  let refreshLease: string | undefined;
+  function cancelRefresh() {
+    if (refreshLease) props.core.sources.cancelFavoriteRefresh(refreshLease);
+    refreshLease = undefined;
+  }
+  cleanup(() => { closed = true; epoch++; cancelRefresh(); });
+  effect(() => { if (!props.active) { epoch++; cancelRefresh(); } });
+  function showSnapshot(item: any, reference: any) {
+    info.set({ reference, title: item.title, description: item.description,
+      cover: item.cover, creator: item.sourceLabel, track_count: item.trackCount });
+    tracks.set(props.core.collections.tracks(item.id) as any[]);
+    next.set(null); albums.set([]); albumNext.set(null); canFavorite.set(true);
+  }
   const first = resource(() => props.active ? props.reference : undefined, async (reference) => {
     const version = ++epoch;
+    cancelRefresh(); error.set("");
+    const [source, kind, id] = JSON.parse(reference) as string[];
+    const favorite = (props.core.collections.list() as any[]).find(
+      p => p.kind === "plugin" && p.sourceId === source && p.remoteId === id && kind === "playlist");
+    if (favorite) {
+      const identity = { source, kind, id };
+      showSnapshot(favorite, identity);
+      const lease = props.core.sources.beginFavoriteRefresh(reference);
+      refreshLease = lease;
+      try {
+        await props.core.sources.refreshFavorite(lease);
+        if (closed || version !== epoch || !props.active) return;
+        const updated = (props.core.collections.list() as any[]).find(p => p.id === favorite.id);
+        if (updated) showSnapshot(updated, identity);
+      } catch (_) {
+        if (!closed && version === epoch && props.active) error.set("刷新失败，显示离线内容");
+      } finally {
+        props.core.sources.cancelFavoriteRefresh(lease);
+        if (refreshLease === lease) refreshLease = undefined;
+      }
+      return;
+    }
     const result = await props.core.sources.detail(reference, null) as any;
     if (closed || version !== epoch || reference !== props.reference || !props.active) return;
     info.set(result.info); tracks.set(result.tracks.items); next.set(result.tracks.next);
@@ -82,7 +118,8 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
               <Button label="播放全部" size="sm" variant="primary" disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
               <Button label="随机播放" size="sm" disabled={!tracks().length || busy()} onPress={() => void act(() => play(true))} />
               <If when={canFavorite()}><Button label={favoriteId() ? "取消收藏歌单" : "收藏歌单"} size="sm" loading={busy()}
-                onPress={() => void act(() => props.core.sources.favoritePlaylist(props.reference, !favoriteId()))} /></If>
+                onPress={() => favoriteId() ? unfavorite.set(true)
+                  : void act(() => props.core.sources.favoritePlaylist(props.reference, true))} /></If>
             </View>
           </View>
         </View>
@@ -104,5 +141,18 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
       </View>
     </If>
     </Scroll>
+    <Dialog open={unfavorite()} onOpenChange={event => { if (!event.open) unfavorite.set(false); }}
+      class="w-112 p-5 gap-4">
+      <Text role="header" class="text-lg font-semibold text-foreground">取消收藏歌单？</Text>
+      <Text class="text-sm text-muted-foreground">仅移除此设备的收藏与离线快照，远端歌单保持不变。</Text>
+      <View class="flex-row justify-end gap-2">
+        <Button label="取消" onPress={() => unfavorite.set(false)} />
+        <Button label="确认取消收藏" variant="destructive" onPress={() => void act(async () => {
+          cancelRefresh();
+          await props.core.sources.favoritePlaylist(props.reference, false);
+          unfavorite.set(false);
+        })} />
+      </View>
+    </Dialog>
   </View>;
 }

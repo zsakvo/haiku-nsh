@@ -19,6 +19,7 @@ function tracks(ctx: Context & PageArgs) {
 let failAlbum = false;
 let homeOffline=false, homeFailOnce=false, radioBatch=0;
 let searches: string[] = [];
+let playlistOffline = false;
 async function searching(keyword: string, ctx: Context) {
   searches.push(keyword);
   if(keyword === "慢请求") { ctx.log.info("slow search started"); await new Promise(r=>setTimeout(r,900)); }
@@ -74,7 +75,7 @@ export default definePlugin({
       ctx.log.info(`streams ${id} quality=${ctx.quality}`);
       return [{url:`${ctx.connection!.url}/song.flac`,format:"flac",quality:ctx.quality,expiresAt:Math.floor(Date.now()/1000)+3600}];
     },
-    async get(id, ctx) { if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
+    async get(id, ctx) { if(id === "playlist-offline")playlistOffline=true; if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
   },
   album: { async get(id, ctx) { guard(); return {info:album(ctx),tracks:tracks(ctx)}; } },
   artist: {
@@ -82,7 +83,25 @@ export default definePlugin({
     async tracks(id, ctx) { return tracks(ctx); },
     async albums(id, ctx) { return {items:[album(ctx)]}; },
   },
-  playlist: { async get(id, ctx) { return {info:playlist(ctx),tracks:tracks(ctx)}; } },
+  playlist: {
+    async get(id, ctx) {
+      if (playlistOffline) throw new Upstream("歌单来源离线");
+      return { info: playlist(ctx), tracks: tracks(ctx) };
+    },
+  },
+  scrape: {
+    async search(query) {
+      if (query.title === "Slow") await new Promise(() => {});
+      return [{
+        id: query.title,
+        title: query.title === "Elsewhere" ? "Unrelated" : query.title,
+        artists: query.title === "Song Alpha" ? query.artists : ["Other"],
+        duration: query.duration,
+        album: "刮削专辑",
+        year: 2026,
+      }];
+    },
+  },
   toplist: { async get(id, ctx) { return {info:{id,title:"回声榜",cover:album(ctx).cover},tracks:tracks(ctx)}; } },
   library: {
     cards: [

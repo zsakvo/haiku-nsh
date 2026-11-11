@@ -11,6 +11,8 @@ export interface SettingsSnapshot {
   mediaCacheEnabled: boolean; mediaCacheMaxBytes: number;
   lyricsAutoSearch: boolean; lyricsProviderOrder: string[]; lyricsProvidersDisabled: string[];
   lyricsCustomProviders: CustomLyricsProvider[];
+  scrapersDisabled?: string[]; scraperOrder?: string[]; scrapeUseMusicPlugins?: boolean;
+  scrapeMode?: "missing" | "replace";
 }
 export interface CustomLyricsProvider {
   id: string; name: string; urlTemplate: string; responseType: string;

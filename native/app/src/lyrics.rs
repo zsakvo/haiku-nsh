@@ -152,12 +152,26 @@ impl LyricsService {
         providers: Option<Vec<String>>,
     ) -> Result<JsonValue, JsError> {
         let q: Query = decode(query)?;
-        let (service, o) = this.with(|s| (s.bridge.lyrics.clone(), options(&s.bridge)));
+        let (service, o, logs) = this.with(|s| (
+            s.bridge.lyrics.clone(), options(&s.bridge), s.bridge.logs.clone(),
+        ));
         background(async move {
-            service
-                .search_report(q, providers, o)
-                .await
-                .map(|r| serde_json::to_value(r).unwrap())
+            let mut report = service.search_report(q, providers, o).await?;
+            for (source, error) in &mut report.source_errors {
+                let _ = logs.add("app", "warn", source, Some("lyrics"),
+                    "歌词来源查找失败", Some(error));
+                let message = error.to_lowercase();
+                *error = if message.contains("timeout") || message.contains("timed out") {
+                    "请求超时，请稍后重试"
+                } else if message.contains("json") || message.contains("expected")
+                    || message.contains("parse") || message.contains("invalid")
+                {
+                    "返回格式无法解析"
+                } else {
+                    "来源暂时不可用，请稍后重试"
+                }.into();
+            }
+            Ok::<_, String>(serde_json::to_value(report).unwrap())
         })
         .await
         .map_err(|e| JsError::Error(e.to_string()))?

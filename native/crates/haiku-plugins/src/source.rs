@@ -27,7 +27,8 @@ impl Cancellation {
     pub fn is_cancelled(&self) -> bool {
         *self.0.borrow()
     }
-    pub(crate) async fn cancelled(&self) {
+    /// Wait for cancellation without polling, including cancellation before subscription.
+    pub async fn cancelled(&self) {
         let mut receiver = self.0.subscribe();
         if *receiver.borrow_and_update() {
             return;

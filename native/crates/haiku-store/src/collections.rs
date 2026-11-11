@@ -1,10 +1,10 @@
 //! Reference-compatible collections with serialized mutations, automatic persistence and events.
-use crate::playlist_core::{LIKED_PLAYLIST_ID, PlaylistCore, PlaylistMeta, TrackEntry};
+use crate::playlist_core::{PlaylistCore, PlaylistMeta, TrackEntry, LIKED_PLAYLIST_ID};
 use haiku_model::{Album, Artist, EntityRef, Track};
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
     thread::{self, JoinHandle},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -58,6 +58,7 @@ struct State {
     dirty: bool,
     listeners: Vec<mpsc::Sender<Change>>,
     error: Option<String>,
+    versions: std::collections::BTreeMap<String, u64>,
 }
 impl State {
     fn changed(&mut self, ids: Vec<String>) {
@@ -66,6 +67,9 @@ impl State {
         }
         self.dirty = true;
         self.revision += 1;
+        for id in &ids {
+            *self.versions.entry(id.clone()).or_default() += 1;
+        }
         let event = Change {
             revision: self.revision,
             playlist_ids: ids,
@@ -149,32 +153,31 @@ impl Collections {
             revision: 0,
             listeners: vec![],
             error: None,
+            versions: Default::default(),
         }));
         let (tx, rx) = mpsc::channel();
         let disk_state = state.clone();
         let disk_path = path.clone();
         let worker = thread::Builder::new()
             .name("haiku-collections".into())
-            .spawn(move || {
-                loop {
-                    match rx.recv() {
-                        Ok(Wake::Changed) => loop {
-                            match rx.recv_timeout(Duration::from_millis(500)) {
-                                Ok(Wake::Changed) => continue,
-                                Ok(Wake::Shutdown) | Err(mpsc::RecvTimeoutError::Disconnected) => {
-                                    let _ = save(&disk_state, &disk_path);
-                                    return;
-                                }
-                                Err(mpsc::RecvTimeoutError::Timeout) => {
-                                    let _ = save(&disk_state, &disk_path);
-                                    break;
-                                }
+            .spawn(move || loop {
+                match rx.recv() {
+                    Ok(Wake::Changed) => loop {
+                        match rx.recv_timeout(Duration::from_millis(500)) {
+                            Ok(Wake::Changed) => continue,
+                            Ok(Wake::Shutdown) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                                let _ = save(&disk_state, &disk_path);
+                                return;
                             }
-                        },
-                        Ok(Wake::Shutdown) | Err(_) => {
-                            let _ = save(&disk_state, &disk_path);
-                            return;
+                            Err(mpsc::RecvTimeoutError::Timeout) => {
+                                let _ = save(&disk_state, &disk_path);
+                                break;
+                            }
                         }
+                    },
+                    Ok(Wake::Shutdown) | Err(_) => {
+                        let _ = save(&disk_state, &disk_path);
+                        return;
                     }
                 }
             })
@@ -364,6 +367,54 @@ impl Collections {
                 &entries,
             );
             Ok((id.clone(), vec![id]))
+        })
+    }
+    /// Capture a refresh version without changing the offline mirror.
+    pub fn refresh_version(&self, id: &str) -> Result<u64, String> {
+        let state = self.0.state.lock().unwrap();
+        if !state
+            .core
+            .playlists()
+            .iter()
+            .any(|p| p.id == id && p.kind == "plugin")
+        {
+            return Err("收藏歌单不存在".into());
+        }
+        Ok(*state.versions.get(id).unwrap_or(&0))
+    }
+    /// Replace a complete mirror only if no mutation/import/deletion has overtaken this load.
+    pub fn refresh_favorite(
+        &self,
+        id: &str,
+        version: u64,
+        title: &str,
+        description: &str,
+        cover: &str,
+        tracks: &[Track],
+    ) -> Result<bool, String> {
+        self.mutate(|s| {
+            let Some(meta) = s
+                .core
+                .playlists()
+                .into_iter()
+                .find(|p| p.id == id && p.kind == "plugin")
+            else {
+                return Ok((false, vec![]));
+            };
+            if *s.versions.get(id).unwrap_or(&0) != version {
+                return Ok((false, vec![]));
+            }
+            let entries = tracks.iter().map(to_entry).collect::<Vec<_>>();
+            s.core.favorite_plugin_playlist(
+                meta.source_plugin_id.as_deref().ok_or("收藏缺少来源")?,
+                meta.source_playlist_id.as_deref().ok_or("收藏缺少远端ID")?,
+                meta.source_label.as_deref().unwrap_or(""),
+                title,
+                description,
+                cover,
+                &entries,
+            );
+            Ok((true, vec![id.to_owned()]))
         })
     }
     pub fn export_snapshot(&self) -> Vec<u8> {

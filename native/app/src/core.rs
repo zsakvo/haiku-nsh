@@ -193,6 +193,7 @@ impl Drop for CoreBridge {
 /// The application core. `open` restores local playback as paused, without opening audio.
 #[class]
 pub struct Core {
+    scrape: Instance<crate::scrape::ScrapeService>,
     lyrics: Instance<crate::lyrics::LyricsService>,
     activity: Instance<crate::activity::ActivityService>,
     collections: Instance<crate::collections::CollectionsService>,
@@ -346,6 +347,14 @@ impl Core {
         bridge
             .owner
             .run(|| crate::platform::initialize_media(bridge.clone()));
+        let scrape = {
+            let (root, library, host, settings) = (
+                bridge._root.path.clone(), library.clone(), plugins.clone(), settings.clone(),
+            );
+            let service = blocking(move || crate::scrape_service::Service::open(&root, library, host, settings))
+                .await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
+            crate::scrape::ScrapeService::new(service)
+        };
         let settings = crate::settings::SettingsService::new(settings, bridge.clone());
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
@@ -356,6 +365,7 @@ impl Core {
             .run(|| crate::lyrics::LyricsService::new(bridge.clone()));
         let plugin_logs = bridge.logs.clone();
         let core = Instance::new(Self {
+            scrape,
             lyrics,
             activity,
             collections,
@@ -450,6 +460,7 @@ impl Core {
     }
     /// Flush pending collections and playback, releasing the cached Core for a later open.
     pub async fn close(this: Instance<Self>) -> Result<(), String> {
+        crate::scrape::ScrapeService::close(this.with(|s| s.scrape.clone())).await?;
         let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));
         let store = bridge.collections.clone();
         let history = bridge.history.clone();
@@ -474,6 +485,11 @@ impl Core {
     #[getter]
     pub fn settings(&self) -> Instance<crate::settings::SettingsService> {
         self.settings.clone()
+    }
+    /// Cancellable local metadata jobs, durable review and reversible sparse overrides.
+    #[getter]
+    pub fn scrape(&self) -> Instance<crate::scrape::ScrapeService> {
+        self.scrape.clone()
     }
     /// Installed plugin packages and developer tooling, shared with the source settings service.
     #[getter]

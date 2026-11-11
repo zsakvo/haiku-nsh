@@ -3,7 +3,8 @@ import type { Core } from "haiku/native";
 
 export type Collection = {
   id: string; title: string; description: string; kind: "user" | "liked" | "plugin";
-  position: number; trackCount: number; sourceId?: string; sourceLabel?: string;
+  position: number; trackCount: number; sourceId?: string; remoteId?: string; sourceLabel?: string;
+  cover?: string; refreshedAt?: number;
 };
 /** Read-only TSX mirror. Mutations, ordering, identities and persistence remain in Rust. */
 export function mirrorCollections(core: Core) {

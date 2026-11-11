@@ -34,6 +34,14 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M4-05 已验收并提交，M4 完成
+
+- 远端收藏刷新（`favorite_refresh.rs`：离线快照优先、完整分页原子换版、单飞/离页取消/迟到丢弃、取消收藏确认）；刮削服务 `scrape_service.rs` 与 `core.scrape`（start/cancel/jobs/review/accept/skip/undo/retry/onChange）；覆盖写 `library/overrides.json`，审阅存 `<data>/scrape_review.json`（参考版格式双向转换）；设置位于“存储 → 元数据刮削”；歌词逐源错误中文化。
+- 证据：workspace 260 通过/1 忽略，完整 nsh test 43/43，check/build 通过；四张浅色截图（`.artifacts/m4-05/`）。
+- 偏离：音乐来源候选默认关闭（参考版默认开）。遗留：参考版高级关键词清洗/文件名回退、专辑艺术家/碟号、刮削封面本地缓存；重开 Core 后审阅 UI 无 Headless。UI 小项：审阅列表项居中、“年份”差异行空白、来源显示内部 ID。
+- 待人工确认：真实刮削上游、标签写回实机流程、真实来源收藏刷新。
+- 下一步：M5（下载 → 账号与统计上传 → Gist 同步与 `.haikubak` 备份），按 MILESTONES.md 拆任务。Codex 周额度剩约 3%。
+
 ## 2026-11-11 更新：M4-04 已验收并提交
 
 - 第一部分 `1dfae04`：来源链（手动 > 缓存 > 本地 > 插件 > 提供方）、六个内置提供方、`core.lyrics`、`<data>/lyrics/` 缓存。第二部分：查找歌词对话框（正在播放上的“查找歌词…”直达按钮）、设置“歌词”分组、M4-03 三项 UI 小项。

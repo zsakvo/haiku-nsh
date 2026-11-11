@@ -156,6 +156,10 @@ pub struct SourceApi {
     cover_size: u32,
 }
 impl SourceApi {
+    /// Whether this source implements dedicated metadata scraping.
+    pub fn source_has_scrape(&self) -> bool {
+        self.source.descriptor().capabilities.iter().any(|c| c == "scrape.search")
+    }
     pub fn new(source: Arc<Source>) -> Self {
         Self {
             source,

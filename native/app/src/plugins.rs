@@ -38,6 +38,7 @@ pub struct PluginService {
     logins: Arc<tokio::sync::Mutex<BTreeMap<String, Login>>>,
     cancellations: Arc<Mutex<BTreeMap<String, Cancellation>>>,
     collections: haiku_store::collections::Collections,
+    favorite_refresh: crate::favorite_refresh::FavoriteRefresh,
     remote: Rc<crate::sources::RemoteSources>,
     network_fixtures: Arc<Mutex<Vec<crate::network_fixture::Server>>>,
 }
@@ -108,7 +109,7 @@ impl PluginService {
         });
         Instance::new(Self {
             home: crate::discovery::HomeCache::new(home_root),
-            host,
+            host: host.clone(),
             listeners: Listeners::default(),
             event_listeners,
             alive,
@@ -116,6 +117,7 @@ impl PluginService {
             fixtures: Arc::default(),
             logins: Arc::default(),
             cancellations: Arc::default(),
+            favorite_refresh: crate::favorite_refresh::FavoriteRefresh::new(host.clone(), collections.clone()),
             collections,
             remote: Rc::new(Default::default()),
             network_fixtures: Arc::default(),
@@ -384,6 +386,20 @@ impl PluginService {
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
+    }
+    /// Reserve a shared refresh lease before awaiting; release it when the detail page leaves.
+    pub fn begin_favorite_refresh(&self, reference: String) -> Result<String, String> {
+        let reference = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
+        self.favorite_refresh.reserve(reference)
+    }
+    /// Load all pages and atomically replace the mirror. False means a newer version won.
+    pub async fn refresh_favorite(this: Instance<Self>, lease: String) -> Result<bool, String> {
+        let pending = this.with(|s| s.favorite_refresh.pending(&lease))?;
+        background(pending).await.map_err(|e| e.to_string())?
+    }
+    /// Release this page's lease; the last departing consumer cancels upstream requests.
+    pub fn cancel_favorite_refresh(&self, lease: String) {
+        self.favorite_refresh.release(&lease);
     }
     /// Snapshot every playlist page (maximum 100) into the existing offline favorite contract.
     /// False removes only the local favorite mirror.

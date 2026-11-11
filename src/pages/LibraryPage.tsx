@@ -9,6 +9,9 @@ import { Button } from "../ui/Button";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
+import { ScrapeReview } from "./ScrapeReview";
+import { mirrorScrape } from "../state/scrape";
+import { SettingSelect } from "../ui/SettingsControls";
 
 const views = [{ id: "tracks", label: "歌曲" }, { id: "albums", label: "专辑" }, { id: "artists", label: "艺术家" }];
 const sorts = [{ id: "title", label: "标题" }, { id: "artist", label: "艺术家" }, { id: "album", label: "专辑" },
@@ -34,6 +37,9 @@ export function LibraryPage(props: {
   const errorsOpen = signal(false);
   const selected = signal<string[]>([]);
   const editor = signal<string[] | null>(null);
+  const scrape = mirrorScrape(props.core);
+  const scrapeIds = signal<string[]>([]), reviewOpen = signal(false);
+  const scrapeMode = signal((props.core.settings.get() as any).scrapeMode ?? "replace");
   const playlistTracks = signal<unknown[] | null>(null);
   const groupLimit = signal(100);
   const query = () => ({ search: search(), sort: sort(), descending: descending(), group: props.group ?? null });
@@ -75,6 +81,7 @@ export function LibraryPage(props: {
     if (paths.length) { await library.addRoots(paths); await library.scan(); }
   }
   async function action(command: string, ids: string[]) {
+    if (command === "scrape") { scrapeIds.set(ids); return; }
     if (command === "edit") { editor.set(ids); return; }
     if (command === "new-playlist") { playlistTracks.set(ids.map((id) => library.track(id)).filter(Boolean)); return; }
     await act(async () => {
@@ -92,6 +99,9 @@ export function LibraryPage(props: {
           {props.group ? (detail()?.title ?? (props.groupKind === "album" ? "本地专辑" : "本地艺术家")) : "本地曲库"}
         </Text>
         <Button label="管理文件夹…" size="sm" disabled={busy()} onPress={() => rootsOpen.set(true)} />
+        <If when={!!scrape().items.length}>
+          <Button label="刮削审阅…" size="sm" onPress={() => reviewOpen.set(true)} />
+        </If>
         <Button label="重新扫描" size="sm" disabled={busy() || mirrors.library().scanning || !roots().length}
           onPress={() => void act(() => library.scan())} />
       </View>
@@ -140,7 +150,19 @@ export function LibraryPage(props: {
         <View class="flex-row gap-2 items-center">
           <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
           <Button label="编辑信息…" size="sm" onPress={() => editor.set(selected())} />
+          <Button label="刮削…" size="sm" disabled={scrape().running} onPress={() => scrapeIds.set(selected())} />
           <Button label="加入队列" size="sm" onPress={() => void action("append", selected())} />
+        </View>
+      </If>
+      <If when={scrape().running}>
+        <View testID="scrape-progress" class="gap-2">
+          <View class="flex-row gap-3 items-center">
+            <Text class="flex-1 text-sm text-muted-foreground">{`正在刮削 · ${scrape().completed} / ${scrape().total}`}</Text>
+            <Button label="取消刮削" size="sm" onPress={() => props.core.scrape.cancel()} />
+          </View>
+          <View class="h-1 rounded-full bg-muted overflow-hidden">
+            <View class="h-1 bg-primary" style={{ width: `${100 * scrape().completed / Math.max(1, scrape().total)}%` }} />
+          </View>
         </View>
       </If>
     </View>
@@ -152,7 +174,7 @@ export function LibraryPage(props: {
       <Text class="p-5 text-sm text-muted-foreground">正在加载曲库…</Text>
     </If>
     <If when={!!roots().length && !!source() && showTracks()}>
-      <TrackList source={source()!} active={props.active && !editor() && !rootsOpen() && !playlistTracks()}
+      <TrackList source={source()!} active={props.active && !editor() && !rootsOpen() && !playlistTracks() && !reviewOpen() && !scrapeIds().length}
         currentId={mirrors.player()?.current?.id ?? null}
         onPlay={(event) => void act(() => library.playSource(event.source, event.id))}
         onAction={(event) => void action(event.command, event.ids)}
@@ -191,5 +213,21 @@ export function LibraryPage(props: {
     </Dialog>
     <If when={!!playlistTracks()}><PlaylistEditor core={props.core} tracks={playlistTracks()!} onClose={() => playlistTracks.set(null)} /></If>
     <If when={!!editor()}><TrackEditor core={props.core} ids={editor()!} onClose={() => editor.set(null)} /></If>
+    <If when={reviewOpen()}><ScrapeReview core={props.core} open onClose={() => reviewOpen.set(false)} /></If>
+    <Dialog open={!!scrapeIds().length} onOpenChange={e => { if (!e.open) scrapeIds.set([]); }}
+      class="w-112 p-5 gap-4">
+      <Text role="header" class="text-lg font-semibold text-foreground">刮削 {scrapeIds().length} 首歌曲</Text>
+      <Text class="text-sm text-muted-foreground">明确匹配会自动采用，可在审阅中撤销；其他候选等待确认。</Text>
+      <SettingSelect label="应用模式" value={scrapeMode()}
+        items={[{ value: "missing", title: "只填补缺失字段" }, { value: "replace", title: "覆盖现有字段" }]}
+        onChange={value => scrapeMode.set(value)} />
+      <View class="flex-row justify-end gap-2">
+        <Button label="取消" onPress={() => scrapeIds.set([])} />
+        <Button label="开始刮削" variant="primary" disabled={scrape().running || busy()} onPress={() => void act(async () => {
+          await props.core.scrape.start(scrapeIds(), { mode: scrapeMode() });
+          scrapeIds.set([]); reviewOpen.set(true);
+        })} />
+      </View>
+    </Dialog>
   </View>;
 }

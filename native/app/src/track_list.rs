@@ -204,6 +204,10 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
             move || {
                 view()
                     .child(command(props, at, cx, "edit", "编辑信息…"))
+                    .child(when(
+                        move || source(props).and_then(|s| s.provider.collection_id()).is_none(),
+                        move || command(props, at, cx, "scrape", "刮削…"),
+                    ))
                     .child(command(props, at, cx, "reveal", "在 Finder 中显示"))
             },
         ))

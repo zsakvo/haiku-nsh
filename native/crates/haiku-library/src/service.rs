@@ -139,6 +139,22 @@ impl Library {
         Ok(report)
     }
     pub fn track(&self, id: &str) -> Option<Track> { let data = self.0.data.lock().unwrap(); Self::effective(&data,id) }
+    /// Sparse authoritative override, retained for reversible metadata scraping.
+    pub fn get_override(&self, id: &str) -> Patch {
+        self.0.data.lock().unwrap().overrides.get(id).cloned().unwrap_or_default()
+    }
+    /// Restore an override only while it still matches the scrape result; preserve later edits.
+    pub fn restore_override(&self, id: &str, expected: &Patch, previous: Patch) -> Result<()> {
+        let mut data = self.0.data.lock().unwrap();
+        if data.overrides.get(id).cloned().unwrap_or_default() != *expected {
+            return Err("曲目已再次编辑，无法撤销此前刮削".into());
+        }
+        let mut next = data.overrides.clone();
+        if previous == Patch::default() { next.remove(id); }
+        else { next.insert(id.into(), previous); }
+        json_file::write(&self.0.dir.join("overrides.json"), &next).map_err(|e| e.to_string())?;
+        data.overrides = next; drop(data); self.changed(); Ok(())
+    }
     fn effective(data: &Data, id: &str) -> Option<Track> { let mut t = data.index.get(id)?.clone(); if let Some(p) = data.overrides.get(id) { p.apply(&mut t); } Some(t) }
     pub fn edit(&self, ids: &[String], patch: Patch) -> Result<()> {
         patch.validate()?;
