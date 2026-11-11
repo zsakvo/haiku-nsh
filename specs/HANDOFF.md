@@ -36,6 +36,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-12 更新：M6-05 已验收并提交
+
+- 打包：`nsh package --target macos`，发行入口 `packaging/{App.tsx,nsh.json}`（fs capability 为空，测试路径不进发行包）；图标 `assets/app-icon.png`（用户选定 Flutter 版 icon-v2，满版方图，NSH 不加圆角，`.icns` 四角不透明）。产物 `.artifacts/m6-05/release/Haiku.app` 约 84MB，adhoc 签名、未公证。
+- 内置插件与 UI 资源经 Rust 资源注册入包（`Icon.tsx`/`EmptyState.tsx` 改用 `asset:/ui/...` 地址）；第三方声明 `native/app/assets/THIRD_PARTY_NOTICES.txt`（610 个 Rust 包，`native/tools/generate-notices.py` 生成），关于页显示。空数据目录启动四个内置插件安装成功、无 WARN/ERROR。审阅者复跑 workspace 304、nsh test 76/76。
+- 已知：rust-objcopy 缺 libLLVM.dylib，strip 步骤警告但不影响产物。待人工：Finder 双击、Gatekeeper、Dock 图标观感（直角方块，可能需换带圆角/留白的图）。下一步 M6-06 审计。
+
 ## 2026-11-11 更新：M6-04 已验收并提交
 
 - `GlassSurface`：`#[native_components(macos)]` 的 NSVisualEffectView 作 PlayerDock 背景，外观显式跟随应用主题（Now Playing 用 Dark Aqua），文字/时间用语义色；Headless 与其他平台回退 NSH 半透明表面。新增依赖 `nsh-platform-macos =0.4.0`。

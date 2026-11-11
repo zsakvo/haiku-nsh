@@ -1,0 +1,18 @@
+{
+  "name": "Haiku",
+  "id": "dev.haiku.nsh",
+  "version": "1.0.0",
+  "build": 1,
+  "rust": "../native/app",
+  "theme": "../src/ui/theme/haiku.json",
+  "icon": "../assets/app-icon.png",
+  "capabilities": {
+    "network": { "hosts": ["*"] },
+    "webview": { "hosts": ["*"] },
+    "statusBar": true,
+    "clipboard": true,
+    "picker": true,
+    "speech": true,
+    "openUrl": true
+  }
+}

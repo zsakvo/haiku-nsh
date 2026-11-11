@@ -1,0 +1,1890 @@
+Haiku — 第三方声明
+
+应用自身许可证尚未声明。以下声明仅适用于第三方组件。
+
+Rust 依赖许可证清单
+来源：NSH macOS release runner 的 Cargo.lock / cargo metadata。
+平台：aarch64-apple-darwin；包括构建依赖，不包括仅用于测试的依赖。
+SPDX 表达式照录依赖的 Cargo 元数据，不代替各项目的完整许可证条款。
+共 610 个第三方 Rust 包（同名不同版本分别列出）。
+
+adler2 2.0.1 — 0BSD OR MIT OR Apache-2.0
+https://github.com/oyvindln/adler2
+
+aead 0.6.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+aes 0.9.4 — MIT OR Apache-2.0
+https://github.com/RustCrypto/block-ciphers
+
+aes-gcm 0.11.1 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/AEADs
+
+aes-kw 0.3.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/key-wraps
+
+ahash 0.8.12 — MIT OR Apache-2.0
+https://github.com/tkaitchuck/ahash
+
+aho-corasick 1.1.4 — Unlicense OR MIT
+https://github.com/BurntSushi/aho-corasick
+
+alloc-no-stdlib 3.0.0 — BSD-3-Clause
+https://github.com/dropbox/rust-alloc-no-stdlib
+
+alloc-stdlib 0.3.0 — BSD-3-Clause
+https://github.com/dropbox/rust-alloc-no-stdlib
+
+allocator-api2 0.2.21 — MIT OR Apache-2.0
+https://github.com/zakarumych/allocator-api2
+
+ambient-authority 0.0.2 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/sunfishcode/ambient-authority
+
+anyhow 1.0.100 — MIT OR Apache-2.0
+https://github.com/dtolnay/anyhow
+
+append-only-bytes 0.1.12 — MIT
+https://github.com/zxch3n/append-only-bytes
+
+ar_archive_writer 0.5.3 — Apache-2.0 WITH LLVM-exception
+https://github.com/rust-lang/ar_archive_writer
+
+arbitrary 1.5.0 — MIT OR Apache-2.0
+https://github.com/rust-fuzz/arbitrary/
+
+arrayref 0.3.9 — BSD-2-Clause
+https://github.com/droundy/arrayref
+
+arrayvec 0.7.7 — MIT OR Apache-2.0
+https://github.com/bluss/arrayvec
+
+arref 0.1.0 — MIT
+https://github.com/zxch3n/arref
+
+ash 0.38.0+1.3.281 — MIT OR Apache-2.0
+https://github.com/ash-rs/ash
+
+async-lock 3.4.2 — Apache-2.0 OR MIT
+https://github.com/smol-rs/async-lock
+
+atomic-waker 1.1.2 — Apache-2.0 OR MIT
+https://github.com/smol-rs/atomic-waker
+
+autocfg 1.5.0 — Apache-2.0 OR MIT
+https://github.com/cuviper/autocfg
+
+base16ct 1.0.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+base64 0.22.1 — MIT OR Apache-2.0
+https://github.com/marshallpierce/rust-base64
+
+base64 0.23.1 — MIT OR Apache-2.0
+https://github.com/marshallpierce/rust-base64
+
+base64-simd 0.8.0 — MIT
+https://github.com/Nugine/simd
+
+base64ct 1.8.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+bincode 1.3.3 — MIT
+https://github.com/servo/bincode
+
+bindgen 0.72.1 — BSD-3-Clause
+https://github.com/rust-lang/rust-bindgen
+
+bit-set 0.8.0 — Apache-2.0 OR MIT
+https://github.com/contain-rs/bit-set
+
+bit-set 0.9.1 — Apache-2.0 OR MIT
+https://github.com/contain-rs/bit-set
+
+bit-vec 0.8.0 — Apache-2.0 OR MIT
+https://github.com/contain-rs/bit-vec
+
+bit-vec 0.9.1 — Apache-2.0 OR MIT
+https://github.com/contain-rs/bit-vec
+
+bitflags 1.3.2 — MIT/Apache-2.0
+https://github.com/bitflags/bitflags
+
+bitflags 2.13.2 — MIT OR Apache-2.0
+https://github.com/bitflags/bitflags
+
+bitmaps 2.1.0 — MPL-2.0+
+https://github.com/bodil/bitmaps
+
+block 0.1.6 — MIT
+http://github.com/SSheldon/rust-block
+
+block-buffer 0.10.4 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+block-buffer 0.12.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+block-padding 0.4.2 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+block2 0.6.2 — MIT
+https://github.com/madsmtm/objc2
+
+brotli 9.1.1 — BSD-3-Clause AND MIT
+https://github.com/dropbox/rust-brotli
+
+brotli-decompressor 6.3.1 — BSD-3-Clause/MIT
+https://github.com/dropbox/rust-brotli-decompressor
+
+bumpalo 3.19.1 — MIT OR Apache-2.0
+https://github.com/fitzgen/bumpalo
+
+bytecount 0.6.9 — Apache-2.0/MIT
+https://github.com/llogiq/bytecount
+
+bytemuck 1.25.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/Lokathor/bytemuck
+
+bytemuck_derive 1.12.1 — Zlib OR Apache-2.0 OR MIT
+https://github.com/Lokathor/bytemuck
+
+byteorder 1.5.0 — Unlicense OR MIT
+https://github.com/BurntSushi/byteorder
+
+byteorder-lite 0.1.0 — Unlicense OR MIT
+https://github.com/image-rs/byteorder-lite
+
+bytes 1.11.0 — MIT
+https://github.com/tokio-rs/bytes
+
+cap-primitives 4.0.3 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/bytecodealliance/cap-std
+
+cap-std 4.0.3 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/bytecodealliance/cap-std
+
+castaway 0.2.4 — MIT
+https://github.com/sagebind/castaway
+
+cbc 0.2.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/block-modes
+
+cc 1.2.52 — MIT OR Apache-2.0
+https://github.com/rust-lang/cc-rs
+
+cexpr 0.6.0 — Apache-2.0/MIT
+https://github.com/jethrogb/rust-cexpr
+
+cfg-if 1.0.4 — MIT OR Apache-2.0
+https://github.com/rust-lang/cfg-if
+
+cfg_aliases 0.2.1 — MIT
+https://github.com/katharostech/cfg_aliases
+
+chacha20 0.10.2 — MIT OR Apache-2.0
+https://github.com/RustCrypto/stream-ciphers
+
+chacha20poly1305 0.11.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/AEADs
+
+chardetng 0.1.17 — Apache-2.0 OR MIT
+https://github.com/hsivonen/chardetng
+
+chrono 0.4.45 — MIT OR Apache-2.0
+https://github.com/chronotope/chrono
+
+cipher 0.5.2 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+clang-sys 1.8.1 — Apache-2.0
+https://github.com/KyleMayes/clang-sys
+
+cmov 0.5.4 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/utils
+
+cobs 0.3.0 — MIT OR Apache-2.0
+https://github.com/jamesmunns/cobs.rs
+
+cocoa 0.24.1 — MIT / Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+cocoa-foundation 0.1.2 — MIT OR Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+codespan-reporting 0.13.1 — Apache-2.0
+https://github.com/brendanzab/codespan
+
+color_quant 1.1.0 — MIT
+https://github.com/image-rs/color_quant.git
+
+compact_str 0.10.0 — MIT
+https://github.com/ParkMyCar/compact_str
+
+concurrent-queue 2.5.0 — Apache-2.0 OR MIT
+https://github.com/smol-rs/concurrent-queue
+
+const-oid 0.10.2 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+const-oid 0.9.6 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats/tree/master/const-oid
+
+convert_case 0.12.0 — MIT
+https://github.com/rutrum/convert-case
+
+core-foundation 0.10.1 — MIT OR Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+core-foundation 0.9.4 — MIT OR Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+core-foundation-sys 0.8.7 — MIT OR Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+core-graphics 0.22.3 — MIT / Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+core-graphics-types 0.1.3 — MIT OR Apache-2.0
+https://github.com/servo/core-foundation-rs
+
+coreaudio-rs 0.11.3 — MIT/Apache-2.0
+https://github.com/RustAudio/coreaudio-rs.git
+
+coreaudio-sys 0.2.18 — MIT
+https://github.com/RustAudio/coreaudio-sys.git
+
+cow-utils 0.1.3 — MIT
+https://github.com/RReverser/cow-utils-rs
+
+cpal 0.15.3 — Apache-2.0
+https://github.com/rustaudio/cpal
+
+cpubits 0.1.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+cpufeatures 0.2.17 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+cpufeatures 0.3.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+crc32c 0.6.8 — Apache-2.0/MIT
+https://github.com/zowens/crc32c
+
+crc32fast 1.5.0 — MIT OR Apache-2.0
+https://github.com/srijs/rust-crc32fast
+
+crossbeam-channel 0.5.15 — MIT OR Apache-2.0
+https://github.com/crossbeam-rs/crossbeam
+
+crossbeam-utils 0.8.21 — MIT OR Apache-2.0
+https://github.com/crossbeam-rs/crossbeam
+
+crypto-bigint 0.7.11 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/crypto-bigint
+
+crypto-common 0.1.7 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+crypto-common 0.2.2 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+crypto-primes 0.7.2 — Apache-2.0 OR MIT
+https://github.com/entropyxyz/crypto-primes
+
+cshake 0.2.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/XOFs
+
+ctr 0.10.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/block-modes
+
+ctutils 0.4.8 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/utils
+
+curve25519-dalek 4.1.3 — BSD-3-Clause
+https://github.com/dalek-cryptography/curve25519-dalek/tree/main/curve25519-dalek
+
+curve25519-dalek 5.0.0 — BSD-3-Clause
+https://github.com/dalek-cryptography/curve25519-dalek/tree/main/curve25519-dalek
+
+darling 0.20.11 — MIT
+https://github.com/TedDriggs/darling
+
+darling_core 0.20.11 — MIT
+https://github.com/TedDriggs/darling
+
+darling_macro 0.20.11 — MIT
+https://github.com/TedDriggs/darling
+
+dasp_frame 0.11.0 — MIT OR Apache-2.0
+https://github.com/rustaudio/dasp.git
+
+dasp_sample 0.11.0 — MIT OR Apache-2.0
+https://github.com/rustaudio/sample.git
+
+data-encoding 2.11.0 — MIT
+https://github.com/ia0/data-encoding
+
+data-url 0.3.2 — MIT OR Apache-2.0
+https://github.com/servo/rust-url
+
+der 0.7.10 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats/tree/master/der
+
+der 0.8.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+der_derive 0.8.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+derive_arbitrary 1.5.0 — MIT OR Apache-2.0
+https://github.com/rust-fuzz/arbitrary
+
+diff 0.1.13 — MIT OR Apache-2.0
+https://github.com/utkarshkukreti/diff.rs
+
+digest 0.10.7 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+digest 0.11.3 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+dispatch 0.2.0 — MIT
+http://github.com/SSheldon/rust-dispatch
+
+dispatch2 0.3.1 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+displaydoc 0.2.5 — MIT OR Apache-2.0
+https://github.com/yaahc/displaydoc
+
+dlib 0.5.3 — MIT
+https://github.com/elinorbgr/dlib
+
+document-features 0.2.12 — MIT OR Apache-2.0
+https://github.com/slint-ui/document-features
+
+dragonbox_ecma 0.1.12 — Apache-2.0 WITH LLVM-exception OR BSL-1.0
+https://github.com/magic-akari/dragonbox
+
+dunce 1.0.5 — CC0-1.0 OR MIT-0 OR Apache-2.0
+https://gitlab.com/kornelski/dunce
+
+ebur128 0.1.10 — MIT
+https://github.com/sdroege/ebur128
+
+ecdsa 0.17.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/signatures
+
+ed25519 2.2.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/signatures/tree/master/ed25519
+
+ed25519 3.0.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/signatures
+
+ed25519-dalek 2.2.0 — BSD-3-Clause
+https://github.com/dalek-cryptography/curve25519-dalek/tree/main/ed25519-dalek
+
+ed25519-dalek 3.0.0 — BSD-3-Clause
+https://github.com/dalek-cryptography/curve25519-dalek/tree/main/ed25519-dalek
+
+either 1.15.0 — MIT OR Apache-2.0
+https://github.com/rayon-rs/either
+
+elliptic-curve 0.14.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/traits
+
+embedded-io 0.4.0 — MIT OR Apache-2.0
+https://github.com/embassy-rs/embedded-io
+
+embedded-io 0.6.1 — MIT OR Apache-2.0
+https://github.com/rust-embedded/embedded-hal
+
+encoding_rs 0.8.35 — (Apache-2.0 OR MIT) AND BSD-3-Clause
+https://github.com/hsivonen/encoding_rs
+
+ensure-cov 0.1.0 — MIT OR Apache-2.0
+https://github.com/zxch3n/ensure-cov
+
+enum-as-inner 0.5.1 — MIT/Apache-2.0
+https://github.com/bluejekyll/enum-as-inner
+
+enum-as-inner 0.6.1 — MIT/Apache-2.0
+https://github.com/bluejekyll/enum-as-inner
+
+enum_dispatch 0.3.13 — MIT OR Apache-2.0
+https://gitlab.com/antonok/enum_dispatch
+
+equivalent 1.0.2 — Apache-2.0 OR MIT
+https://github.com/indexmap-rs/equivalent
+
+errno 0.3.14 — MIT OR Apache-2.0
+https://github.com/lambda-fairy/rust-errno
+
+escape-simd 0.1.1 — MIT AND Apache-2.0
+https://github.com/napi-rs/escape-simd
+
+euclid 0.22.14 — MIT OR Apache-2.0
+https://github.com/servo/euclid
+
+event-listener 5.4.1 — Apache-2.0 OR MIT
+https://github.com/smol-rs/event-listener
+
+event-listener-strategy 0.5.4 — Apache-2.0 OR MIT
+https://github.com/smol-rs/event-listener-strategy
+
+fancy-regex 0.14.0 — MIT
+https://github.com/fancy-regex/fancy-regex
+
+fancy-regex 0.16.2 — MIT
+https://github.com/fancy-regex/fancy-regex
+
+fastrand 2.3.0 — Apache-2.0 OR MIT
+https://github.com/smol-rs/fastrand
+
+fdeflate 0.3.7 — MIT OR Apache-2.0
+https://github.com/image-rs/fdeflate
+
+ff 0.14.0 — MIT/Apache-2.0
+https://github.com/zkcrypto/ff
+
+find-msvc-tools 0.1.7 — MIT OR Apache-2.0
+https://github.com/rust-lang/cc-rs
+
+flate2 1.1.8 — MIT OR Apache-2.0
+https://github.com/rust-lang/flate2-rs
+
+float-cmp 0.10.0 — MIT
+https://github.com/mikedilger/float-cmp
+
+float-cmp 0.9.0 — MIT
+https://github.com/mikedilger/float-cmp
+
+fnv 1.0.7 — Apache-2.0 / MIT
+https://github.com/servo/rust-fnv
+
+foldhash 0.1.5 — Zlib
+https://github.com/orlp/foldhash
+
+foldhash 0.2.0 — Zlib
+https://github.com/orlp/foldhash
+
+foreign-types 0.3.2 — MIT/Apache-2.0
+https://github.com/sfackler/foreign-types
+
+foreign-types-shared 0.1.1 — MIT/Apache-2.0
+https://github.com/sfackler/foreign-types
+
+form_urlencoded 1.2.2 — MIT OR Apache-2.0
+https://github.com/servo/rust-url
+
+fs-set-times 0.20.3 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/bytecodealliance/fs-set-times
+
+futf 0.1.5 — MIT / Apache-2.0
+https://github.com/servo/futf
+
+futures 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-channel 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-core 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-executor 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-io 0.3.34 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-macro 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-sink 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-task 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+futures-util 0.3.31 — MIT OR Apache-2.0
+https://github.com/rust-lang/futures-rs
+
+generic-array 0.14.7 — MIT
+https://github.com/fizyk20/generic-array.git
+
+generic-btree 0.10.7 — MIT
+https://github.com/loro-dev/generic-btree
+
+getrandom 0.2.17 — MIT OR Apache-2.0
+https://github.com/rust-random/getrandom
+
+getrandom 0.3.4 — MIT OR Apache-2.0
+https://github.com/rust-random/getrandom
+
+getrandom 0.4.3 — MIT OR Apache-2.0
+https://github.com/rust-random/getrandom
+
+ghash 0.6.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/universal-hashes
+
+gif 0.14.2 — MIT OR Apache-2.0
+https://github.com/image-rs/image-gif
+
+glob 0.3.3 — MIT OR Apache-2.0
+https://github.com/rust-lang/glob
+
+glow 0.17.0 — MIT OR Apache-2.0 OR Zlib
+https://github.com/grovesNL/glow
+
+gpu-allocator 0.28.0 — MIT OR Apache-2.0
+https://github.com/Traverse-Research/gpu-allocator
+
+gpu-descriptor 0.3.2 — MIT OR Apache-2.0
+https://github.com/zakarumych/gpu-descriptor
+
+gpu-descriptor-types 0.2.0 — MIT OR Apache-2.0
+https://github.com/zakarumych/gpu-descriptor
+
+group 0.14.0 — MIT/Apache-2.0
+https://github.com/zkcrypto/group
+
+half 2.7.1 — MIT OR Apache-2.0
+https://github.com/VoidStarKat/half-rs
+
+halfbrown 0.4.0 — Apache-2.0/MIT
+https://github.com/Licenser/halfbrown
+
+hash32 0.2.1 — MIT OR Apache-2.0
+https://github.com/japaric/hash32
+
+hash32 0.3.1 — MIT OR Apache-2.0
+https://github.com/japaric/hash32
+
+hashbrown 0.15.5 — MIT OR Apache-2.0
+https://github.com/rust-lang/hashbrown
+
+hashbrown 0.16.1 — MIT OR Apache-2.0
+https://github.com/rust-lang/hashbrown
+
+hashbrown 0.17.1 — MIT OR Apache-2.0
+https://github.com/rust-lang/hashbrown
+
+heapless 0.7.17 — MIT OR Apache-2.0
+https://github.com/japaric/heapless
+
+heapless 0.8.0 — MIT OR Apache-2.0
+https://github.com/rust-embedded/heapless
+
+heapless 0.9.3 — MIT OR Apache-2.0
+https://github.com/rust-embedded/heapless
+
+heck 0.4.1 — MIT OR Apache-2.0
+https://github.com/withoutboats/heck
+
+heck 0.5.0 — MIT OR Apache-2.0
+https://github.com/withoutboats/heck
+
+hex-simd 0.8.0 — MIT
+https://github.com/Nugine/simd
+
+hexf-parse 0.2.1 — CC0-1.0
+https://github.com/lifthrasiir/hexf
+
+hkdf 0.13.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/KDFs/
+
+hmac 0.13.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/MACs
+
+hmac-sha1-compact 1.1.9 — ISC
+https://github.com/jedisct1/rust-hmac-sha1
+
+html5ever 0.27.0 — MIT OR Apache-2.0
+https://github.com/servo/html5ever
+
+http 1.4.0 — MIT OR Apache-2.0
+https://github.com/hyperium/http
+
+http-body 1.1.0 — MIT
+https://github.com/hyperium/http-body
+
+http-body-util 0.1.5 — MIT
+https://github.com/hyperium/http-body
+
+httparse 1.10.1 — MIT OR Apache-2.0
+https://github.com/seanmonstar/httparse
+
+httpdate 1.0.3 — MIT OR Apache-2.0
+https://github.com/pyfisch/httpdate
+
+hybrid-array 0.4.15 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hybrid-array
+
+hyper 1.12.0 — MIT
+https://github.com/hyperium/hyper
+
+hyper-rustls 0.27.10 — Apache-2.0 OR ISC OR MIT
+https://github.com/rustls/hyper-rustls
+
+hyper-util 0.1.21 — MIT
+https://github.com/hyperium/hyper-util
+
+iana-time-zone 0.1.64 — MIT OR Apache-2.0
+https://github.com/strawlab/iana-time-zone
+
+icu_collections 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_locale_core 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_locale_fallback 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_locale_fallback_data 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_normalizer 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_normalizer_data 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_properties 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_properties_data 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_provider 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_segmenter 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+icu_segmenter_data 2.4.0 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+ident_case 1.0.1 — MIT/Apache-2.0
+https://github.com/TedDriggs/ident_case
+
+idna 1.1.0 — MIT OR Apache-2.0
+https://github.com/servo/rust-url/
+
+idna_adapter 1.2.1 — Apache-2.0 OR MIT
+https://github.com/hsivonen/idna_adapter
+
+im 15.1.0 — MPL-2.0+
+https://github.com/bodil/im-rs
+
+image 0.25.10 — MIT OR Apache-2.0
+https://github.com/image-rs/image
+
+image-webp 0.2.4 — MIT OR Apache-2.0
+https://github.com/image-rs/image-webp
+
+imagesize 0.14.0 — MIT
+https://github.com/Roughsketch/imagesize
+
+imagesize 0.15.0 — MIT
+https://github.com/Roughsketch/imagesize
+
+imara-diff 0.2.0 — Apache-2.0
+https://github.com/pascalkuthe/imara-diff
+
+indexmap 2.14.2 — Apache-2.0 OR MIT
+https://github.com/indexmap-rs/indexmap
+
+inout 0.2.2 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+io-extras 0.19.0 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/sunfishcode/io-extras
+
+io-lifetimes 2.0.4 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/sunfishcode/io-lifetimes
+
+io-lifetimes 3.0.1 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/sunfishcode/io-lifetimes
+
+ipnet 2.12.0 — MIT OR Apache-2.0
+https://github.com/krisprice/ipnet
+
+itertools 0.11.0 — MIT OR Apache-2.0
+https://github.com/rust-itertools/itertools
+
+itertools 0.12.1 — MIT OR Apache-2.0
+https://github.com/rust-itertools/itertools
+
+itertools 0.15.0 — MIT OR Apache-2.0
+https://github.com/rust-itertools/itertools
+
+itoa 1.0.19 — MIT OR Apache-2.0
+https://github.com/dtolnay/itoa
+
+jobserver 0.1.34 — MIT OR Apache-2.0
+https://github.com/rust-lang/jobserver-rs
+
+json-escape-simd 3.1.3 — MIT
+https://github.com/napi-rs/escape-simd
+
+keccak 0.2.2 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/sponges
+
+khronos-egl 6.0.0 — MIT/Apache-2.0
+https://github.com/timothee-haudebourg/khronos-egl
+
+kurbo 0.13.1 — Apache-2.0 OR MIT
+https://github.com/linebender/kurbo
+
+lazy_static 1.5.1 — MIT OR Apache-2.0
+https://github.com/rust-lang-nursery/lazy-static.rs
+
+leb128 0.2.7 — MIT OR Apache-2.0
+https://github.com/gimli-rs/leb128
+
+libc 0.2.180 — MIT OR Apache-2.0
+https://github.com/rust-lang/libc
+
+libloading 0.8.9 — ISC
+https://github.com/nagisa/rust_libloading/
+
+libm 0.2.15 — MIT
+https://github.com/rust-lang/compiler-builtins
+
+litemap 0.8.1 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+litrs 1.0.1 — MIT OR Apache-2.0
+https://github.com/LukasKalbertodt/litrs
+
+lock_api 0.4.14 — MIT OR Apache-2.0
+https://github.com/Amanieu/parking_lot
+
+lofty 0.24.0 — MIT OR Apache-2.0
+https://github.com/Serial-ATA/lofty-rs
+
+lofty_attr 0.12.0 — MIT OR Apache-2.0
+https://github.com/Serial-ATA/lofty-rs
+
+log 0.4.29 — MIT OR Apache-2.0
+https://github.com/rust-lang/log
+
+loro 1.13.6 — MIT
+https://github.com/loro-dev/loro/
+
+loro-common 1.17.0 — MIT
+https://github.com/loro-dev/loro
+
+loro-delta 1.13.0 — MIT
+https://github.com/loro-dev/loro/
+
+loro-internal 1.13.6 — MIT
+https://github.com/loro-dev/loro/
+
+loro-kv-store 1.17.0 — MIT
+https://github.com/loro-dev/loro/
+
+loro-rle 1.6.0 — MIT
+https://github.com/loro-dev/loro/
+
+loro-thunderdome 0.6.2 — MIT OR Apache-2.0
+https://github.com/LPGhatguy/thunderdome
+
+loro_fractional_index 1.13.0 — MIT
+https://github.com/loro-dev/loro/
+
+lru-slab 0.1.3 — MIT OR Apache-2.0 OR Zlib
+https://github.com/Ralith/lru-slab
+
+lz4_flex 0.11.6 — MIT
+https://github.com/pseitz/lz4_flex
+
+mac 0.1.1 — MIT/Apache-2.0
+https://github.com/reem/rust-mac.git
+
+mach2 0.4.3 — BSD-2-Clause OR MIT OR Apache-2.0
+https://github.com/JohnTitor/mach2
+
+malloc_buf 0.0.6 — MIT
+https://github.com/SSheldon/malloc_buf
+
+markdown 1.0.0 — MIT
+https://github.com/wooorm/markdown-rs
+
+markup5ever 0.12.1 — MIT OR Apache-2.0
+https://github.com/servo/html5ever
+
+markup5ever_rcdom 0.3.0 — MIT OR Apache-2.0
+https://github.com/servo/html5ever
+
+material-colors 0.5.0 — MIT OR Apache-2.0
+https://github.com/Aiving/material-colors.git
+
+maybe-owned 0.3.4 — MIT OR Apache-2.0
+https://github.com/rustonaut/maybe-owned
+
+md-5 0.11.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+md5 0.7.0 — Apache-2.0/MIT
+https://github.com/stainless-steel/md5
+
+memchr 2.8.3 — Unlicense OR MIT
+https://github.com/BurntSushi/memchr
+
+minimal-lexical 0.2.1 — MIT/Apache-2.0
+https://github.com/Alexhuszagh/minimal-lexical
+
+miniz_oxide 0.8.9 — MIT OR Zlib OR Apache-2.0
+https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
+
+miniz_oxide 0.9.1 — MIT OR Zlib OR Apache-2.0
+https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
+
+mio 1.1.1 — MIT
+https://github.com/tokio-rs/mio
+
+moxcms 0.8.1 — BSD-3-Clause OR Apache-2.0
+https://github.com/awxkee/moxcms.git
+
+naga 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+new_debug_unreachable 1.0.6 — MIT
+https://github.com/mbrubeck/rust-debug-unreachable
+
+nom 7.1.3 — MIT
+https://github.com/Geal/nom
+
+nonmax 0.5.5 — MIT OR Apache-2.0
+https://github.com/LPGhatguy/nonmax
+
+nsh-base 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-core 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-dev 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-engine 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-js 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-macos-app 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-macros 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-package 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-platform-macos 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+nsh-testing 0.4.0 — Apache-2.0
+https://github.com/longbridge/nsh
+
+num 0.4.3 — MIT OR Apache-2.0
+https://github.com/rust-num/num
+
+num-bigint 0.4.8 — MIT OR Apache-2.0
+https://github.com/rust-num/num-bigint
+
+num-bigint 0.5.1 — MIT OR Apache-2.0
+https://github.com/rust-num/num-bigint
+
+num-complex 0.4.6 — MIT OR Apache-2.0
+https://github.com/rust-num/num-complex
+
+num-integer 0.1.47 — MIT OR Apache-2.0
+https://github.com/rust-num/num-integer
+
+num-iter 0.1.46 — MIT OR Apache-2.0
+https://github.com/rust-num/num-iter
+
+num-rational 0.4.2 — MIT OR Apache-2.0
+https://github.com/rust-num/num-rational
+
+num-traits 0.2.19 — MIT OR Apache-2.0
+https://github.com/rust-num/num-traits
+
+objc 0.2.7 — MIT
+http://github.com/SSheldon/rust-objc
+
+objc2 0.6.5 — MIT
+https://github.com/madsmtm/objc2
+
+objc2-app-kit 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-core-foundation 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-core-graphics 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-core-text 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-encode 4.1.0 — MIT
+https://github.com/madsmtm/objc2
+
+objc2-foundation 0.3.2 — MIT
+https://github.com/madsmtm/objc2
+
+objc2-image-io 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-io-kit 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-io-surface 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-metal 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+objc2-quartz-core 0.3.2 — Zlib OR Apache-2.0 OR MIT
+https://github.com/madsmtm/objc2
+
+object 0.39.1 — Apache-2.0 OR MIT
+https://github.com/gimli-rs/object
+
+ogg_pager 0.7.2 — MIT OR Apache-2.0
+https://github.com/Serial-ATA/lofty-rs
+
+once_cell 1.21.3 — MIT OR Apache-2.0
+https://github.com/matklad/once_cell
+
+ordered-float 5.5.1 — MIT
+https://github.com/reem/rust-ordered-float
+
+outref 0.5.2 — MIT
+https://github.com/Nugine/outref
+
+oxc-browserslist 5.0.1 — MIT
+https://github.com/oxc-project/oxc-browserslist
+
+oxc_allocator 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_ast 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_ast_macros 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_ast_visit 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_codegen 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_compat 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_data_structures 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_diagnostics 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_ecmascript 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_estree 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_index 5.0.0 — MIT
+https://github.com/oxc-project/oxc-index-vec
+
+oxc_parser 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_regular_expression 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_semantic 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_sourcemap 9.0.0 — BSD-3-Clause
+https://github.com/oxc-project/oxc-sourcemap
+
+oxc_span 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_str 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_syntax 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_transformer 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+oxc_traverse 0.155.0 — MIT
+https://github.com/oxc-project/oxc
+
+p256 0.14.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+p384 0.14.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+p521 0.14.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+parking_lot 0.12.5 — MIT OR Apache-2.0
+https://github.com/Amanieu/parking_lot
+
+parking_lot_core 0.9.12 — MIT OR Apache-2.0
+https://github.com/Amanieu/parking_lot
+
+paste 1.0.15 — MIT OR Apache-2.0
+https://github.com/dtolnay/paste
+
+pbkdf2 0.13.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/password-hashes
+
+pem-rfc7468 1.0.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+percent-encoding 2.3.2 — MIT OR Apache-2.0
+https://github.com/servo/rust-url/
+
+pest 2.9.5 — MIT OR Apache-2.0
+https://github.com/pest-parser/pest
+
+pest_derive 2.9.5 — MIT OR Apache-2.0
+https://github.com/pest-parser/pest
+
+pest_generator 2.9.5 — MIT OR Apache-2.0
+https://github.com/pest-parser/pest
+
+pest_meta 2.9.5 — MIT OR Apache-2.0
+https://github.com/pest-parser/pest
+
+pest_stack_guard 1.0.1 — MIT OR Apache-2.0
+https://github.com/pest-parser/pest_stack_guard
+
+phf 0.11.3 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf 0.14.0 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_codegen 0.11.3 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_generator 0.11.3 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_generator 0.14.0 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_macros 0.11.3 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_macros 0.14.0 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_shared 0.11.3 — MIT
+https://github.com/rust-phf/rust-phf
+
+phf_shared 0.14.0 — MIT
+https://github.com/rust-phf/rust-phf
+
+pico-args 0.5.0 — MIT
+https://github.com/RazrFalcon/pico-args
+
+pin-project-lite 0.2.16 — Apache-2.0 OR MIT
+https://github.com/taiki-e/pin-project-lite
+
+pin-utils 0.1.0 — MIT OR Apache-2.0
+https://github.com/rust-lang-nursery/pin-utils
+
+pkcs1 0.8.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+pkcs8 0.10.2 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats/tree/master/pkcs8
+
+pkcs8 0.11.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+pkg-config 0.3.34 — MIT OR Apache-2.0
+https://github.com/rust-lang/pkg-config-rs
+
+png 0.17.16 — MIT OR Apache-2.0
+https://github.com/image-rs/image-png
+
+png 0.18.1 — MIT OR Apache-2.0
+https://github.com/image-rs/image-png
+
+pollster 0.4.0 — Apache-2.0/MIT
+https://github.com/zesterer/pollster
+
+poly1305 0.9.1 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/universal-hashes
+
+polycool 0.4.0 — MIT OR Apache-2.0
+https://github.com/linebender/kurbo
+
+polyval 0.7.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/universal-hashes
+
+postcard 1.1.3 — MIT OR Apache-2.0
+https://github.com/jamesmunns/postcard
+
+potential_utf 0.1.4 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+ppv-lite86 0.2.21 — MIT OR Apache-2.0
+https://github.com/cryptocorrosion/cryptocorrosion
+
+precomputed-hash 0.1.1 — MIT
+https://github.com/emilio/precomputed-hash
+
+presser 0.3.1 — MIT OR Apache-2.0
+https://github.com/EmbarkStudios/presser
+
+pretty_assertions 1.4.1 — MIT OR Apache-2.0
+https://github.com/rust-pretty-assertions/rust-pretty-assertions
+
+prettyplease 0.2.37 — MIT OR Apache-2.0
+https://github.com/dtolnay/prettyplease
+
+primefield 0.14.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+primeorder 0.14.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+proc-macro-crate 3.5.0 — MIT OR Apache-2.0
+https://github.com/bkchr/proc-macro-crate
+
+proc-macro2 1.0.105 — MIT OR Apache-2.0
+https://github.com/dtolnay/proc-macro2
+
+profiling 1.0.18 — MIT OR Apache-2.0
+https://github.com/aclysma/profiling
+
+psm 0.1.32 — MIT OR Apache-2.0
+https://github.com/rust-lang/stacker/
+
+pxfm 0.1.30 — BSD-3-Clause OR Apache-2.0
+https://github.com/awxkee/pxfm
+
+qrcode 0.14.1 — MIT OR Apache-2.0
+https://github.com/kennytm/qrcode-rust
+
+quick-error 2.0.1 — MIT/Apache-2.0
+http://github.com/tailhook/quick-error
+
+quick_cache 0.6.24 — MIT
+https://github.com/arthurprs/quick-cache
+
+quickjs-jit 0.14.1 — MIT
+https://github.com/longbridge/rquickjs.git
+
+quickjs-jit-core 0.14.1 — MIT
+https://github.com/longbridge/rquickjs.git
+
+quickjs-jit-macro 0.14.1 — MIT
+https://github.com/longbridge/rquickjs.git
+
+quickjs-jit-stdlib 0.14.1 — Apache-2.0
+https://github.com/longbridge/quickjs-jit
+
+quickjs-jit-sys 0.14.1 — MIT
+https://github.com/longbridge/rquickjs.git
+
+quinn 0.11.12 — MIT OR Apache-2.0
+https://github.com/quinn-rs/quinn
+
+quinn-proto 0.11.19 — MIT OR Apache-2.0
+https://github.com/quinn-rs/quinn
+
+quinn-udp 0.5.16 — MIT OR Apache-2.0
+https://github.com/quinn-rs/quinn
+
+quote 1.0.47 — MIT OR Apache-2.0
+https://github.com/dtolnay/quote
+
+rand 0.10.3 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand 0.8.6 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand 0.9.4 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand_chacha 0.3.1 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand_chacha 0.9.0 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand_core 0.10.1 — MIT OR Apache-2.0
+https://github.com/rust-random/rand_core
+
+rand_core 0.6.4 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand_core 0.9.5 — MIT OR Apache-2.0
+https://github.com/rust-random/rand
+
+rand_pcg 0.10.2 — MIT OR Apache-2.0
+https://github.com/rust-random/rngs
+
+rand_xoshiro 0.6.0 — MIT OR Apache-2.0
+https://github.com/rust-random/rngs
+
+ratex-font 0.1.15 — MIT
+https://github.com/erweixin/RaTeX
+
+ratex-layout 0.1.15 — MIT
+https://github.com/erweixin/RaTeX
+
+ratex-lexer 0.1.15 — MIT
+https://github.com/erweixin/RaTeX
+
+ratex-parser 0.1.15 — MIT
+https://github.com/erweixin/RaTeX
+
+ratex-types 0.1.15 — MIT
+https://github.com/erweixin/RaTeX
+
+raw-window-handle 0.6.2 — MIT OR Apache-2.0 OR Zlib
+https://github.com/rust-windowing/raw-window-handle
+
+raw-window-metal 1.1.0 — MIT OR Apache-2.0
+https://github.com/rust-windowing/raw-window-metal
+
+regex 1.12.2 — MIT OR Apache-2.0
+https://github.com/rust-lang/regex
+
+regex-automata 0.4.13 — MIT OR Apache-2.0
+https://github.com/rust-lang/regex
+
+regex-lite 0.1.9 — MIT OR Apache-2.0
+https://github.com/rust-lang/regex
+
+regex-syntax 0.8.8 — MIT OR Apache-2.0
+https://github.com/rust-lang/regex
+
+relative-path 2.0.1 — MIT OR Apache-2.0
+https://github.com/udoprog/relative-path
+
+renderdoc-sys 1.1.0 — MIT OR Apache-2.0
+https://github.com/ebkalderon/renderdoc-rs
+
+reqwest 0.12.28 — MIT OR Apache-2.0
+https://github.com/seanmonstar/reqwest
+
+resvg 0.46.0 — Apache-2.0 OR MIT
+https://github.com/linebender/resvg
+
+rfc6979 0.6.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/signatures
+
+rgb 0.8.53 — MIT
+https://github.com/kornelski/rust-rgb
+
+ring 0.17.14 — Apache-2.0 AND ISC
+https://github.com/briansmith/ring
+
+rodio 0.20.1 — MIT OR Apache-2.0
+https://github.com/RustAudio/rodio
+
+ropey 1.6.1 — MIT
+https://github.com/cessen/ropey
+
+roxmltree 0.21.2 — MIT OR Apache-2.0
+https://github.com/RazrFalcon/roxmltree
+
+rsa 0.10.0-rc.19 — MIT OR Apache-2.0
+https://github.com/RustCrypto/RSA
+
+rustc-hash 1.1.0 — Apache-2.0/MIT
+https://github.com/rust-lang-nursery/rustc-hash
+
+rustc-hash 2.1.1 — Apache-2.0 OR MIT
+https://github.com/rust-lang/rustc-hash
+
+rustc_version 0.4.1 — MIT OR Apache-2.0
+https://github.com/djc/rustc-version-rs
+
+rustix 1.1.3 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+https://github.com/bytecodealliance/rustix
+
+rustls 0.23.36 — Apache-2.0 OR ISC OR MIT
+https://github.com/rustls/rustls
+
+rustls-pki-types 1.13.2 — MIT OR Apache-2.0
+https://github.com/rustls/pki-types
+
+rustls-webpki 0.103.8 — ISC
+https://github.com/rustls/webpki
+
+rustversion 1.0.22 — MIT OR Apache-2.0
+https://github.com/dtolnay/rustversion
+
+ryu 1.0.22 — Apache-2.0 OR BSL-1.0
+https://github.com/dtolnay/ryu
+
+same-file 1.0.6 — Unlicense/MIT
+https://github.com/BurntSushi/same-file
+
+scopeguard 1.2.0 — MIT OR Apache-2.0
+https://github.com/bluss/scopeguard
+
+sec1 0.8.1 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+security-framework 3.7.0 — MIT OR Apache-2.0
+https://github.com/kornelski/rust-security-framework
+
+security-framework-sys 2.17.0 — MIT OR Apache-2.0
+https://github.com/kornelski/rust-security-framework
+
+self_cell 1.3.0 — Apache-2.0 OR GPL-2.0-only
+https://github.com/Voultapher/self_cell
+
+semver 1.0.27 — MIT OR Apache-2.0
+https://github.com/dtolnay/semver
+
+seq-macro 0.3.6 — MIT OR Apache-2.0
+https://github.com/dtolnay/seq-macro
+
+serde 1.0.229 — MIT OR Apache-2.0
+https://github.com/serde-rs/serde
+
+serde_columnar 0.3.14 — MIT OR Apache-2.0
+https://github.com/loro-dev/columnar
+
+serde_columnar_derive 0.3.7 — MIT OR Apache-2.0
+
+serde_core 1.0.229 — MIT OR Apache-2.0
+https://github.com/serde-rs/serde
+
+serde_derive 1.0.229 — MIT OR Apache-2.0
+https://github.com/serde-rs/serde
+
+serde_json 1.0.149 — MIT OR Apache-2.0
+https://github.com/serde-rs/json
+
+serde_urlencoded 0.7.1 — MIT/Apache-2.0
+https://github.com/nox/serde_urlencoded
+
+serdect 0.4.2 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+sha1 0.10.7 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+sha1 0.11.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+sha2 0.10.9 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+sha2 0.11.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+sha3 0.12.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/hashes
+
+shake 0.1.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/XOFs
+
+shlex 1.3.0 — MIT OR Apache-2.0
+https://github.com/comex/rust-shlex
+
+signature 2.2.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/traits/tree/master/signature
+
+signature 3.0.0 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/traits
+
+simd-adler32 0.3.8 — MIT
+https://github.com/mcountryman/simd-adler32
+
+simd-json 0.18.1 — Apache-2.0 OR MIT
+https://github.com/simd-lite/simd-json
+
+simdutf8 0.1.5 — MIT OR Apache-2.0
+https://github.com/rusticstuff/simdutf8
+
+simplecss 0.2.2 — Apache-2.0 OR MIT
+https://github.com/linebender/simplecss
+
+siphasher 1.0.1 — MIT/Apache-2.0
+https://github.com/jedisct1/rust-siphash
+
+sized-chunks 0.6.5 — MPL-2.0+
+https://github.com/bodil/sized-chunks
+
+slab 0.4.11 — MIT
+https://github.com/tokio-rs/slab
+
+slotmap 1.1.1 — Zlib
+https://github.com/orlp/slotmap
+
+smallvec 1.16.5 — MIT OR Apache-2.0
+https://github.com/servo/rust-smallvec
+
+smawk 0.3.3 — MIT
+https://github.com/mgeisler/smawk
+
+socket2 0.6.1 — MIT OR Apache-2.0
+https://github.com/rust-lang/socket2
+
+spirv 0.4.0+sdk-1.4.341.0 — Apache-2.0
+https://github.com/gfx-rs/rspirv
+
+spki 0.7.3 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats/tree/master/spki
+
+spki 0.8.1 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/formats
+
+sponge-cursor 0.1.0 — MIT OR Apache-2.0
+https://github.com/RustCrypto/utils
+
+stable_deref_trait 1.2.1 — MIT OR Apache-2.0
+https://github.com/storyyeller/stable_deref_trait
+
+stacker 0.1.25 — MIT OR Apache-2.0
+https://github.com/rust-lang/stacker
+
+static_assertions 1.1.0 — MIT OR Apache-2.0
+https://github.com/nvzqz/static-assertions-rs
+
+str_indices 0.4.4 — MIT OR Apache-2.0
+https://github.com/cessen/str_indices
+
+strict-num 0.1.1 — MIT
+https://github.com/RazrFalcon/strict-num
+
+string_cache 0.8.9 — MIT OR Apache-2.0
+https://github.com/servo/string-cache
+
+string_cache_codegen 0.5.4 — MIT OR Apache-2.0
+https://github.com/servo/string-cache
+
+strsim 0.11.1 — MIT
+https://github.com/rapidfuzz/strsim-rs
+
+subtle 2.6.1 — BSD-3-Clause
+https://github.com/dalek-cryptography/subtle
+
+svgtypes 0.16.2 — Apache-2.0 OR MIT
+https://github.com/linebender/svgtypes
+
+symphonia 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-bundle-flac 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-bundle-mp3 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-codec-aac 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-codec-vorbis 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-core 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-format-isomp4 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-format-ogg 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-metadata 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+symphonia-utils-xiph 0.5.5 — MPL-2.0
+https://github.com/pdeljanov/Symphonia
+
+syn 1.0.109 — MIT OR Apache-2.0
+https://github.com/dtolnay/syn
+
+syn 2.0.114 — MIT OR Apache-2.0
+https://github.com/dtolnay/syn
+
+syn 3.0.6 — MIT OR Apache-2.0
+https://github.com/dtolnay/syn
+
+sync_wrapper 1.0.2 — Apache-2.0
+https://github.com/Actyx/sync_wrapper
+
+synstructure 0.13.2 — MIT
+https://github.com/mystor/synstructure
+
+synstructure 0.14.0 — MIT
+https://github.com/mystor/synstructure
+
+syntect 5.3.0 — MIT
+https://github.com/trishume/syntect
+
+taffy 0.15.1 — MIT
+https://github.com/DioxusLabs/taffy
+
+tempfile 3.24.0 — MIT OR Apache-2.0
+https://github.com/Stebalien/tempfile
+
+tendril 0.4.3 — MIT/Apache-2.0
+https://github.com/servo/tendril
+
+textwrap 0.16.4 — MIT
+https://github.com/mgeisler/textwrap
+
+thiserror 1.0.69 — MIT OR Apache-2.0
+https://github.com/dtolnay/thiserror
+
+thiserror 2.0.18 — MIT OR Apache-2.0
+https://github.com/dtolnay/thiserror
+
+thiserror-impl 1.0.69 — MIT OR Apache-2.0
+https://github.com/dtolnay/thiserror
+
+thiserror-impl 2.0.18 — MIT OR Apache-2.0
+https://github.com/dtolnay/thiserror
+
+thread_local 1.1.10 — MIT OR Apache-2.0
+https://github.com/Amanieu/thread_local-rs
+
+tiny-skia 0.11.4 — BSD-3-Clause
+https://github.com/RazrFalcon/tiny-skia
+
+tiny-skia-path 0.11.4 — BSD-3-Clause
+https://github.com/RazrFalcon/tiny-skia/tree/master/path
+
+tinystr 0.8.5 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+tinyvec 1.13.3 — Zlib OR Apache-2.0 OR MIT
+https://github.com/Lokathor/tinyvec
+
+tokio 1.49.0 — MIT
+https://github.com/tokio-rs/tokio
+
+tokio-macros 2.6.0 — MIT
+https://github.com/tokio-rs/tokio
+
+tokio-rustls 0.26.4 — MIT OR Apache-2.0
+https://github.com/rustls/tokio-rustls
+
+tokio-tungstenite 0.28.0 — MIT
+https://github.com/snapview/tokio-tungstenite
+
+tokio-util 0.7.19 — MIT
+https://github.com/tokio-rs/tokio
+
+toml_datetime 1.1.3+spec-1.1.0 — MIT OR Apache-2.0
+https://github.com/toml-rs/toml
+
+toml_edit 0.25.19+spec-1.1.0 — MIT OR Apache-2.0
+https://github.com/toml-rs/toml
+
+toml_parser 1.1.5+spec-1.1.0 — MIT OR Apache-2.0
+https://github.com/toml-rs/toml
+
+tower 0.5.3 — MIT
+https://github.com/tower-rs/tower
+
+tower-http 0.6.11 — MIT
+https://github.com/tower-rs/tower-http
+
+tower-layer 0.3.3 — MIT
+https://github.com/tower-rs/tower
+
+tower-service 0.3.3 — MIT
+https://github.com/tower-rs/tower
+
+tracing 0.1.44 — MIT
+https://github.com/tokio-rs/tracing
+
+tracing-attributes 0.1.31 — MIT
+https://github.com/tokio-rs/tracing
+
+tracing-core 0.1.36 — MIT
+https://github.com/tokio-rs/tracing
+
+try-lock 0.2.5 — MIT
+https://github.com/seanmonstar/try-lock
+
+ttf-parser 0.25.1 — MIT OR Apache-2.0
+https://github.com/harfbuzz/ttf-parser
+
+tungstenite 0.28.0 — MIT OR Apache-2.0
+https://github.com/snapview/tungstenite-rs
+
+tungstenite 0.30.0 — MIT OR Apache-2.0
+https://github.com/snapview/tungstenite-rs
+
+two-face 0.4.5 — MIT OR Apache-2.0
+https://github.com/CosmicHorrorDev/two-face
+
+twox-hash 2.1.5 — MIT
+https://github.com/shepmaster/twox-hash
+
+typed-path 0.12.4 — MIT OR Apache-2.0
+https://github.com/chipsenkbeil/typed-path
+
+typenum 1.20.1 — MIT OR Apache-2.0
+https://github.com/paholg/typenum
+
+ucd-trie 0.1.7 — MIT OR Apache-2.0
+https://github.com/BurntSushi/ucd-generate
+
+unicode-id 0.3.7 — MIT OR Apache-2.0
+https://github.com/Boshen/unicode-id
+
+unicode-id-start 1.5.0 — (MIT OR Apache-2.0) AND Unicode-3.0
+https://github.com/Boshen/unicode-id-start
+
+unicode-ident 1.0.22 — (MIT OR Apache-2.0) AND Unicode-3.0
+https://github.com/dtolnay/unicode-ident
+
+unicode-linebreak 0.1.5 — Apache-2.0
+https://github.com/axelf4/unicode-linebreak
+
+unicode-normalization 0.1.26 — (MIT OR Apache-2.0) AND Unicode-3.0
+https://github.com/unicode-rs/unicode-normalization
+
+unicode-properties 0.1.5 — (MIT OR Apache-2.0) AND Unicode-3.0
+https://github.com/unicode-rs/unicode-properties
+
+unicode-segmentation 1.13.3 — MIT OR Apache-2.0
+https://github.com/unicode-rs/unicode-segmentation
+
+unicode-width 0.2.3 — MIT OR Apache-2.0
+https://github.com/unicode-rs/unicode-width
+
+universal-hash 0.6.1 — MIT OR Apache-2.0
+https://github.com/RustCrypto/traits
+
+untrusted 0.9.0 — ISC
+https://github.com/briansmith/untrusted
+
+ureq 3.4.2 — MIT OR Apache-2.0
+https://github.com/algesten/ureq
+
+ureq-proto 0.6.5 — MIT OR Apache-2.0
+https://github.com/algesten/ureq-proto
+
+url 2.5.8 — MIT OR Apache-2.0
+https://github.com/servo/rust-url
+
+usvg 0.46.0 — Apache-2.0 OR MIT
+https://github.com/linebender/resvg
+
+utf-8 0.7.6 — MIT OR Apache-2.0
+https://github.com/SimonSapin/rust-utf8
+
+utf8-zero 0.8.1 — MIT OR Apache-2.0
+https://github.com/algesten/utf8-zero
+
+utf8_iter 1.0.4 — Apache-2.0 OR MIT
+https://github.com/hsivonen/utf8_iter
+
+uuid 1.19.0 — Apache-2.0 OR MIT
+https://github.com/uuid-rs/uuid
+
+value-trait 0.12.1 — Apache-2.0/MIT
+https://github.com/simd-lite/value-trait
+
+version_check 0.9.5 — MIT/Apache-2.0
+https://github.com/SergioBenitez/version_check
+
+vsimd 0.8.0 — MIT
+https://github.com/Nugine/simd
+
+walkdir 2.5.0 — Unlicense/MIT
+https://github.com/BurntSushi/walkdir
+
+want 0.3.2 — MIT
+https://github.com/seanmonstar/want
+
+wayland-sys 0.31.11 — MIT
+https://github.com/smithay/wayland-rs
+
+webpki-roots 0.26.11 — CDLA-Permissive-2.0
+https://github.com/rustls/webpki-roots
+
+webpki-roots 1.0.5 — CDLA-Permissive-2.0
+https://github.com/rustls/webpki-roots
+
+weezl 0.1.12 — MIT OR Apache-2.0
+https://github.com/image-rs/weezl
+
+wgpu 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+wgpu-core 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+wgpu-core-deps-apple 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+wgpu-hal 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+wgpu-naga-bridge 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+wgpu-types 29.0.4 — MIT OR Apache-2.0
+https://github.com/gfx-rs/wgpu
+
+winnow 1.0.5 — MIT
+https://github.com/winnow-rs/winnow
+
+wnaf 0.14.1 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/elliptic-curves
+
+writeable 0.6.4 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+wuff 0.2.10 — MIT
+https://github.com/nicoburns/wuff
+
+x25519-dalek 3.0.0 — BSD-3-Clause
+https://github.com/dalek-cryptography/curve25519-dalek/tree/main/x25519-dalek
+
+xml5ever 0.18.1 — MIT OR Apache-2.0
+https://github.com/servo/html5ever
+
+xmlwriter 0.1.0 — MIT
+https://github.com/RazrFalcon/xmlwriter
+
+xxhash-rust 0.8.19 — BSL-1.0
+https://github.com/DoumanAsh/xxhash-rust
+
+yansi 1.0.1 — MIT OR Apache-2.0
+https://github.com/SergioBenitez/yansi
+
+yoke 0.8.4 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+yoke-derive 0.8.4 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zerocopy 0.8.52 — BSD-2-Clause OR Apache-2.0 OR MIT
+https://github.com/google/zerocopy
+
+zerocopy-derive 0.8.52 — BSD-2-Clause OR Apache-2.0 OR MIT
+https://github.com/google/zerocopy
+
+zerofrom 0.1.6 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zerofrom-derive 0.1.6 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zeroize 1.8.2 — Apache-2.0 OR MIT
+https://github.com/RustCrypto/utils
+
+zerotrie 0.2.5 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zerovec 0.11.9 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zerovec-derive 0.11.7 — Unicode-3.0
+https://github.com/unicode-org/icu4x
+
+zip 8.6.0 — MIT
+https://github.com/zip-rs/zip2
+
+zlib-rs 0.5.5 — Zlib
+https://github.com/trifectatechfoundation/zlib-rs
+
+zmij 1.0.13 — MIT
+https://github.com/dtolnay/zmij
+
+zopfli 0.8.3 — Apache-2.0
+https://github.com/zopfli-rs/zopfli
+
+zstd 0.14.3 — BSD-3-Clause
+https://github.com/gyscos/zstd-rs
+
+zstd-safe 8.2.0 — BSD-3-Clause
+https://github.com/gyscos/zstd-rs
+
+zstd-sys 2.1.2+zstd.1.5.7 — BSD-3-Clause
+https://github.com/gyscos/zstd-rs
+
+zune-core 0.5.3 — MIT OR Apache-2.0 OR Zlib
+https://github.com/etemesi254/zune-image
+
+zune-jpeg 0.5.15 — MIT OR Apache-2.0 OR Zlib
+https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg
+
+Iconoir icons — MIT
+MIT License
+
+Copyright (c) 2021 Luca Burgio
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+unDraw illustrations
+Lost in Music / Listening
+Artist: Katerina Limpitsouni / unDraw
+Source: https://undraw.co/illustrations (Lost in Music, plu7)
+Source: https://undraw.co/search/music (Listening, fz9g)
+Downloaded: 2026-10-09
+License: https://undraw.co/license
+
+Copyright 2026 Katerina Limpitsouni
+
+All images, assets and vectors published on unDraw can be used for free. You can use them for noncommercial and commercial purposes. You do not need to ask permission from or provide credit to the creator or unDraw.
+
+More precisely, unDraw grants you an nonexclusive, worldwide copyright license to download, copy, modify, distribute, perform, and use the assets provided from unDraw for free, including for commercial purposes, without permission from or attributing the creator or unDraw. This license does not include the right to compile assets, vectors or images from unDraw to replicate a similar or competing service, in any form or distribute the assets in packs or otherwise. This extends to automated and non-automated ways to link, embed, scrape, search or download the assets included on the website without our consent.
+
+Additionally, this license explicitly prohibits the use of unDraw assets, vectors, and images for training, fine-tuning, or developing artificial intelligence, machine learning models, or similar technologies. This includes but is not limited to:
+
+Using the assets as training data for generative AI models
+Incorporating the assets into machine learning datasets
+Fine-tuning a machine learning model
+Using the assets to train, validate, or test AI systems
+Any automated processing of the assets for AI/ML model development
+
+Any such use requires separate explicit written permission from unDraw.
+
+Regarding brand logos that are included:
+
+Are registered trademarks of their respected owners. Are included on a promotional basis and do not represent an association with unDraw or its users. Do not indicate any kind of endorsement of the trademark holder towards unDraw, nor vice versa. Are provided with the sole purpose to represent the actual brand/service/company that has registered the trademark and must not be used otherwise.
+

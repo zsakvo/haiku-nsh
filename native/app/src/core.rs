@@ -610,7 +610,7 @@ impl Core {
         let manifest: JsonValue=serde_json::from_str(include_str!("../../../nsh.json")).unwrap();
         serde_json::json!({"version":manifest["version"],"framework":"0.4.0",
             "license":"应用许可证尚未声明。",
-            "notices":concat!("Iconoir icons — MIT\n",include_str!("../../../assets/icons/LICENSE"),"\n\nunDraw illustrations\n",include_str!("../../../assets/illustrations/LICENSE.txt"),"\n\nNative Shell 0.4.0 — Apache-2.0\nRust 依赖的完整发行声明将在打包阶段随应用提供。")})
+            "notices":include_str!("../assets/THIRD_PARTY_NOTICES.txt")})
     }
     /// Replace semantic tokens shared by TSX and Rust.
     pub async fn apply_theme(json: String) -> Result<(), String> {

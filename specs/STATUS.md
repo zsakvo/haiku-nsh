@@ -27,14 +27,14 @@
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
-| F09 桌面集成 | 部分实现（M6-03 已验收；M6-04 其他项已通过，玻璃主题修正待审阅） | `haiku-macos::{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}`、`native/app/src/{player_dock,menubar,desktop_lyrics,platform/*}.rs` | 审阅者复核 workspace 304、nsh test 75/75；玻璃显式跟随应用/Now Playing 外观，深浅色文字修正；本轮 check/build、Player 2/2 通过，深浅窗口截图齐全 | 原生交互及其他平台编译未覆盖；KaraokeLayer 仅测量、是否实现待审阅者决定；打包未覆盖；详见 M6-04 |
+| F09 桌面集成 | 部分实现（M6-04 已审阅通过；M6-05 release 包与干净启动已验证，待审阅） | `haiku-macos::{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}`、`native/app/src/{player_dock,menubar,desktop_lyrics,platform/*}.rs`、`packaging/` | M6-04 审阅通过；M6-05 check/build、定向 Rust/TSX 通过，NSH release arm64 .app 83.75 MiB；四个内置插件在空数据根安装、真实窗口截图正常 | Finder/Gatekeeper 及其他平台未覆盖；NSH 默认 adhoc，工具链 strip 警告已记录；KaraokeLayer 暂不实现；详见 M6-05 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
 | F14 Haiku 账号 | 已实现（M5-03 界面待审阅） | `haiku-services::account`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | Rust 第一部分已验收；本轮 check/build 通过、账户 Headless 1/1、完整 nsh test 62/62；两张浅色截图已检查 | 真实服务端与 Keychain 实机待确认 |
 | F15 同步与备份 | 已验证（M5 范围，备份待审阅） | `haiku-services::{sync,backup}`、`native/app/src/{sync,backup}.rs`、`src/shell/{SyncSettings,BackupSettings}.tsx` | M5-04 已验收；M5-05 备份 Rust 5/5，workspace 291 通过/1 忽略，check/build 通过，Headless 专项 1/1，完整 nsh test 64/64；两张浅色截图已查看 | 真实 GitHub/Keychain、原生备份选择器与真实跨平台备份待人工确认；详见 M5-04/M5-05 |
-| F16 设置、通知与日志 | 部分实现（M6-01 快捷键/关于待审阅） | `haiku-store::{settings,shortcuts,logs}`、`native/app/src/{settings,shortcuts,activity}.rs`、`src/shell/{Settings,ShortcutSettings,About,Diagnostics}.tsx` | 已有设置/日志/通知沿用验收；M6-01 录制→冲突→单项/全部恢复通过，check/build 通过，两张浅色截图已查看；菜单与设置共用关于内容 | 应用许可证待决定；菜单关于、真实全局按键与系统选择器待人工；备份热恢复后快捷键刷新未接线；详见 M6-01 |
+| F16 设置、通知与日志 | 部分实现（M6-05 第三方声明已验证，待审阅） | `haiku-store::{settings,shortcuts,logs}`、`native/app/src/{settings,shortcuts,activity}.rs`、`src/shell/{Settings,ShortcutSettings,About,Diagnostics}.tsx` | 已有设置/日志/通知沿用验收；M6-01 录制→冲突→单项/全部恢复通过，check/build 通过，两张浅色截图已查看；菜单与设置共用关于内容 | 应用许可证待决定；菜单关于、真实全局按键与系统选择器待人工；备份热恢复后快捷键刷新未接线；M6-05 610 个 Rust 依赖许可证清单已入包，关于页定向 1/1；应用自身许可证仍未声明；详见 M6-01/M6-05 |
 
 ## 2026-11-09 实施文档
 
@@ -1059,3 +1059,37 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 本轮未重跑 workspace、全量 nsh test 或 CPU；沿用审阅者已认可的结果；KaraokeLayer 未实现。
 - 未覆盖：系统辅助功能偏好组合、窗口缩放后的材质变化、真实按钮人工交互、其他平台编译；深浅截图通过不等于覆盖这些情况。
 - 已更新 F09；保留全部改动，未提交 git；未做 GUI 自动化，未修改工作树、Rex 会话/窗格、参考版、NSH、依赖源码或其他 specs 文件。
+
+## 2026-11-12 M6-05：release .app 打包与干净启动（待审阅）
+
+- 替换此前缺图标的前置检查记录；用户已选定并提交 assets/app-icon.png（Flutter icon-v2，1024×1024 满版方形 PNG），本轮未修改图标内容。
+- 根 nsh.json 配置图标；packaging/{App.tsx,nsh.json} 是独立发行入口/配置，沿用原 AppShell 与 native/app，不自写打包脚本。
+- 根配置保留开发/测试文件路径；发行配置不声明 fs，实际包内 capabilities.json 的 fs.read/fs.write 均为空，测试路径未进入发行权限。
+- native/app/src/lib.rs 用 NSH Registry::assets 注册第三方声明、4×3 个插件文件，以及 25 个 UI SVG；由 NSH 统一复制资源。
+- Icon/EmptyState 改为稳定的 asset:/ui/ 地址，替代子目录发行入口会解析为开发机绝对路径的跨目录图片导入；图形、布局、主题未改。
+- 内置 subsonic、feiniu、qq-scraper、kugou-scraper 源码/logo/离线契约均在包内；首次启动仍从可执行文件内嵌字节安装，避免依赖仓库或参考版。
+- Host 仅在实际安装时记录 info；沿用 builtin=true、可停用不可删除的原实现，本轮未改插件生命周期策略。
+- native/tools/generate-notices.py 从发行 runner 的 locked/offline Cargo metadata（macOS arm64）生成 native/app/assets/THIRD_PARTY_NOTICES.txt。
+- 清单包含 610 个第三方 Rust 包/版本/SPDX 表达式/项目地址，含构建依赖、不含仅测试依赖；并附 Iconoir MIT 与 unDraw 声明，不冒称完整许可证全文集合。
+- Core.about_info 读取同一生成文件；文件作为 NSH asset 入包，关于页沿用现有声明对话框；应用自身许可证保持“尚未声明”。
+- 验收 1：nsh check 通过，nsh-check-final.log；nsh build packaging 通过，nsh-build-final.log（38 assets）。
+- 打包：nsh package packaging --target macos -o .artifacts/m6-05/release -v 成功；nsh-package-final.log，release [optimized]、arm64。
+- 产物：.artifacts/m6-05/release/Haiku.app；45 文件，共 87,816,718 bytes（83.75 MiB）；package-contents-final.log。
+- 包内声明 50,358 bytes 与生成源一致；4×3 插件资源及 25 SVG 与仓库源一致；发行 fs 权限为空；均记录在 package-contents-final.log。
+- 偏离：未传 --sign/未使用证书/未公证，但 NSH 内置 macOS 打包自动作 adhoc 签名；Signature=adhoc、无 TeamIdentifier，package-signature.log。
+- 非已知警告：release 的 rust-objcopy 因缺 libLLVM.dylib 无法完成 strip，Cargo/NSH 仍成功；未更换工具链或修工具链，警告保留在最终打包日志供审阅。
+- 修复思路 1：首轮磁盘耗尽导致打包/插件测试失败；cargo clean 仅清本轮 packaging/target，释放约 6 GB；重试沿用原生成工作区 lock 与已有 target 缓存，未改依赖源码/锁文件。
+- 缓存复用的临时 packaging/target 链接已解除；clean-task-cache.log、nsh-package.log、nsh-package-repair1.log 保留失败/修复证据。
+- 修复思路 2：首个可启动包出现 UI 资源绝对路径缺图警告；注册稳定包内 URI 后重做受影响 check/build/test/打包，未扩大到第三种修复。
+- 受影响 Rust：core_open_installs_readable_builtin_descriptor 1/1；builtin_offline_contracts_validate_capabilities_ids_pages_errors_and_abort 重试 1/1。
+- Rust 日志：cargo-core-builtins.log、cargo-builtin-contracts-repair1.log；首轮空间失败在 cargo-builtin-contracts.log，不记为通过。
+- 受影响 TSX：App.test.tsx 4/4、src/shell/About.test.tsx 1/1；nsh-test-shell.log、nsh-test-about-final.log；检查声明打开/关闭、Rust 清单、原许可证文案。
+- 定向 Headless 仅有既知开发链接器提示；未重跑 workspace 或全量 nsh test，未改超时或测试并发。
+- 验收 2：直接运行包内 Contents/MacOS/Haiku；HAIKU_DATA_DIR 指向 mktemp 空目录，HAIKU_NO_KEYCHAIN=1 防止验收触及真实凭据。
+- NSH_APP_DIR 指向该 .app 自身的 Contents/Resources/nsh，仅启用发行 runner 的 info 日志；实际执行 release 二进制/包内字节码与资源，没有使用 dev server。
+- package-run-final.log 确认四个首次安装 info，无 WARN/ERROR；安装目录四个 descriptor 均 builtin=true，见 package-contents-final.log。
+- package-window.png 已查看，仅应用窗口，侧栏图标/插画正常；window-final.log、screenshot.log 记录窗口限定捕获；screen-lock-final.log 确认未锁屏。
+- 截图后停止应用；首次缺图运行日志 package-run.log 保留，不作为最终通过证据。
+- icon-inspection.log：包内 AppIcon.icns 的 1024×1024 表示四角 alpha=1，NSH 未为图片内容加透明圆角；未自行加工，Finder/Dock 实际呈现待人工。
+- 所有证据在 .artifacts/m6-05/；未覆盖 Finder 双击、Gatekeeper 提示、真实 Keychain、其他架构/平台、签名公证、自动更新、DMG 与 F01–F16 全量审计。
+- 已更新 F09/F16；保留改动，未提交 git；未切换工作树、未改 Rex 会话/窗格、参考版、NSH/依赖源码或其他 specs 文件，未做 GUI 自动化。

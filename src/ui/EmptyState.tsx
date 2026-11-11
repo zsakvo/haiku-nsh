@@ -1,6 +1,6 @@
 import { colorScheme, Image, Text, View } from "nsh";
-import illustration from "../../assets/illustrations/listening.svg";
-import darkIllustration from "../../assets/illustrations/listening-dark.svg";
+const illustration = "asset:/ui/illustrations/listening.svg";
+const darkIllustration = "asset:/ui/illustrations/listening-dark.svg";
 import { Button } from "./Button";
 export function EmptyState(props: { title: string; description: string; action?: { label: string; onPress: () => void } }) {
   return <View class="flex-1 items-center justify-center gap-2 px-(--content-inset) py-6">

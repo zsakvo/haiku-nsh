@@ -5,6 +5,7 @@
   "build": 1,
   "rust": "native/app",
   "theme": "src/ui/theme/haiku.json",
+  "icon": "assets/app-icon.png",
   "capabilities": {
     "network": { "hosts": ["*"] },
     "webview": { "hosts": ["*"] },

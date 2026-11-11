@@ -206,6 +206,7 @@ impl Host {
                     true,
                 )
                 .await?;
+                log::info!("Installed builtin plugin {id} into {}", host.root.display());
             }
         }
         let records = host.records();
