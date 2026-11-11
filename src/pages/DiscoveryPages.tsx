@@ -119,10 +119,9 @@ export function RadioPage(props:Props) {
     return stop;
   });
   effect(()=>{const r=props.route;if(r.kind==="radio"&&r.source)state.selected.set(r.source);});
-  const channels=resource(()=>props.active&&state.selected()?state.selected():undefined,async s=>{
-    if(!state.available().find(p=>p.id===s)?.caps.includes("radio.channels"))return [];
-    return await props.core.sources.radioChannels(s) as any[];
-  });
+  const channels=resource(()=>props.active&&state.available().some(p=>
+    p.id===state.selected()&&p.caps.includes("radio.channels"))?state.selected():undefined,
+    async s=>await props.core.sources.radioChannels(s) as any[]);
   async function start(id?:string){error.set("");try{await props.core.player.startRadio(state.selected(),id??null);}catch(e){error.set(String(e));}}
   const radio=()=>player().radio?.source===state.selected()?player().radio:null;
   return <View testID="page-radio" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>

@@ -14,8 +14,8 @@
 ## 环境
 
 - macOS arm64，Xcode；`nsh 0.4.0`（`curl -fsSL https://nsh.dev/install.sh | sh`）；cargo 用 huacnlee/cargo（`curl -fsSL https://huacnlee.github.io/cargo/install.sh | sh`，会替换 `~/.cargo/bin/cargo`，原版留为 `cargo.rustup`）。
-- 参考项目（只读）：本机为 `~/Project/haiku-gpuix`（业务与行为依据；`~/Project/GPUI/haiku` 在本机不存在）；原 Flutter 版 `~/Project/Flutter/haiku`。
-- 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交，**截至 `9a52e44` 均未推送**。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
+- 参考项目（只读，业务与行为依据）：路径随机器不同——MacBook Air（Rex 会话 Mono）为 `~/Project/GPUI/haiku`，另一台为 `~/Project/haiku-gpuix`；派发任务时按当前机器改写任务文件里的路径。原 Flutter 版 `~/Project/Flutter/haiku`。
+- 仓库有 `origin` remote，分支 main；已验收任务逐个本地提交；推送由用户自行决定（截至 `625319a` 已推送）。`.artifacts/`（日志、截图、测试音频）被忽略，不随提交走；新机器验收需重新生成证据，不假定旧机器音频和日志存在。
 
 ## 当前进度（2026-11-10 交接时）
 
@@ -34,11 +34,22 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
-## 2026-11-11 进行中：M4-03 实现完成，验收被环境阻塞（未提交）
+## 2026-11-11 更新：M4-03 已验收并提交
+
+- Codex 修复：推荐页 tracks 货架 TrackList 补 `flex-1 min-h-0`（高度塌陷）；电台频道在来源描述符加载前请求导致永久为空。审阅者复跑完整 nsh test 29/29；workspace 247 通过/1 忽略；check/build 通过；五张浅色截图（推荐、分类 tag 墙、分类歌单网格、电台、命令面板“标题 · 歌手”）已审阅。
+- Search 命令面板 Escape 用例在 Codex 一次全量中超时，单跑 2/2 两次、审阅者两次全量均通过，判为满载偶发；若再现单独排查。
+- **锁屏会让 Player/真实音频类 Headless 停滞、截图失败**——跑 nsh test 与截图前确认 `ioreg -n Root -d1 | grep IOConsoleLocked` 为 false。
+- 小项待后续 UI 任务：分类歌单页标题显示原始 ID（“cn”）；电台未选频道为纯文字，与已选按钮样式不一致；推荐页货架卡片间距偏大。
+- 待人工确认：真实来源首页/分类/电台连续播放。
+- Codex 周额度剩约 4%，下一步 M4-04（远端歌词与来源链、手动查找歌词）需等额度恢复。
+
+## 2026-11-11（已解决）M4-03 验收曾被锁屏阻塞
 
 - Codex 已完成推荐/分类/电台与 M4-02 小项；插件契约两项由审阅者决定并写入 PLUGIN_SDK.md §5.2：`categories.list` 可选 `sorts`，`radio.next(channelId?: string)` 中 undefined 为私人 FM。workspace 247 通过，check/build 通过。
 - `nsh test` 卡在 Player.test.tsx 的 persistent dock 用例（点歌词跳到 0:10 后停住）。审阅者在干净工作树 `/tmp/haiku-nsh-baseline`（4b000a2）上同样卡住 15 分钟，说明不是 M4-03 回归。当时（02:30）屏幕已锁定（IOConsoleLocked=true），怀疑锁屏下真实音频/渲染不推进；截图也无法在锁屏下拍。
 - 解锁后：先在基线工作树重跑 `nsh test Player.test.tsx` 确认能通过，再让 Codex 完成完整 nsh test、五张截图与 STATUS，然后审阅提交。
+- 注：M4-03 代码已由用户以 `625319a` 提交并推送（非审阅提交），验收仍未完成。
+- 2026-11-11 MacBook Air（未锁屏）复核：`nsh test Player.test.tsx` 2/2 通过（3.3s），停滞确认是锁屏所致。审阅者自跑：workspace 247 通过/1 忽略，nsh check/build 通过，`nsh test` 28/29——失败为 `Discovery.test.tsx` 首个用例：推荐页 tracks 货架标题在、曲目行（“潮汐之间”）不在屏幕上，疑原生 TrackList 在货架中高度为 0。已派 Codex 修复 + 五张截图 + STATUS（Codex 周额度剩 4%）。日志在 `.artifacts/m4-03/{player-unlocked,cargo-test-workspace-final,nsh-check-final2,nsh-build-final2,nsh-test-final}.log`。
 
 ## 2026-11-10 更新：M4-02 已验收并提交
 

@@ -22,7 +22,7 @@
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
 | F02 插件包与来源生命周期 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/{host,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | workspace 228 通过/1 忽略；QQ CLI 契约 34/34；tsc、nsh check/build、nsh test 17/17；`.artifacts/m2-05/` | 目录监听为 500ms 内容哈希轮询；record/live 仍为基础实现；系统文件选择器与真实热重载体验待人工确认 |
 | F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
-| F04 推荐、发现与分类 | 部分实现（M4-03 编码完成，验收阻塞） | `native/app/src/discovery.rs`、`native/crates/haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | workspace 首轮 247 通过/1 忽略；最终 nsh check/build 通过；nsh test 在 PlayerFixture 停滞 | 新增发现页 Headless 和五张截图未覆盖；审阅授权单文件二分后仍未定位，临时替换均已恢复 |
+| F04 推荐、发现与分类 | 部分实现（推荐/分类/电台，M4-03 已验收） | `native/app/src/discovery.rs`、`native/crates/haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | workspace 247 通过/1 忽略、check/build 通过；审阅者复跑完整 nsh test 29/29（Search Escape 用例单跑 2/2 ×2，判为满载偶发）；五张浅色截图 | 真实来源首页/电台待人工确认；分类标题显示原始 ID、电台未选频道无按钮样式待 UI 小项 |
 | F05 搜索 | 部分实现（搜索页与命令面板；M4-02 fixture 验收完成，待审阅） | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | M4-02：workspace 244 通过/1 忽略；最终 nsh check/build 通过，nsh test 25/25；五张浅色实机截图齐全 | 五种实体、来源筛选、分页、历史、防旧结果覆盖、280ms 面板预览与完整第一页起播已实现；真实来源搜索与实机键盘体验待人工确认 |
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
@@ -675,37 +675,26 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未覆盖/待人工：真实来源搜索、最小窗口长列表布局与实机键盘体验；未访问真实上游，无新增待定架构决策；保留改动并停止，未提交 git。
 
 
-## 2026-11-11 M4-03：推荐、分类与电台（实现待验收，验证阻塞）
-- 主仓库保留改动，未提交 git；未改 Rex、参考项目、NSH 或依赖源码；保留审阅者的 PLUGIN_SDK.md 改动与任务文件。
-- 第 0 步：命令面板曲目改为“标题 · 歌手”，同步搜索回归断言；来源曲库分组 gap4→3、标题内容 gap3→2。
-- 新增 DiscoveryPages.tsx：推荐按能力筛选已启用来源，homeSourceId 保存选择；只显示所选来源，提供加载/空/错误重试/缓存刷新失败状态。
-- tracks 使用原生 TrackList；playlists/albums/toplists/programs 横向封面货架进现有详情；Entry/more 按宿主 Link 跳转分类、详情或电台起播。
-- 分类分组 tag→歌单网格，支持声明的 sorts、透明传递 SDK 游标、加载更多与详情；无 sorts 隐藏排序。
-- 电台提供频道与私人 FM，监听随 active 订阅/解除；设置用既有 extra 字段保存分类/电台来源。
-- 导出：sources.home(source,refresh)→{shelves,cached}；categories(source)→{groups,sorts?}。
-- 导出：sources.categoryPlaylists(source,id,sort:string|null,cursor:string|null)→Page；radioChannels(source)→频道数组。
-- 导出：player.startRadio(source,channel: string|null)；宿主 null→Rust None→SDK 真正的 undefined，普通频道拒绝空字符串。
-- 缓存：Rust HomeCache，数据根/cache/home/<来源哈希>.json；version=1、saved_at（Unix 秒）、home；原子写入，7 天、40×60，仅首屏。
-- home(false) 命中立即返回，不调用插件；页面展示后 home(true) 后台刷新；刷新合并旧 radio Entry、隐藏空货架，来源错误分别保存。
-- 续歌：Controller 注入 RadioProvider，SourceRadio 适配 SourceApi；顺序队列剩余≤3 首时单次请求 count=10，按 EntityRef 去重已听/已排队曲目。
-- 替换/清空/停止队列会取消请求，session token 拒绝迟到结果；无新曲/来源失败停止自动重试，页面重新选择频道恢复；不做混合来源 FM。
-- 同步 sdk/haiku.d.ts、GUIDE、宿主参数校验/JS 桥与契约测试；categories sorts 校验唯一非空 ID/标题，私人 FM 不以 null/空字符串传给插件。
-- QQ 现有协议固定热门，因此仅声明 hot；未臆造 new 支持。夹具声明 hot/new；QQ 契约期望同步为 hot。
-- 扩展 network-plugin 为纯 loopback 推荐/分类/电台与离线/一次失败夹具；共享组件/夹具位于 src/，根 Discovery* 仅为 NSH 配置薄入口。
-- 验收 1：cargo test --manifest-path native/Cargo.toml --workspace 首轮通过，247 passed/1 ignored；证据 .artifacts/m4-03/cargo-test-workspace.log。
-- 首轮通过覆盖缓存过期/上限/缓存优先/保留电台、续歌触发/已听去重/切队列取消、SDK sorts 与真实 undefined。
-- 其后补充电台队列 session_tag 保留、初次取歌时暂停处理、已排队重复/会话标记断言；未再次运行 workspace，这些收尾分支未覆盖。
-- 验收 2：nsh check 首次 TS 列表类型/文本行数属性失败，按明确 DTO 与 style 修正；最终 nsh-check-final.log 通过。
-- nsh build 初次与最终通过，最终证据 nsh-build-final.log；仅见已允许的 block 0.1.6 / __eh_frame 提示。
-- nsh-test.log、nsh-test-repair1.log、nsh-test-repair2.log 均在既有 Player.test 的 persistent dock 用例停滞，非全绿；最后两次日志止于暂停歌词 seek 10 秒。
-- 每轮已通过 app 原生 10 项及前 8 个 Headless；runner CPU=0、无后续结果，主动 SIGTERM 结束，日志保留信号退出记录；根因未确定，不能判定为基线问题。
-- 两种处理：同工具链详细重跑；电台页面仅激活时订阅播放状态。均未消除停滞，按上限停止，未用调试器或 GUI 自动化。
-- 新增 Discovery.test 三条流程、后续 Network/Search 回归尚未执行；验收 3 未运行，五张浅色截图 0/5，未生成汇总 JSON。
-- 未覆盖：上述收尾 Rust 分支、发现页 UI 行为/外观、真实来源推荐/分类/电台；没有新增架构待决事项，需审阅者决定后续排障授权。
-- 续查授权：不受两次修复上限，约 30 分钟内只跑 nsh test Player.test.tsx；本轮未改测试、加 timeout、换工具链或使用 GUI/调试器。
-- 二分 1：移除 Home/Categories/Radio 挂载仍停滞；二分 2：同时移除 Actor 循环 refill_radio() 仍停滞；日志 player-bisect-no-discovery{,-no-refill}.log。
-- 二分 3：M4-02 Controller 本地路径（仅保留新 API 编译兼容层）仍停滞；证据 player-bisect-baseline-controller.log。
-- 二分 4：所有已改运行时代码临时恢复 4b000a2，PlayerFixture bundle 246108 字节（与旧日志一致），同一单文件命令仍停滞；证据 player-bisect-baseline-runtime.log。
-- 原样恢复 21 个文件并校验恢复内容后再跑仍停滞，证据 player-bisect-restored.log；每轮 SeekBar 通过、persistent dock 未完成，主动 SIGTERM；新日志未开 -v，不能确定内部等待点相同。
-- 二分未锁定根因；历史全量通过与当前单文件停滞不是同环境同顺序对照，尚不能据此确定或排除本轮回归。临时替换/备份均清除，未保留诊断改动。
-- 因未修好，授权要求的后续 workspace/完整 nsh test/check/build/五张截图未执行；停止等待审阅者决定是否扩大诊断方法。
+## 2026-11-11 M4-03：推荐、分类与电台（发现页通过，完整回归剩一项）
+
+- 在主仓库完成 625319a 的验收收尾；本轮未提交 git，未修改审阅者 HANDOFF、参考项目、NSH、依赖或 Rex。
+- 第 0 步：命令面板曲目“标题 · 歌手”、来源曲库分组收紧；推荐/分类/电台沿用既有共享组件与 token。
+- 推荐按 home 能力筛选已启用来源，保存 homeSourceId；tracks 原生 TrackList、实体横向货架、Entry/more 跳转、来源错误隔离。
+- 修复 SourceContent.tsx：TrackList TSX 宿主补 flex-1/min-h-0，使用货架既有定高，原生行实际显示并可双击起播。
+- 修复 DiscoveryPages.tsx：频道 resource 等描述符及 radio.channels 能力就绪再请求，避免初始空快照返回空数组后不重载。
+- Discovery 回归保留原曲目选择器/双击/起播断言；增加异步行就绪等待与频道按钮可见断言。
+- 分类 tag→四列歌单网格，支持来源 sorts、分页和详情；QQ 仅声明 hot，不臆造 new；私人 FM 使用真正 undefined。
+- 导出 sources.home(source,refresh)→{shelves,cached}；categories(source)→{groups,sorts?}；categoryPlaylists(source,id,sort|null,cursor|null)→Page；radioChannels(source)→频道数组。
+- 导出 player.startRadio(source,channel|null)；null 在宿主转为 SDK undefined，普通频道拒绝空字符串。
+- 缓存由 Rust HomeCache 持有：<data>/cache/home/<来源哈希>.json，{version:1,saved_at:Unix秒,home}，原子写、7 天、最多40×60、仅首屏。
+- 缓存命中先返回，页面随后 home(true) 刷新；刷新保留旧 radio Entry，隐藏空货架，离线缓存展示与刷新错误并存。
+- 续歌在 Rust Controller：顺序队列剩余≤3首时单次请求 count=10，以 EntityRef 排除已听/已排队曲目；切换/清空/停止取消，session token 拒绝迟到结果。
+- 无新曲或来源失败停止自动重试，由重新选频道恢复；仅所选来源，不混合来源 FM。相对参考版以 Rust 文件缓存/Controller 替代 TS 服务。
+- 审阅者已验收 workspace 247 passed/1 ignored、nsh check/build 通过；沿用 cargo-test-workspace-final.log、nsh-check-final2.log、nsh-build-final2.log，本轮未重跑。
+- 锁屏导致 Player 停滞已由审阅者解锁复核确认；本轮 Player 单文件2/2、Discovery单文件3/3通过，日志 player-layout-repair.log、nsh-test-discovery-repair.log。
+- 首次完整收尾测试28/29：货架标题早于异步原生行就绪，立即press失败；增加原选择器waitFor，保留双击/队列断言；失败日志 nsh-test-acceptance-final.log。
+- 最终完整回归28/29：Discovery三项及Player均通过；Search命令面板用例最后Escape后仍显示默认命令，等待关闭5秒超时；根因未定位，日志 nsh-test-acceptance-repair.log。
+- 五张真实浅色截图齐：home.png、categories-tags.png、categories-playlists.png、radio.png、command-tracks.png；已逐张查看，运行日志 run-*-final*.log 等保留。
+- 所有证据 .artifacts/m4-03/；预览与测试使用 openIsolated/loopback，无真实上游；截图无 GUI 自动化。
+- 待人工：真实来源首页/分类分页/电台连续播放与听感。小项：直接路由分类标题显示原始ID（如cn），tag点击显示中文，未做名称反查。
+- 未完成：完整nsh test全绿，需后续处理命令面板Escape回归；按额度与验证边界停止扩展排查。无新增架构待决事项；在线歌词/远端收藏刷新/下载留后续。

@@ -49,7 +49,7 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
     style={props.fit ? {height:Math.min(props.tracks.length,8)*token("track-row-height")+token("compact-control-height")+8} : {}}>
     <If when={!!error() || !!handle.error()}><Text class="text-sm text-destructive">{error() || String(handle.error())}</Text></If>
     <If when={!!handle()}>
-      <TrackList source={handle()!} active={props.active && !creating()}
+      <TrackList class="flex-1 min-h-0" source={handle()!} active={props.active && !creating()}
         onPlay={(e) => void act(() => props.core.collections.playSource(e.source, e.id))}
         onAction={(e) => void act(async () => {
           const tracks = await CollectionsService.selectedTracks(handle()!, e.ids) as any[];

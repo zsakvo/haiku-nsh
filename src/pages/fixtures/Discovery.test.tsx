@@ -3,6 +3,7 @@ const options={platform:"macos" as const,width:1200,height:800,network:"live" as
 test("home shelves play, navigate cards/entries/more and categories page sorts and paginates",async()=>{
   const app=await open("../../../DiscoveryFixture.tsx",options);
   await app.waitFor("id:shelf-tracks");expect(app.shows("text:空货架")).toBe(false);
+  await app.waitFor("id:shelf-tracks >> label:潮汐之间");
   await app.press("id:shelf-tracks >> label:潮汐之间");await app.press("id:shelf-tracks >> label:潮汐之间");
   await app.waitFor("text:队列 2 首 · 潮汐之间");await app.press("label:播放 / 暂停");
   await app.press("id:shelf-entries >> role:button[华语分类]");
@@ -14,7 +15,7 @@ test("home shelves play, navigate cards/entries/more and categories page sorts a
   await app.press("id:nav-home");await app.press("id:shelf-playlists >> role:button[夜航精选]");await app.waitFor("id:page-source-detail");
   await app.keyboard.press("mod+[");await app.press("更多精选歌单");await app.waitFor("text:已显示 4 个歌单");
   await app.press("id:nav-home");await app.press("id:shelf-entries >> role:button[林间频道]");
-  await app.waitFor("id:page-radio");await app.waitFor("text:队列 4 首 · 林间频道 · 1");
+  await app.waitFor("id:page-radio");await app.waitFor("id:radio-channels >> role:button[林间频道]");await app.waitFor("text:队列 4 首 · 林间频道 · 1");
   await app.press("下一首夹具");await app.waitFor("text:持续播放 · 队列 8 首");
   await app.press("role:button[私人 FM]");await app.waitFor("text:队列 4 首 · 私人 FM · 9");
 });
