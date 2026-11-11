@@ -59,7 +59,7 @@ export function HomePage(props:Props) {
       <Text role="header" class="text-xl font-semibold text-foreground">推荐</Text><If when={!!state.available().length}><SourcePicker state={state} /></If>
     </View><View class="flex-row"><Button label="刷新推荐" size="sm" loading={home.loading()} disabled={!state.selected()} onPress={refresh} /></View></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <Scroll testID="home-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-4 pb-4">
+    <Scroll testID="home-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-6 pb-4">
       <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
       <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
       <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
@@ -75,9 +75,9 @@ export function CategoriesPage(props:Props) {
   const state=useSource(props,"categories.list","categorySourceId"), category=signal(""),title=signal(""),sort=signal("");
   const items=signal<any[]>([]),next=signal<string|null>(null),error=signal(""),busy=signal(false);
   let epoch=0,closed=false;cleanup(()=>{closed=true;epoch++;});
-  effect(()=>{const r=props.route;if(r.kind==="categories"&&r.source){state.selected.set(r.source);category.set(r.category??"");title.set(r.category??"");}});
+  effect(()=>{const r=props.route;if(r.kind==="categories"&&r.source){state.selected.set(r.source);category.set(r.category??"");title.set("");}});
   const groups=resource(()=>props.active&&state.selected()?state.selected():undefined,async s=>await props.core.sources.categories(s) as Categories);
-  effect(()=>{const match=groups()?.groups.flatMap(g=>g.items).find(c=>c.id===category());if(match)title.set(match.title);});
+  const categoryTitle=()=>groups()?.groups.flatMap(g=>g.items).find(c=>c.id===category())?.title || title() || "分类歌单";
   effect(()=>{const sorts=groups()?.sorts??[];if(!sorts.some((s:any)=>s.id===sort()))sort.set(sorts[0]?.id??"");});
   const identity=()=>props.active&&state.selected()&&category()?JSON.stringify([state.selected(),category(),sort()]):undefined;
   const result=resource(identity,async key=>{
@@ -99,7 +99,7 @@ export function CategoriesPage(props:Props) {
         <If when={groups.loading()}><Skeleton label="正在加载分类…" /></If>
         <Each of={groups()?.groups??[]} key={g=>g.title}>{g=><Shelf id={`tags-${g().title}`} title={g().title}><View class="flex-row flex-wrap gap-2"><Each of={g().items} key={c=>c.id}>{c=><Button label={c().title} size="sm" onPress={()=>choose(c().id,c().title)} />}</Each></View></Shelf>}</Each>
       </If>
-      <If when={!!category()}><View class="flex-row items-center gap-3"><Button label="全部分类" size="sm" variant="ghost" onPress={()=>category.set("")} /><Text class="flex-1 text-lg font-semibold text-foreground">{title()}</Text>
+      <If when={!!category()}><View class="flex-row items-center gap-3"><Button label="全部分类" size="sm" variant="ghost" onPress={()=>category.set("")} /><Text testID="category-title" class="flex-1 text-lg font-semibold text-foreground">{categoryTitle()}</Text>
         <If when={!!groups()?.sorts?.length}><SettingSelect label="排序" value={sort()} items={(groups()?.sorts??[]).map((s:any)=>({value:s.id,title:s.title}))} onChange={v=>sort.set(v)} /></If>
       </View><If when={result.loading()}><Skeleton label="正在加载歌单…" /></If>
         <If when={!!result.error()||!!error()}><ErrorState message={error()||String(result.error())} retry={()=>result.refetch()} /></If>
@@ -128,7 +128,8 @@ export function RadioPage(props:Props) {
   return <View testID="page-radio" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
     <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text><If when={!!state.available().length}><SourcePicker state={state} /></If></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <If when={!!state.available().length}><View class="px-(--content-inset) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel} onPress={()=>void start()} /></View></Shelf>
+    <If when={!!state.available().length}><View class="px-(--content-inset) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel}
+      variant={!!radio()&&!radio().channel?"primary":"secondary"} onPress={()=>void start()} /></View></Shelf>
       <If when={!!error()||!!channels.error()}><ErrorState message={error()||String(channels.error())} retry={()=>channels.refetch()} /></If>
       <If when={!!radio()?.error}><ErrorState message={radio().error} retry={()=>void start(radio().channel??undefined)} /></If>
       <If when={!!radio()}><Text class="text-sm text-muted-foreground">{radio().loading?"正在获取下一批曲目…":`持续播放 · 队列 ${player().tracks.length} 首`}</Text></If>

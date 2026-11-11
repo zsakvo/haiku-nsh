@@ -27,7 +27,7 @@
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
 | F07 音效与响度 | 已验证（M1 范围，待审阅） | `haiku-store::settings`、`haiku-playback::{backend,loudness_cache}`、`src/shell/PlaybackSettings.tsx` | M1-05：DSP 映射/切歌与预加载保持、测量优劣规则通过；Headless EQ 设置与后端一致；浅色播放设置截图通过 | 真实听感待人工确认；软削波与 8ms 淡入淡出沿用固定保护机制 |
 | F08 歌词与正在播放 | 部分实现（来源链、提供方、导出、查找与设置界面，M4-04 已验收） | `haiku-lyrics::{formats,providers,service,Cursor}`、`native/app/src/{lyrics,presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 审阅者复跑：workspace 252 通过/1 忽略，nsh check/build 通过，完整 nsh test 33/33；五张浅色截图 | initialNowPlaying 初始打开时组件事件不到达（夹具专有）；Paxsenix 评分/令牌重取、Kugou 署名裁剪遗留；真实上游待人工确认 |
-| F09 桌面集成 | 部分实现（媒体中心、全局快捷键、M6-02 菜单栏已验收；M6-03 证据补齐待审阅） | `haiku-macos::{shortcuts,lifecycle,system,menubar,menubar_api,desktop_lyrics,desktop_lyrics_api}`、`native/app/src/{menubar,desktop_lyrics,platform/*}.rs` | M6-03 桌面歌词单例、变化/行边界推送、工具栏/快捷键/设置接线；workspace 303 通过/1 忽略，check/build 通过；原 nsh test 71/73，Core 超时经审阅者复核为满载偶发；真实播放、仅面板截图及原生快照已补齐 | 原生交互待人工，其他平台未编译；M6-04～05 未覆盖；详见 M6-03 |
+| F09 桌面集成 | 部分实现（M6-03 已验收；M6-04 其他项已通过，玻璃主题修正待审阅） | `haiku-macos::{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}`、`native/app/src/{player_dock,menubar,desktop_lyrics,platform/*}.rs` | 审阅者复核 workspace 304、nsh test 75/75；玻璃显式跟随应用/Now Playing 外观，深浅色文字修正；本轮 check/build、Player 2/2 通过，深浅窗口截图齐全 | 原生交互及其他平台编译未覆盖；KaraokeLayer 仅测量、是否实现待审阅者决定；打包未覆盖；详见 M6-04 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
 | F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
@@ -1030,3 +1030,32 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 待人工：锁定后悬停解锁、拖动保存/恢复、八按钮真实点击、NSFontPanel；其他平台 no-op 未编译验证。
 - 验收 3 无未完成项；完整测试偶发已由审阅者复核并要求停止排查；无新增架构决策。
 - 保留全部改动，未提交 git；未做 GUI 自动化，未修改 Rex 会话/窗格、参考版、NSH、依赖源码或其他 specs 文件。
+
+## 2026-11-11 M6-04：玻璃底栏与累积 UI 小项（玻璃主题修正待审阅）
+
+- 审阅者已通过原小项 1–9、中文字描边与 CPU 记录，并复跑 workspace 304 通过、nsh test 75/75；本轮仅修玻璃外观与可读性。
+- crate 根 #[native_components(macos)] 注册 haiku.GlassSurface，沿用 nsh-platform-macos =0.4.0，无新依赖版本。
+- NSVisualEffectView 保持 WithinWindow + UnderWindowBackground，无应用染色；新增响应式 dark 属性，显式设置 Dark Aqua / Aqua。
+- 属性读取应用实际 color scheme；Now Playing 是固定深色表面，打开时强制 Dark Aqua，即使应用选择浅色也匹配当前背景。
+- Dock 的标题、艺术家、模式、控制图标和喜欢按钮跟随所在表面；时间改用固定中性前景角色，避免封面提色降低对比度。
+- 新增 dock-on-dark-* 与 dock-highlight 语义 token；深色表面使用浅色文字/细边框，普通页面继续应用深浅主题角色。
+- 原生玻璃仍为第一层叶子，控件为后续兄弟；圆角 token、布局、尺寸与输入行为保持原实现；Headless/其他平台保留半透明回退及 alpha，Now Playing 回退匹配深色。
+- 小项 1–2：二维码过期置灰/刷新；空 warnings 为叶子，已有 Headless 断言。
+- 小项 3–5：分类名称、频道选中区分、推荐 gap-6；既有断言与 home-shelves.png 保留。
+- 小项 6–7：刮削左对齐/空年份隐藏/来源显示名；快捷键冲突列明双方、去 Error:；既有测试与 scrape-review.png 保留。
+- 小项 8：整行先描边再填充，高亮只裁剪填充；desktop-lyrics-outline.png 已通过审阅。
+- 小项 9：watch_collections 等待已有变更通道，替代 100ms 轮询；集合/设置提交与 reload 回归已通过。
+- 本轮验证：nsh check 通过，nsh-check-appearance-final.log；nsh build 通过，nsh-build-appearance-final.log。
+- 仅运行受影响 Player.test.tsx（包含 SeekBar）：2/2 通过；nsh-test-player-appearance-final.log。
+- 新断言覆盖普通浅色/深色、浅色应用打开深色 Now Playing、关闭后恢复浅色；检查标题、艺术家、elapsed/duration 的实际文字颜色。
+- 初次 check 修正原生背景闭包 move 捕获；截图入口修正 If 的 else 属性；首轮新增样式断言误把 Text 节点当 span，改为节点内文字选择器后通过，未放宽断言/超时。
+- 修复采用一条产品思路：显式外观 + 匹配表面的语义前景；未尝试替代材质、叠加不透明遮罩或改 NSH。
+- 真实运行：GlassDockRun.tsx 深色 Now Playing、GlassDockLightRun.tsx 浅色 AppShell，共用 src/pages/fixtures/GlassDockFixture.tsx 的 loopback 音频。
+- 新截图 glass-dock-dark.png、glass-dock-light.png 均已查看：底栏分别为深色/浅色材质，文字、图标及两端时间清楚；仅截应用窗口，无其他应用。
+- 新两张截图取代原 glass-dock.png 的玻璃验收证据；旧图保留以便对照，不再作为通过依据。
+- nsh-run-glass-{dark,light}.log 记录真实 playing=true、position 递增；window-glass-*.log、screenshot-glass-*.log 记录窗口限定捕获；截图后停止运行。
+- 测试/截图前 screen-lock-appearance.log 确认 IOConsoleLocked=false；所有本轮证据均在 .artifacts/m6-04/。
+- 原 CPU：cpu.log 30 秒/30 数值，均值 14.28%、最低 8.60%、最高 17.40%；debug host、Now Playing 与桌面歌词同时开启，本轮未重测。
+- 本轮未重跑 workspace、全量 nsh test 或 CPU；沿用审阅者已认可的结果；KaraokeLayer 未实现。
+- 未覆盖：系统辅助功能偏好组合、窗口缩放后的材质变化、真实按钮人工交互、其他平台编译；深浅截图通过不等于覆盖这些情况。
+- 已更新 F09；保留全部改动，未提交 git；未做 GUI 自动化，未修改工作树、Rex 会话/窗格、参考版、NSH、依赖源码或其他 specs 文件。

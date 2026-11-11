@@ -60,6 +60,7 @@ struct State {
     error: Option<String>,
     versions: std::collections::BTreeMap<String, u64>,
     local_changes: tokio::sync::watch::Sender<u64>,
+    changes: tokio::sync::watch::Sender<u64>,
 }
 impl State {
     fn changed(&mut self, ids: Vec<String>) {
@@ -68,6 +69,7 @@ impl State {
         }
         self.dirty = true;
         self.revision += 1;
+        self.changes.send_replace(self.revision);
         for id in &ids {
             *self.versions.entry(id.clone()).or_default() += 1;
         }
@@ -156,6 +158,7 @@ impl Collections {
             error: None,
             versions: Default::default(),
             local_changes: tokio::sync::watch::channel(0).0,
+            changes: tokio::sync::watch::channel(0).0,
         }));
         let (tx, rx) = mpsc::channel();
         let disk_state = state.clone();
@@ -241,6 +244,10 @@ impl Collections {
     /// Local mutations only. Remote imports refresh views without scheduling another upload.
     pub fn subscribe_local(&self) -> tokio::sync::watch::Receiver<u64> {
         self.0.state.lock().unwrap().local_changes.subscribe()
+    }
+    /// All committed changes, including remote refresh and backup reload, for async consumers.
+    pub fn subscribe_changes(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.0.state.lock().unwrap().changes.subscribe()
     }
     /// Most recent background write failure, cleared by a successful retry.
     pub fn persistence_error(&self) -> Option<String> {

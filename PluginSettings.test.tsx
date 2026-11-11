@@ -63,13 +63,16 @@ test("source form verifies against loopback, failed drafts leave no source; deve
   await app.press("role:button[调用]");
   await app.waitFor("id:plugin-call-result");
   await app.waitFor('text:title: "Fixture Song"');
+  expect(app.shows("role:button[收起warnings]")).toBe(false);
+  expect(app.shows("text:warnings: []")).toBe(true);
 });
 
 test("QR expires, refreshes and cancels; SMS cooldown, cookie/web fallback and event Stop", async () => {
   const app = await open("./PluginAuthFixture.tsx", options);
   await app.waitFor("id:login-qr-image");
   await app.waitFor("text:二维码已过期，请刷新");
-  await app.press("生成或刷新二维码");
+  expect(app.shows("label:已过期的二维码")).toBe(true);
+  await app.press("刷新二维码");
   await app.waitFor("text:请使用手机扫码");
   await app.press("role:button[取消]");
   await app.press("读取来源");

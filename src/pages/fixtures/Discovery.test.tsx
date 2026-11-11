@@ -7,6 +7,8 @@ test("home shelves play, navigate cards/entries/more and categories page sorts a
   await app.press("id:shelf-tracks >> label:潮汐之间");await app.press("id:shelf-tracks >> label:潮汐之间");
   await app.waitFor("text:队列 2 首 · 潮汐之间");await app.press("label:播放 / 暂停");
   await app.press("id:shelf-entries >> role:button[华语分类]");
+  await app.waitFor("id:category-title");
+  expect(app.shows("id:page-categories >> text:华语")).toBe(true);
   await app.waitFor("role:button[热门精选 1]");await app.press("加载更多歌单");await app.waitFor("text:已显示 6 个歌单");
   await app.press("label:排序");await app.press("role:option[最新]");await app.waitFor("role:button[最新精选 1]");
   await app.press("role:button[最新精选 1]");await app.waitFor("id:page-source-detail");
@@ -16,8 +18,11 @@ test("home shelves play, navigate cards/entries/more and categories page sorts a
   await app.keyboard.press("mod+[");await app.press("更多精选歌单");await app.waitFor("text:已显示 4 个歌单");
   await app.press("id:nav-home");await app.press("id:shelf-entries >> role:button[林间频道]");
   await app.waitFor("id:page-radio");await app.waitFor("id:radio-channels >> role:button[林间频道]");await app.waitFor("text:队列 4 首 · 林间频道 · 1");
+  const selectedRadioColor=app.spanStyle("id:radio-channels >> role:button[林间频道] >> text:林间频道").color;
+  expect(app.spanStyle("role:button[私人 FM] >> text:私人 FM").color).not.toBe(selectedRadioColor);
   await app.press("下一首夹具");await app.waitFor("text:持续播放 · 队列 8 首");
   await app.press("role:button[私人 FM]");await app.waitFor("text:队列 4 首 · 私人 FM · 9");
+  expect(app.spanStyle("role:button[私人 FM] >> text:私人 FM").color).toBe(selectedRadioColor);
 });
 test("home source error retries without poisoning other pages",async()=>{
   const app=await open("../../../DiscoveryFailureFixture.tsx",options);

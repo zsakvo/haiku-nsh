@@ -3289,6 +3289,7 @@ dependencies = [
  "nsh-base",
  "nsh-core",
  "nsh-engine",
+ "nsh-platform-macos",
  "nsh-testing",
  "qrcode",
  "reqwest",

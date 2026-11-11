@@ -1449,14 +1449,20 @@ mod imp {
         scale: f64,
     ) {
         let (x, y) = (0.0, 0.0);
-        let base_attrs = styled_attrs(font, text_color(st), st.style.outline);
-        let hi_attrs = styled_attrs(font, highlight_color(st), st.style.outline);
+        let base_attrs = text_attrs(font, text_color(st));
+        let hi_attrs = text_attrs(font, highlight_color(st));
 
         let size = text_size(text, base_attrs);
         let tw = size.width;
         let th = size.height.ceil() + 2.0;
         st.current_height = th;
 
+        // Stroke every glyph first, then fill the complete line above it. This
+        // covers CJK overlap contours instead of stroking each filled glyph last.
+        if st.style.outline {
+            let stroke = new_text_layer(attr_string(text, styled_attrs(font)), tw, th, x, y, scale);
+            let _: () = msg_send![container, addSublayer: stroke];
+        }
         let base = new_text_layer(attr_string(text, base_attrs), tw, th, x, y, scale);
         apply_text_shadow(base, st.style.shadow);
         let _: () = msg_send![container, addSublayer: base];
@@ -1486,18 +1492,25 @@ mod imp {
         y: f64,
         scale: f64,
     ) -> id {
-        let attrs = styled_attrs(font, fg, outline);
+        let attrs = text_attrs(font, fg);
         let size = text_size(text, attrs);
+        let group: id = msg_send![class!(CALayer), layer];
+        let _: () = msg_send![group, setFrame: rect(x,y,size.width,size.height.ceil()+2.0)];
+        if outline {
+            let stroke = new_text_layer(attr_string(text,styled_attrs(font)),size.width,size.height.ceil()+2.0,0.,0.,scale);
+            let _: () = msg_send![group, addSublayer: stroke];
+        }
         let l = new_text_layer(
             attr_string(text, attrs),
             size.width,
             size.height.ceil() + 2.0,
-            x,
-            y,
+            0.0,
+            0.0,
             scale,
         );
-        apply_text_shadow(l, shadow);
-        l
+        let _: () = msg_send![group, addSublayer: l];
+        apply_text_shadow(group, shadow);
+        group
     }
 
     /// 文字可读性效果：在图层上叠加一层柔和黑色投影。投影由 Core Animation 按文字
@@ -1937,13 +1950,11 @@ mod imp {
         dict
     }
 
-    unsafe fn styled_attrs(font:id,fg:id,outline:bool)->id {
-        let attrs=text_attrs(font,fg);
-        if outline {
-            let stroke:id=msg_send![class!(NSNumber),numberWithDouble:-2.0f64];
+    unsafe fn styled_attrs(font:id)->id {
+        let attrs=text_attrs(font,color(0.,0.,0.,0.85));
+            let stroke:id=msg_send![class!(NSNumber),numberWithDouble:2.0f64];
             let _:()=msg_send![attrs,setObject:stroke forKey:NSStrokeWidthAttributeName];
             let _:()=msg_send![attrs,setObject:color(0.,0.,0.,0.85) forKey:NSStrokeColorAttributeName];
-        }
         attrs
     }
 

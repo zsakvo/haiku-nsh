@@ -31,17 +31,32 @@ test("persistent dock, commands through Core, retained navigation and local lyri
     expect(app.enabled("label:下一首")).toBe(false);
     await app.press("装载暂停队列");
     await app.waitFor("text:player:paused;track:Song Alpha");
+    expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#272522ff");
+    expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#716b64ff");
+    expect(app.spanStyle("id:seek-duration >> text:/^.+$/").color).toBe("#716b64ff");
+    await app.press("深色外观");
+    await app.waitUntil(() => app.spanStyle("id:dock-title >> text:/^.+$/").color === "#f2efebff");
+    expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#aaa298ff");
+    await app.press("浅色外观");
+    await app.waitUntil(() => app.spanStyle("id:dock-title >> text:/^.+$/").color === "#272522ff");
     await app.press("id:nav-search");
     await app.type("label:搜索词", "保留的播放页状态");
     await app.press("id:nav-library");
     await app.press("label:显示歌词");
     await app.waitFor("id:now-playing");
+    // Now Playing is a dark surface even while the application is in light mode.
+    expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#f9f7f4ff");
+    expect(app.spanStyle("id:dock-artist >> text:/^.+$/").color).toBe("#d6d1caff");
+    expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#d6d1caff");
+    expect(app.spanStyle("id:seek-duration >> text:/^.+$/").color).toBe("#d6d1caff");
     await app.waitFor("label:Alpha middle"); // lyrics load while paused, before any audio open
     expect(app.count("id:player-dock-1")).toBe(1);
     await app.press("label:Alpha middle");
     await app.waitFor("text:0:10");
     await app.keyboard.press("escape");
     await app.waitUntil(() => !app.shows("id:now-playing"));
+    expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#272522ff");
+    expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#716b64ff");
     await app.keyboard.press("mod+[");
     expect(app.value("label:搜索词")).toBe("保留的播放页状态");
     await app.keyboard.press("mod+]");

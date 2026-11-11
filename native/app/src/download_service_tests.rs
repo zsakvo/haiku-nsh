@@ -466,6 +466,26 @@ async fn auto_download_watches_additions_favorite_refresh_and_reopen() {
 }
 
 #[tokio::test]
+async fn auto_download_waits_for_settings_commit_and_collection_reload() {
+    use haiku_store::collections::Collections;
+    let (root, service, server) = fixture().await;
+    let collections = Collections::open(root.path()).unwrap();
+    let playlist = collections.create("提交唤醒").unwrap();
+    collections.add(&playlist, &[track("song", &server)]).unwrap();
+    service.watch_collections(collections.clone());
+    // A commit after registration must wake an idle watcher, without a collection edit.
+    service.settings.update(json!({"autoDownloadPlaylists":[playlist]})).unwrap();
+    wait(&service, |items| items.len()==1 && items[0].status=="completed").await;
+    collections.flush().unwrap();
+    let other = Collections::open(root.path()).unwrap();
+    other.add(&playlist, &[track("song2",&server)]).unwrap();
+    other.flush().unwrap();
+    collections.reload().unwrap();
+    wait(&service, |items| items.len()==2 && items.iter().all(|i|i.status=="completed")).await;
+    service.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn auto_download_follow_removal_preserves_manual_and_other_auto_membership() {
     use haiku_store::collections::Collections;
     let (root, service, server) = fixture().await;

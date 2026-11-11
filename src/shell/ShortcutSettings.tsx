@@ -26,7 +26,7 @@ export function ShortcutSettings(props: { core: Core; initialConflict?: string }
     if (busy()) return;
     busy.set(true);
     try { await action(); error.set(""); recording.set(null); }
-    catch (e) { error.set(String(e)); recording.set(null); }
+    catch (e) { error.set(e instanceof Error ? e.message : String(e).replace(/^Error:\s*/, "")); recording.set(null); }
     finally { busy.set(false); }
   }
   function record(chord: string) {

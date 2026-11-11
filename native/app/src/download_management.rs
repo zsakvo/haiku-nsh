@@ -125,7 +125,9 @@ impl Service {
     /// Watch committed local/favorite snapshots and relevant settings, including startup.
     pub fn watch_collections(self: &Arc<Self>, collections: Collections) {
         let weak = Arc::downgrade(self);
-        let events = collections.subscribe();
+        let mut events = collections.subscribe_changes();
+        let mut settings_events = self.settings.subscribe();
+        let mut service_events = self.subscribe();
         downloader::runtime().spawn(async move {
             let mut previous = None;
             loop {
@@ -139,8 +141,6 @@ impl Service {
                     settings.auto_download_playlists,
                     settings.download_follow_playlist_removal,
                 );
-                // Drain committed change notifications; compare only reconciliation inputs.
-                while events.try_recv().is_ok() {}
                 if previous.as_ref() != Some(&input) {
                     match service.reconcile_auto(&collections).await {
                         Ok(()) => previous = Some(input),
@@ -148,7 +148,11 @@ impl Service {
                     }
                 }
                 drop(service);
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                tokio::select! {
+                    changed=events.changed()=>if changed.is_err(){break},
+                    changed=settings_events.changed()=>if changed.is_err(){break},
+                    changed=service_events.changed()=>if changed.is_err(){break},
+                }
             }
         });
     }

@@ -37,6 +37,8 @@ function Probe(props: { core: Core; root: string; tracks: unknown[] }) {
   const cleaned = signal(false);
   return <View class="flex-row items-center gap-2">
     <Text>{`player:${state.player().status};track:${state.player().current?.title ?? ""}`}</Text>
+    <Button label="浅色外观" onPress={() => void props.core.settings.update({ themeMode: "light" })} />
+    <Button label="深色外观" onPress={() => void props.core.settings.update({ themeMode: "dark" })} />
     <Button label="装载暂停队列" onPress={() => void (async () => {
       await props.core.player.append(props.tracks);
       await props.core.player.pause();

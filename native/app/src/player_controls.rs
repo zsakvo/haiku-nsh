@@ -3,6 +3,9 @@ use nsh_base::{ButtonElement, button, theme};
 use nsh_core::{element::ImageSrc, prelude::*};
 
 pub(crate) fn icon(name: &str, primary: bool) -> impl IntoElement {
+    surface_icon(name, primary, false.into())
+}
+fn surface_icon(name: &str, primary: bool, dark: Prop<bool>) -> impl IntoElement {
     let markup = match name {
         "pause" => include_str!("../../../assets/icons/pause.svg"),
         "previous" => include_str!("../../../assets/icons/skip-prev.svg"),
@@ -21,6 +24,8 @@ pub(crate) fn icon(name: &str, primary: bool) -> impl IntoElement {
         .tint_color(move || {
             if primary {
                 theme().primary_foreground
+            } else if dark.get() {
+                theme().color("dock-on-dark-foreground").unwrap()
             } else {
                 theme().foreground
             }
@@ -30,6 +35,14 @@ pub(crate) fn control(
     label: &'static str,
     icon_name: &'static str,
     primary: bool,
+) -> ButtonElement {
+    surface_control(label, icon_name, primary, false.into())
+}
+pub(crate) fn surface_control(
+    label: &'static str,
+    icon_name: &'static str,
+    primary: bool,
+    dark: Prop<bool>,
 ) -> ButtonElement {
     button()
         .accessibility_label(label)
@@ -47,7 +60,7 @@ pub(crate) fn control(
         .hover(move |s| s.opacity(0.8))
         .active(|s| s.opacity(0.65))
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
-        .child(view().tooltip(hint(label)).child(icon(icon_name, primary)))
+        .child(view().tooltip(hint(label)).child(surface_icon(icon_name, primary, dark)))
 }
 pub(crate) fn hint(label: &'static str) -> AnyElement {
     nsh_base::tooltip()

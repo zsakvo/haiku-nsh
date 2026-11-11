@@ -212,6 +212,7 @@ pub struct SettingsStore {
     path: PathBuf,
     value: Mutex<Settings>,
     recovery: Option<String>,
+    changes: tokio::sync::watch::Sender<u64>,
 }
 impl SettingsStore {
     pub fn open(root: &Path) -> Result<Self, String> {
@@ -242,6 +243,7 @@ impl SettingsStore {
             path,
             value: Mutex::new(value),
             recovery,
+            changes: tokio::sync::watch::channel(0).0,
         })
     }
     /// Replace both maps without recursive merge retaining removed overrides.
@@ -257,7 +259,9 @@ impl SettingsStore {
             }
         }
         crate::json_file::write(&self.path, &next).map_err(|e|e.to_string())?;
-        *guard=next.clone(); Ok(next)
+        *guard=next.clone();
+        self.changes.send_modify(|revision| *revision += 1);
+        Ok(next)
     }
     pub fn recovery_warning(&self) -> Option<String> {
         self.recovery.clone()
@@ -265,11 +269,16 @@ impl SettingsStore {
     pub fn get(&self) -> Settings {
         self.value.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
+    /// Durable commits and reloads wake consumers without periodic settings reads.
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.changes.subscribe()
+    }
     /// Replace the in-memory snapshot after a backup restore, retaining service identity.
     pub fn reload(&self) -> Result<Settings, String> {
         let reopened = Self::open(self.path.parent().ok_or("Missing settings root")?)?;
         let next = reopened.get();
         *self.value.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
+        self.changes.send_modify(|revision| *revision += 1);
         Ok(next)
     }
     /// Merge against the latest committed value; publish only after atomic replacement succeeds.
@@ -285,6 +294,7 @@ impl SettingsStore {
         next.normalize();
         crate::json_file::write(&self.path, &next).map_err(|e| e.to_string())?;
         *guard = next.clone();
+        self.changes.send_modify(|revision| *revision += 1);
         Ok(next)
     }
 }

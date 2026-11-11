@@ -98,7 +98,7 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
   let session: string | null = null;
   const presentation = signal<Record<string, unknown>>({});
   const phone = signal(""), code = signal(""), cookie = signal(""), pageUrl = signal("");
-  const cooldown = signal(0), variant = signal(""), qrStatus = signal("");
+  const cooldown = signal(0), variant = signal(""), qrStatus = signal(""), qrExpired = signal(false);
   let closed = false, generation = 0;
   const descriptor = () => props.state.value().packages.find(p => p.id === plugin());
   const activeMethod = () => method() || descriptor()?.authMethods[0] || "";
@@ -135,6 +135,7 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
   async function startQr() {
     await cancel();
     const revision = generation;
+    qrExpired.set(false);
     qrStatus.set("正在生成二维码…");
     const start = await step("qrcode.start", variant() || Object.keys(descriptor()?.auth?.qrcode?.variants ?? {})[0] || "");
     if (!start || closed || revision !== generation) return;
@@ -147,7 +148,7 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
       const status = String(poll.result.status);
       qrStatus.set(status === "scanned" ? "已扫描，请在手机上确认"
         : status === "expired" ? "二维码已过期，请刷新" : "请使用手机扫码");
-      if (status === "expired") break;
+      if (status === "expired") { qrExpired.set(true); break; }
     }
   }
   let qrKey = "";
@@ -211,10 +212,12 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
         descriptor()?.auth?.qrcode?.variants ?? {}).map(([value, title]) => ({ value, title }))}
         onChange={value => variant.set(value)} />
       <If when={typeof presentation().image === "string"}>
-        <Image testID="login-qr-image" src={String(presentation().image)} class="size-48 self-center" />
+        <Image testID="login-qr-image" src={String(presentation().image)} class="size-48 self-center"
+          accessibilityLabel={qrExpired() ? "已过期的二维码" : "登录二维码"}
+          style={{ opacity: qrExpired() ? 0.25 : 1 }} />
       </If>
       <Text class="text-sm text-muted-foreground">{qrStatus()}</Text>
-      <Button label="生成或刷新二维码" onPress={() => void startQr()} />
+      <Button label={qrExpired() ? "刷新二维码" : "生成或刷新二维码"} onPress={() => void startQr()} />
     </If>
     <If when={!!props.state.error()}><Text class="text-sm text-destructive">{props.state.error()}</Text></If>
     <View class="flex-row justify-end gap-2">
@@ -293,7 +296,8 @@ export function PluginsSettings(props: { state: PluginsState }) {
 /** Recursive data inspector; branches can be collapsed without losing the result. */
 function JsonTree(props: { value: unknown; name?: string }) {
   const expanded = signal(true);
-  const entries = () => props.value && typeof props.value === "object" ? Object.entries(props.value) : null;
+  const entries = () => props.value && typeof props.value === "object" && Object.keys(props.value).length
+    ? Object.entries(props.value) : null;
   return <View class="gap-1 items-start">
     <If when={!!entries()}>
       <BaseButton accessibilityLabel={`${expanded() ? "收起" : "展开"}${props.name || "结果"}`}

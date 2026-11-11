@@ -198,7 +198,7 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
                         .text_xs()
                         .text_color(move || {
                             if props.now_playing.get() {
-                                theme().color("now-playing-muted").unwrap()
+                                theme().color("dock-on-dark-muted").unwrap()
                             } else {
                                 theme().muted_foreground
                             }
@@ -206,10 +206,11 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
                 )
                 .child(
                     text(move || time(props.duration.get()))
+                        .test_id("seek-duration")
                         .text_xs()
                         .text_color(move || {
                             if props.now_playing.get() {
-                                theme().color("now-playing-muted").unwrap()
+                                theme().color("dock-on-dark-muted").unwrap()
                             } else {
                                 theme().muted_foreground
                             }

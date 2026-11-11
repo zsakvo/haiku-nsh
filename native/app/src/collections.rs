@@ -563,7 +563,8 @@ impl CollectionsService {
     }
 }
 /// One native like control shared by Dock and now-playing; no JS mirror in the mutation path.
-pub(crate) fn like_button(dark: bool) -> impl IntoElement {
+pub(crate) fn like_button(dark: impl Into<Prop<bool>>) -> impl IntoElement {
+    let dark = dark.into();
     let p = crate::presentation::get().expect("Core.open");
     let track = p.track;
     let revision = p.bridge.collections_revision;
@@ -585,5 +586,5 @@ pub(crate) fn like_button(dark: bool) -> impl IntoElement {
             .child(image(move || nsh_core::element::ImageSrc::svg_markup(if liked.get() {
                 include_str!("../../../assets/icons/heart-filled.svg")
             } else { include_str!("../../../assets/icons/heart.svg") })).size_5()
-                .tint_color(move ||if liked.get(){nsh_base::theme().primary}else if dark{nsh_base::theme().color("now-playing-foreground").unwrap()}else{nsh_base::theme().foreground})))
+                .tint_color(move ||if liked.get(){nsh_base::theme().primary}else if dark.get(){nsh_base::theme().color("now-playing-foreground").unwrap()}else{nsh_base::theme().foreground})))
 }

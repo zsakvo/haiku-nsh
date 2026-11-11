@@ -194,7 +194,7 @@ pub fn validate(bindings: &[Binding]) -> Result<Vec<Binding>, String> {
         return Err("必须替换整组快捷键".into());
     }
     let mut ids = HashSet::new();
-    let mut chords = HashSet::new();
+    let mut chords = BTreeMap::new();
     let mut result = Vec::new();
     for b in bindings {
         if !expected.iter().any(|e| e.id == b.id && e.scope == b.scope)
@@ -236,8 +236,11 @@ pub fn validate(bindings: &[Binding]) -> Result<Vec<Binding>, String> {
         {
             return Err("快捷键冲突：此组合由系统或编辑菜单使用".into());
         }
-        if !chords.insert(b.chord.clone()) {
-            return Err("快捷键冲突：组合已被应用内或全局操作使用".into());
+        let action = |id: &str| ACTIONS.iter().find(|a| a.0 == id).map(|a| a.1).unwrap_or("显示主窗口");
+        if let Some((scope, id)) = chords.insert(b.chord.clone(), (b.scope.clone(), b.id.clone())) {
+            return Err(format!("快捷键冲突：{}「{}」与{}「{}」使用了相同组合",
+                if scope=="global" {"全局"} else {"应用内"}, action(&id),
+                if b.scope=="global" {"全局"} else {"应用内"}, action(&b.id)));
         }
         result.push(b);
     }

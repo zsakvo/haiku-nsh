@@ -42,6 +42,12 @@ pub use player_dock::PlayerDock;
 pub use seek_bar::SeekBar;
 pub use track_list::TrackList;
 
+/// Platform leaves are registered before the NSH surface is loaded.
+#[native_components(macos)]
+fn native_views(components: &nsh_platform_macos::Components) {
+    haiku_macos::glass::register(components);
+}
+
 /// The native API imported by the TSX entry.
 #[native_module("haiku/native")]
 fn native(registry: &mut Registry) {

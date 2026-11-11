@@ -9,6 +9,8 @@ test("record shortcut, report conflicts, restore one and all defaults", async()=
   await app.keyboard.press("cmd+k");
   await app.waitFor("id:shortcut-error");
   expect(app.texts().some(t=>t.includes("快捷键冲突"))).toBe(true);
+  expect(app.texts().some(t=>t.includes("命令面板") && t.includes("播放 / 暂停"))).toBe(true);
+  expect(app.texts().some(t=>t.startsWith("Error:"))).toBe(false);
   await app.press("id:shortcut-reset-app-togglePlayback");
   await app.waitFor("id:shortcut-edit-app-togglePlayback >> text:Space");
   await app.press("id:shortcut-edit-app-togglePlayback");

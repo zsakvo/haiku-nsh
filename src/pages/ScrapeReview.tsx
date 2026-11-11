@@ -4,6 +4,7 @@ import { mirrorScrape, type ScrapeCandidate } from "../state/scrape";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/LibraryControls";
 import { Dialog } from "../ui/Surfaces";
+import { createPlugins } from "../state/plugins";
 
 const labels: Record<string, string> = {
   pending: "等待中", searching: "查找中", applied: "已采用", review: "待审阅",
@@ -12,6 +13,11 @@ const labels: Record<string, string> = {
 /** One review selection, a virtual job list and candidate field comparisons. */
 export function ScrapeReview(props: { core: Core; open: boolean; onClose: () => void }) {
   const snapshot = mirrorScrape(props.core);
+  const plugins = createPlugins();
+  const providerName = (id: string) => plugins.value().sources.find(s => s.sourceId === id)?.displayName
+    || plugins.value().packages.find(p => p.id === id)?.name
+    || plugins.value().packages.find(p => p.id === plugins.value().sources.find(s => s.sourceId === id)?.pluginId)?.name
+    || "未知来源";
   const selected = signal(""), index = signal(0), keyword = signal("");
   const error = signal(""), busy = signal(false);
   const item = () => snapshot().items.find(i => i.track.id === selected())
@@ -25,7 +31,7 @@ export function ScrapeReview(props: { core: Core; open: boolean; onClose: () => 
       ["标题", t?.title, c.title], ["艺术家", artistNames(t?.artists), c.artists.join(" / ")],
       ["专辑", t?.album?.title, c.album], ["年份", t?.extra?.year, c.year],
       ["曲号", t?.extra?.track_no, c.trackNo], ["封面", t?.cover, c.cover],
-    ].filter(([, old, next]) => next != null && next !== old);
+    ].filter(([, old, next]) => next != null && String(next).trim() !== "" && next !== old);
   }
   async function act(work: () => Promise<unknown>) {
     busy.set(true); error.set("");
@@ -50,6 +56,7 @@ export function ScrapeReview(props: { core: Core; open: boolean; onClose: () => 
       <List testID="scrape-review-items" each={snapshot().items} keyExtractor={i => i.track.id}
         estimatedItemSize={68} class="w-56 shrink-0 min-h-0">
         {entry => <Button label={`${entry().track.title} · ${labels[entry().status] ?? entry().status}${entry().automatic ? " · 自动" : ""}`}
+          class="items-start justify-start"
           variant={item()?.track.id === entry().track.id ? "secondary" : "ghost"}
           onPress={() => { selected.set(entry().track.id); index.set(0); keyword.set(entry().track.title); }} />}
       </List>
@@ -60,9 +67,9 @@ export function ScrapeReview(props: { core: Core; open: boolean; onClose: () => 
           <Button label="重新匹配" size="sm" disabled={!item() || snapshot().running || !keyword().trim() || busy()}
             onPress={() => void act(() => props.core.scrape.retry(item()!.track.id, keyword()))} />
         </View>
-        <List each={item()?.candidates ?? []} keyExtractor={c => `${c.providerId}:${c.id}`}
+        <List testID="scrape-candidates" each={item()?.candidates ?? []} keyExtractor={c => `${c.providerId}:${c.id}`}
           estimatedItemSize={44} class="h-24 shrink-0">
-          {c => <Button label={`${c().title} · ${Math.round(c().score * 100)} 分 · ${c().providerId}`}
+          {c => <Button class="items-start justify-start" label={`${c().title} · ${Math.round(c().score * 100)} 分 · ${providerName(c().providerId)}`}
             variant={candidate()?.id === c().id ? "secondary" : "ghost"}
             onPress={() => index.set(item()!.candidates.findIndex(value =>
               value.id === c().id && value.providerId === c().providerId))} />}

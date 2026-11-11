@@ -36,6 +36,13 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-11 更新：M6-04 已验收并提交
+
+- `GlassSurface`：`#[native_components(macos)]` 的 NSVisualEffectView 作 PlayerDock 背景，外观显式跟随应用主题（Now Playing 用 Dark Aqua），文字/时间用语义色；Headless 与其他平台回退 NSH 半透明表面。新增依赖 `nsh-platform-macos =0.4.0`。
+- UI 小项 1–9 全部完成（含快捷键冲突提示、中文描边先描后填、下载监听去轮询）。审阅返工一次：初版玻璃在深色页呈浅灰、时间不可读。审阅者复跑 workspace 304 通过，nsh test 75/75。
+- KaraokeLayer 暂不实现，保留为优化点（见 MACOS.md §5）。未处理：albumProgress、`animated_value` host 推进（留 M6-06 审计）。
+- 下一步 M6-05 打包。
+
 ## 2026-11-11 更新：M6-03 已验收并提交
 
 - 桌面歌词：复用迁入的 NSPanel 实现，按 M6-02 模式接线（`native/app/src/{desktop_lyrics,platform/desktop_lyrics}.rs`）；几何/位置限制在 `haiku-macos/src/desktop_lyrics/`；设置 `desktopLyrics` 兼容参考版（新增可选 shadow）；快捷键与菜单栏中的桌面歌词项已接通。workspace 303 通过；审阅者复跑完整 nsh test 时仅已知偶发 Search Escape 失败（单跑通过）；Codex 一轮中两个 Core 启动 5s 超时为满载偶发（单跑与复跑均通过）。
