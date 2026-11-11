@@ -34,10 +34,10 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
-## 2026-11-11 更新：M5-03 第一部分（账号服务、统计上传）已验收并提交
+## 2026-11-11 更新：M5-03 已验收并提交（第一部分账号服务与统计上传，第二部分账户设置界面，nsh test 62/62）
 
 - `haiku-services::{account,stats_upload}` 与 `core.account`（snapshot/sendCode/login/logout/refresh/subscription/plans/setServer/onChange）；令牌存 Keychain（新增 macOS 依赖 `security-framework` 3.7.0），测试用内存凭据与 loopback 假服务端。workspace 282 通过/1 忽略，nsh test 61/61。
-- 未完成：§3 设置“账户”界面、账户 Headless、两张截图。待人工确认：真实服务端、Keychain 授权、重启恢复。
+- 待人工确认：真实服务端、Keychain 授权、重启恢复。
 
 ## 2026-11-11 更新：M5-02 已验收并提交
 

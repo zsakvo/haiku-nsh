@@ -373,7 +373,7 @@ impl Core {
             let service = blocking(move || haiku_services::account::Service::open(&root, credentials))
                 .await.map_err(|e| JsError::Error(e.to_string()))?
                 .map_err(|e| JsError::Error(e.to_string()))?;
-            crate::account::AccountService::new(service, bridge.stats.clone())
+            crate::account::AccountService::new(service, bridge.stats.clone(), bridge._root._temporary.is_some())
         };
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());

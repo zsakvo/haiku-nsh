@@ -24,6 +24,8 @@ fn error(e: haiku_services::account::AccountError) -> JsError {
 /// Haiku account and informational subscription; membership never gates app features.
 #[class]
 pub struct AccountService {
+    isolated: bool,
+    fixture: Option<Arc<crate::account_fixture::Server>>,
     service: Arc<Service>,
     uploader: Arc<haiku_services::stats_upload::Service>,
     listeners: Listeners,
@@ -32,7 +34,11 @@ pub struct AccountService {
     _exit: crate::exit::ExitGuard,
 }
 impl AccountService {
-    pub(crate) fn new(service: Arc<Service>, stats: haiku_store::stats::Stats) -> Instance<Self> {
+    pub(crate) fn new(
+        service: Arc<Service>,
+        stats: haiku_store::stats::Stats,
+        isolated: bool,
+    ) -> Instance<Self> {
         let uploader = haiku_services::stats_upload::Service::start(service.clone(), stats);
         let listeners = Listeners::default();
         let callbacks = listeners.clone();
@@ -81,6 +87,8 @@ impl AccountService {
             Ok(())
         });
         Instance::new(Self {
+            isolated,
+            fixture: None,
             service,
             uploader,
             listeners,
@@ -101,6 +109,26 @@ impl Drop for AccountService {
 }
 #[class]
 impl AccountService {
+    /// Start a loopback account server for an explicitly temporary Core; never use system credentials.
+    pub async fn start_fixture(this: Instance<Self>) -> Result<String, JsError> {
+        let (isolated, service) = this.with(|s| (s.isolated, s.service.clone()));
+        if !isolated {
+            return Err(JsError::Error("账户夹具仅限隔离 Core".into()));
+        }
+        let server = blocking(move || {
+            let server = Arc::new(crate::account_fixture::Server::start()?);
+            service
+                .set_server(server.url.clone())
+                .map_err(|e| e.to_string())?;
+            Ok::<_, String>(server)
+        })
+        .await
+        .map_err(|e| JsError::Error(e.to_string()))?
+        .map_err(JsError::Error)?;
+        let url = server.url.clone();
+        this.with_mut(|s| s.fixture = Some(server));
+        Ok(url)
+    }
     /// Cached user/subscription, sign-in state, server and email cooldown deadlines; no tokens.
     pub fn snapshot(&self) -> JsonValue {
         let mut value = serde_json::to_value(self.service.snapshot()).unwrap();

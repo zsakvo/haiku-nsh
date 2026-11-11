@@ -30,9 +30,9 @@
 | F09 桌面集成 | 部分实现（媒体中心接线） | `native/app/src/platform/media.rs`、`haiku-macos::{system,lifecycle}` | M1-05：真实标题/封面及 playback_state 1→2 快照；媒体回调通过 channel 进入 Controller；防息屏与退出清理已接线 | 媒体键/控制中心、关闭隐藏续播、Dock 恢复、Cmd+Q 与防息屏待人工确认；M6 功能未覆盖 |
 | F10 本地曲库与刮削 | 曲库、刮削任务与审阅界面已实现（M4-05 已验收） | `haiku-library/src/service.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview}.tsx` | 4并发/8秒、三档verdict、取消、稀疏填补/覆盖、撤销冲突保护、持久化审阅与参考格式转换；新增Headless通过；workspace260通过/1忽略、完整nsh test43/43；收尾补充Rust定向各4/4，见M4-05 | 真实刮削上游、写回文件标签实机流程待人工；参考版高级查询清洗、专辑艺术家/碟号与刮削封面本地缓存仍未补齐 |
 | F11 喜欢、歌单与远端收藏 | 本地收藏、远端镜像刷新已实现（M4-05 已验收） | `haiku-store::collections`、`native/app/src/{collections,plugins,favorite_refresh}.rs`、`src/pages/{CollectionPage,SourceDetailPage}.tsx` | 离线快照优先、完整分页原子换版、单飞/取消/迟到丢弃、取消收藏确认；Rust4/4、Headless刷新/离线/取消确认通过；浅色截图齐全 | 真实来源刷新与取消收藏、媒体命令实机交互仍待人工确认 |
-| F12 历史与听歌统计 | 部分实现（本地与远程服务） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；eventId、watermark、远程去重、分页事务、退避与登出隔离通过 | 账户/同步状态界面未做；真实服务端与长时累计待人工确认；详见 M5-03 |
+| F12 历史与听歌统计 | 部分实现（本地与远程同步） | `haiku-store::{history,stats}`、`haiku-services::stats_upload`、`native/app/src/activity.rs`、`src/shell/AccountSettings.tsx`、`src/pages/{HistoryPage,StatsPage}.tsx` | M5-03：上传 loopback 5/5；workspace 282 通过/1 忽略；本轮账户 Headless 1/1、完整 nsh test 62/62，设置已展示同步时间/错误/重试状态 | 真实服务端与长时累计待人工确认；详见 M5-03 |
 | F13 下载与媒体缓存 | 已实现（M5-01/M5-02 已验收） | `native/app/src/{download_service,download_management,downloads}.rs`、`src/ui/AutoDownloadControls.tsx`、`src/shell/DownloadSettings.tsx` | 自动下载Rust3/3、目录迁移Rust3/3；workspace273通过/1忽略，check/build通过；Headless新增2/2，审阅者复跑完整61/61 | 两张浅色截图已检查；Search Escape为既有偶发；真实跨卷/权限/系统选择器待人工确认；详见M5-02 |
-| F14 Haiku 账号 | 部分实现（Rust + core.account） | `haiku-services::account`、`native/app/src/account.rs` | M5-03：账号 loopback 4/4，workspace 282 通过/1 忽略，nsh check/build 通过 | 设置账户界面、专项 Headless 与截图未做；真实服务端与 Keychain 实机待确认 |
+| F14 Haiku 账号 | 已实现（M5-03 界面待审阅） | `haiku-services::account`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | Rust 第一部分已验收；本轮 check/build 通过、账户 Headless 1/1、完整 nsh test 62/62；两张浅色截图已检查 | 真实服务端与 Keychain 实机待确认 |
 | F15 同步与备份 | 未实现 | | | |
 | F16 设置、通知与日志 | 部分实现（外观/播放/存储、日志与通知） | `haiku-store::{settings,logs}`、`native/app/src/{settings,activity}.rs`、`src/shell/{Settings,Diagnostics}.tsx` | M1-05 设置测试沿用；M3-02 日志轮转/限额/脱敏/过滤、Headless 清空确认与通知清除通过；设置损坏备份接入日志和通知；日志/通知浅色截图通过 | 其他设置分组待后续；系统保存选择器与剪贴板结果待人工确认；应用许可证待确定 |
 
@@ -868,3 +868,24 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 未覆盖：真实服务器契约、Keychain 授权/重启恢复实机、120 秒周期的实时时钟等待；已覆盖调度防抖、退避边界、登出停止与账号切换。
 - 无新增待决架构事项；真实服务端与 Keychain 实机由人工确认，后续继续 §3 与截图。
 - 审阅者：§1–§2 已验收（workspace 最新 282 通过/1 忽略，nsh test 61/61；新增依赖 security-framework 3.7.0 仅 macOS，用于规格要求的 Keychain，认可）。§3 界面与截图转第二部分。
+
+## 2026-11-11 M5-03 第二部分：账户设置界面（待审阅）
+
+- 仅在主仓库修改，未提交 git；本轮完成 §3、账户专项 Headless 与两张浅色实机截图。
+- 新增 src/shell/AccountSettings.tsx，设置“账户”替换占位；复用 Field/Button/Dialog 和语义主题 token。
+- 未登录：邮箱、验证码发送/60 秒倒计时、验证码、登录、服务地址草稿/保存；首次登录自动注册提示及错误反馈。
+- 已登录：用户/邮箱、普通账户或有效/永久会员、到期日、套餐价格/时长、“购买即将开放”禁用按钮、刷新账户、登出确认。
+- 统计区展示未登录/同步中/最近同步时间/失败详情与下次重试时间；会员不限制功能。
+- 账户状态通过 core.account.snapshot/onChange 镜像；仅表单/确认/忙碌状态归 TSX；Stop、倒计时定时器及迟到套餐结果随组件释放。
+- 套餐在登录后读取，异步结果按组件/会话代次丢弃；本轮未修改账号刷新、统计调度或持久化格式，无新增依赖。
+- 新增 native/app/src/account_fixture.rs 和 core.account.startFixture，仅允许 Core.openIsolated；真实凭据后端不可调用。
+- AccountPreview/AccountSignedInPreview 使用独立临时根、内存凭据、127.0.0.1 假服务端；未访问真实账号 API。
+- Headless 覆盖：发送验证码→倒计时递减→错误验证码→登录→用户/会员/套餐/同步时间→取消登出→确认登出→回到登录表单。
+- 初次 check 发现误用 app.key，改用已有 Input clear；专项首轮固定等待受秒刻度相位影响，改为等待倒计时实际递减；第二轮修正 Input 不可 press 的测试用法，未修改业务断言或加长超时。
+- 最终专项 1/1：nsh-test-account-ui-repair2.log；check 修正后通过：nsh-check-ui-repair1.log；build 一次通过：nsh-build-ui.log。
+- 完整 nsh test 一次 62/62：nsh-test-ui-full.log，包含新增账户流程及 Player/Search 回归；未重复已验收的 workspace。
+- 浅色截图已查看：account-signed-out.png、account-signed-in.png；nsh run 日志为 run-account-signed-{out,in}.log，预览均已关闭。
+- nsh test/截图前均确认 IOConsoleLocked=No；锁屏与窗口查询记录在 screen-unlocked-ui*.log、capture-windows-signed-*.log。
+- 证据均在 .artifacts/m5-03/；仅既有 target-dir/block/__eh_frame 提示，下载音频 fixture 沿有 lofty PADDING 提示。
+- STATUS F12/F14 已更新；无本轮未完成项或新增待决事项。真实服务端发送邮件/登录、Keychain 授权与重启恢复仍待人工确认；未专项测服务地址表单保存、同步失败画面或深色实机截图。
+- 审阅者：§3 已验收（完整 nsh test 62/62，两张截图已审阅）；account_fixture 沿用 network_fixture 模式，仅隔离 Core 使用。
