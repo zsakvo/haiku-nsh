@@ -19,4 +19,6 @@ test("backup export warning, inspect, cancel and confirmed hot restore", async (
   await app.press("label:关闭设置");
   await app.waitFor("text:备份中的歌单");
   expect(app.shows("text:恢复前的歌单")).toBe(false);
+  await app.keyboard.press("cmd+shift+,");
+  await app.waitFor("id:settings-heading");
 });

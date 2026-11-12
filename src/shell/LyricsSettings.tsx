@@ -57,6 +57,8 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
   return <View testID="lyrics-settings" class="gap-4">
     <Text role="header" class="text-lg font-semibold text-foreground">歌词</Text>
     <If when={platform.os === "macos"}><View class="gap-3">
+      <SettingSwitch label="在媒体中心显示当前歌词" checked={settings().notificationLyrics}
+        onChange={notificationLyrics => void props.settings.update({ notificationLyrics })} />
       <SettingSwitch label="菜单栏歌词" checked={settings().menubarLyricsVisible}
         onChange={menubarLyricsVisible => void props.settings.update({ menubarLyricsVisible })} />
       <SettingSelect label="菜单栏逐字高亮" value={settings().menubarLyricHighlight === "system" ? "system" : "custom"}

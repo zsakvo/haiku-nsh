@@ -258,12 +258,12 @@
 | 编号 | 规模 | 涉及 F | 缺口、建议与完成判据 |
 |---|---|---|---|
 | G01 | 小（搬回已有证据）；若遗失则中/大 | F01/F08/F09/F16 | 本机缺 M0、M1-01/02、M4-01/02、M6-01～05 原始证据/最终 app。**如实标注**历史已审阅；优先取回旧证据。以后单独派当前基线/最终包验收，不在审计中重跑。 |
-| G02 | 小 | F07/F16 | EQ 全参数重置、自定义预设覆盖及删除确认。**补齐**管理入口，保留 enable/自定义预设语义并验证 DSP 设置一致。 |
-| G03 | 小（视图持久化）；曲目排序中 | F11/F16 | playlistsViewMode 未持久化/恢复，歌单内缺可选曲目排序。**补齐**设置消费者与入口；不改 CRDT 手工顺序语义。 |
-| G04 | 小 | F09/F16 | 可选“媒体中心当前歌词”无设置/投影。**补齐**且关闭时不写该字段。 |
+| G02 | 已补（M6-06b） | F07/F16 | PlaybackSettings 增加全参数重置、覆盖当前自定义预设、删除确认；保留 enabled/customPresets，删除保留曲线。`SmallGaps.test.tsx` 断言重置全部参数与 DSP 一致、覆盖及确认/取消；证据 `.artifacts/m6-06b/nsh-test-serial.log`（80/80）、`effects-light.png`。 |
+| G03 | 已补（M6-06b） | F11/F16 | playlistsViewMode 持久化并订阅恢复；歌单详情提供手工/最新/最早/曲名排序，Rust 只排序读快照，播放消费相同查询。Settings/Collections Rust 回归验证重开、时间排序/稳定同值及 CRDT 原序不变；Headless 验证切换后 Core 重开。证据 `.artifacts/m6-06b/cargo-test.log`、`nsh-test-serial.log`、`playlists-grid-light.png`。 |
+| G04 | 已补（M6-06b） | F09/F16 | 沿用参考字段 notificationLyrics（按任务默认关），开启后随现有歌词行 signal 投影到可选 media lyrics，原生按参考替换标题，无轮询；关闭时序列化省略字段。Rust 回归覆盖行边界与关闭无字段；证据 `.artifacts/m6-06b/cargo-test.log`。真实系统媒体中心待人工。 |
 | G05 | 小（工具链修复是否成立待核） | F09/F16 | 最终打包 strip 缺 libLLVM.dylib 警告（H）。**如实标注**，后续定位既有工具链配置；不能据成功产包称无警告。 |
 | G06 | 中 | F08/F16 | 独立 UI/普通歌词系统字体选择与运行消费者。**补齐** D8 保留范围；桌面歌词 NSFontPanel 不替代这两项。 |
-| G07 | 中 | F09/F15/F16 | 备份热恢复只刷新设置，不重注册全局/应用快捷键或通知快捷键订阅。**补齐**恢复接线/冲突回滚，验证恢复后立即生效；当前需重启。 |
+| G07 | 已补（M6-06b） | F09/F15/F16 | 备份 after_restore 重新注册整组快捷键，完成后刷新 Settings/Shortcuts 订阅；注册失败沿用整组回滚并恢复快捷键设置、反馈错误。真实归档＋记录后端回归断言新绑定已注册和拒绝回滚，Backup Headless 验证恢复后新应用快捷键立即打开设置。证据 `.artifacts/m6-06b/cargo-test.log`、`nsh-test-serial.log`；真实全局按键待人工。 |
 | G08 | 中 | F01/F06/F16 | 睡眠完整 UI、Stop/静音、队列清空/重排/当前项定位。**补齐**桌面入口，复用现有 Controller 命令，不另造队列。 |
 | G09 | 中 | F06/F16 | 自动错误跳曲、gapless开关未消费；audioQuality 无播放选择入口。**补齐**设置到实际播放/预载行为，验证关闭后行为不同。 |
 | G10 | 中 | F08/F16 | 普通歌词翻译开关；Paxsenix 评分/令牌重取/content兜底、Kugou署名裁剪。**补齐**参考语义及失败 fixture；纯音乐已有文本映射，需补显示证据，不先判未实现。 |

@@ -15,6 +15,7 @@ export interface DesktopLyricsSettings {
 export interface SettingsSnapshot {
   desktopLyrics: DesktopLyricsSettings;
   menubarLyricsVisible: boolean; menubarLyricHighlight: string;
+  notificationLyrics: boolean; playlistsViewMode: "grid" | "list";
   downloadDir: string; downloadQuality: string; downloadNaming: string; downloadLayout: string;
   downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
   downloadLyricsMode: string; downloadLyricsTranslation: boolean; downloadReuseMediaCache: boolean;

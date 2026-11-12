@@ -226,9 +226,19 @@ impl Collections {
     }
     /// SDK tracks; likes are ordered by addition time, newest first, with stable ties.
     pub fn tracks(&self, id: &str) -> Vec<Track> {
+        self.sorted_tracks(id, if id == LIKED_PLAYLIST_ID { "newest" } else { "manual" })
+    }
+    /// Sort a read snapshot only; CRDT order and addition timestamps stay intact.
+    pub fn sorted_tracks(&self, id: &str, sort: &str) -> Vec<Track> {
         let mut entries = self.0.state.lock().unwrap().core.playlist_tracks(id);
-        if id == LIKED_PLAYLIST_ID {
-            entries.sort_by_key(|t| std::cmp::Reverse(t.added_at));
+        match sort {
+            "newest" => entries.sort_by_key(|t| std::cmp::Reverse(t.added_at)),
+            "oldest" => entries.sort_by_key(|t| t.added_at),
+            "title" => entries.sort_by(|a, b| {
+                a.sdk_track.as_ref().map_or(a.title.as_str(), |t| t.title.as_str())
+                    .cmp(b.sdk_track.as_ref().map_or(b.title.as_str(), |t| t.title.as_str()))
+            }),
+            _ => {}
         }
         entries.into_iter().map(from_entry).collect()
     }
@@ -509,6 +519,31 @@ fn from_entry(t: TrackEntry) -> Track {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn display_sort_preserves_manual_crdt_order_and_timestamp_ties() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Collections::open(dir.path()).unwrap();
+        let id = store.create("Sort").unwrap();
+        {
+            let state = store.0.state.lock().unwrap();
+            for (name, at) in [("C", 20), ("A", 10), ("B", 20)] {
+                let mut entry = to_entry(&Track::local(name));
+                entry.title = name.into();
+                entry.added_at = at;
+                entry.sdk_track.as_mut().unwrap().title = name.into();
+                state.core.add_track(&id, &entry);
+            }
+        }
+        let names = |sort| store.sorted_tracks(&id, sort).into_iter().map(|t| t.title).collect::<Vec<_>>();
+        assert_eq!(names("manual"), ["C", "A", "B"]);
+        assert_eq!(names("newest"), ["C", "B", "A"]);
+        assert_eq!(names("oldest"), ["A", "C", "B"]);
+        assert_eq!(names("title"), ["A", "B", "C"]);
+        assert_eq!(names("manual"), ["C", "A", "B"]);
+        store.flush().unwrap();
+        let reopened = Collections::open(dir.path()).unwrap();
+        assert_eq!(reopened.tracks(&id).iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), ["C", "A", "B"]);
+    }
     #[test]
     fn debounce_flush_restart_identity_crud_and_events() {
         let dir = tempfile::tempdir().unwrap();

@@ -403,17 +403,21 @@ impl Core {
             )).await.map_err(|e| JsError::Error(e.to_string()))?.map_err(JsError::Error)?;
             crate::sync::SyncService::new(service, isolated)
         };
+        let native_shortcuts=bridge._root._temporary.is_none();
+        let shortcut_registration = crate::shortcuts::Registration::new(
+            settings.clone(), Arc::new(haiku_macos::shortcuts::SystemShortcuts { native: native_shortcuts }),
+        );
         let backup_runtime = crate::backup::Runtime {
             root: bridge._root.path.clone(), secrets: bridge._root.sync_secrets.clone(),
             controller: bridge.controller.clone(), host: plugins.clone(), settings: settings.clone(),
             collections: bridge.collections.clone(), history: bridge.history.clone(), stats: bridge.stats.clone(),
             sync: sync.with(|s| s.authority()), downloads: downloads.clone(),
+            shortcuts: shortcut_registration.clone(),
         };
         let shortcut_store=settings.clone();
-        let native_shortcuts=bridge._root._temporary.is_none();
         let settings = crate::settings::SettingsService::new(settings, bridge.clone(), downloads.clone());
         bridge.owner.run(|| crate::platform::initialize_media(bridge.clone(), settings.clone(), native_shortcuts));
-        let shortcuts=crate::shortcuts::ShortcutsService::new(shortcut_store,settings.clone(),bridge.clone(),native_shortcuts);
+        let shortcuts=crate::shortcuts::ShortcutsService::new(shortcut_store,settings.clone(),bridge.clone(),shortcut_registration);
         let downloads = crate::downloads::DownloadService::new(downloads, settings.clone());
         let collections =
             crate::collections::CollectionsService::new(bridge.clone(), library.clone());
@@ -426,7 +430,7 @@ impl Core {
         let plugins = crate::plugins::PluginService::new(
             plugins, plugin_logs, bridge.collections.clone(), bridge._root.path.join("cache/home"),
         );
-        let backup = crate::backup::BackupService::new(backup_runtime, settings.clone(), plugins.clone());
+        let backup = crate::backup::BackupService::new(backup_runtime, settings.clone(), plugins.clone(), shortcuts.clone());
         let core = Instance::new(Self {
             shortcuts,
             backup,

@@ -52,6 +52,8 @@ pub struct Settings {
     pub desktop_lyrics: crate::desktop_lyrics::DesktopLyrics,
     pub menubar_lyrics_visible: bool,
     pub menubar_lyric_highlight: String,
+    pub notification_lyrics: bool,
+    pub playlists_view_mode: String,
     pub shortcuts: BTreeMap<String, String>,
     pub global_shortcuts: BTreeMap<String, String>,
     pub schema_version: u32,
@@ -87,6 +89,8 @@ impl Default for Settings {
             desktop_lyrics: Default::default(),
             menubar_lyrics_visible: true,
             menubar_lyric_highlight: "system".into(),
+            notification_lyrics: false,
+            playlists_view_mode: "grid".into(),
             shortcuts: BTreeMap::new(),
             global_shortcuts: BTreeMap::new(),
             schema_version: 1,
@@ -126,6 +130,9 @@ fn clamp(v: f32, min: f32, max: f32, fallback: f32) -> f32 {
 }
 impl Settings {
     pub fn normalize(&mut self) {
+        if !["grid", "list"].contains(&self.playlists_view_mode.as_str()) {
+            self.playlists_view_mode = "grid".into();
+        }
         self.desktop_lyrics.normalize();
         if self.menubar_lyric_highlight != "system" && !(self.menubar_lyric_highlight.len() == 7
             && self.menubar_lyric_highlight.starts_with('#')
@@ -302,6 +309,17 @@ impl SettingsStore {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn playlist_view_and_notification_lyrics_defaults_persist() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SettingsStore::open(dir.path()).unwrap();
+        assert_eq!(store.get().playlists_view_mode, "grid");
+        assert!(!store.get().notification_lyrics);
+        store.update(json!({"playlistsViewMode":"list","notificationLyrics":true})).unwrap();
+        let restored = SettingsStore::open(dir.path()).unwrap().get();
+        assert_eq!(restored.playlists_view_mode, "list");
+        assert!(restored.notification_lyrics);
+    }
     #[test]
     fn menubar_reference_settings_roundtrip() {
         let root = tempfile::tempdir().unwrap();

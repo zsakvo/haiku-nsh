@@ -17,6 +17,7 @@ pub(crate) struct Runtime {
     pub stats: haiku_store::stats::Stats,
     pub sync: Arc<haiku_services::sync::Service>,
     pub downloads: Arc<crate::download_service::Service>,
+    pub shortcuts: Arc<crate::shortcuts::Registration>,
 }
 impl Hooks for Runtime {
     fn flush(&self) -> BoxFuture<'_, Result<(), String>> {
@@ -53,6 +54,10 @@ impl Hooks for Runtime {
             if let Err(e) = self.settings.reload() {
                 errors.push(e);
             }
+            let _guard = self.shortcuts.serial.lock().await;
+            if let Err(e) = self.shortcuts.reload() {
+                errors.push(e);
+            }
             if let Err(e) = self.collections.reload() {
                 errors.push(e);
             }
@@ -80,12 +85,14 @@ pub struct BackupService {
     service: Arc<Service>,
     settings: Instance<crate::settings::SettingsService>,
     plugins: Instance<crate::plugins::PluginService>,
+    shortcuts: Instance<crate::shortcuts::ShortcutsService>,
 }
 impl BackupService {
     pub(crate) fn new(
         runtime: Runtime,
         settings: Instance<crate::settings::SettingsService>,
         plugins: Instance<crate::plugins::PluginService>,
+        shortcuts: Instance<crate::shortcuts::ShortcutsService>,
     ) -> Instance<Self> {
         let service = Arc::new(Service::new(
             runtime.root.clone(),
@@ -96,6 +103,7 @@ impl BackupService {
             service,
             settings,
             plugins,
+            shortcuts,
         })
     }
 }
@@ -134,8 +142,9 @@ impl BackupService {
         let result = background(async move { service.import(&PathBuf::from(path)).await })
             .await
             .map_err(|e| e.to_string())?;
-        let (settings, plugins) = this.with(|s| (s.settings.clone(), s.plugins.clone()));
+        let (settings, plugins, shortcuts) = this.with(|s| (s.settings.clone(), s.plugins.clone(), s.shortcuts.clone()));
         let refreshed = crate::settings::SettingsService::refresh(settings).await;
+        crate::shortcuts::ShortcutsService::refresh(&shortcuts);
         let sources = crate::plugins::PluginService::changed(&plugins).await;
         let report = result?;
         refreshed?;

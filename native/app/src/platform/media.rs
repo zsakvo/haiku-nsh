@@ -206,7 +206,9 @@ pub(super) fn initialize(
     let controller = bridge.controller.clone();
     let last = stored(None);
     let info_updates = updates.clone();
-    let artwork_path = crate::presentation::get().unwrap().artwork_path;
+    let presentation = crate::presentation::get().unwrap();
+    let artwork_path = presentation.artwork_path;
+    let media_settings = bridge.settings;
     effect(move || {
         if !ready.get() {
             return;
@@ -218,6 +220,11 @@ pub(super) fn initialize(
             .as_ref()
             .is_some_and(|t| collections.is_liked(&t.entity_ref()));
         let artwork = artwork_path.get();
+        let lyrics = if media_settings.get().notification_lyrics {
+            current_lyric(true, &presentation.lyrics.get(), presentation.line.get())
+        } else {
+            None
+        };
         let key = (
             s.current.clone(),
             s.status,
@@ -227,6 +234,7 @@ pub(super) fn initialize(
             s.mode,
             favorite,
             artwork.clone(),
+            lyrics.clone(),
         );
         if last.with(|old| old.as_ref() == Some(&key)) {
             return;
@@ -234,6 +242,7 @@ pub(super) fn initialize(
         last.replace(Some(key));
         let info = s.current.map(|track| haiku_macos::system::MediaInfo {
             title: track.title,
+            lyrics,
             artist: track
                 .artists
                 .iter()
@@ -272,6 +281,37 @@ pub(super) fn initialize(
         let awake = enabled && open && lifecycle() != nsh_core::platform::Lifecycle::Background;
         let _ = updates.send(Update::Awake(awake));
     });
+}
+fn current_lyric(enabled: bool, lyrics: &haiku_lyrics::Lyrics, line: Option<usize>) -> Option<String> {
+    enabled.then(|| lyrics.lines.get(line?)).flatten()
+        .filter(|line| !line.text.trim().is_empty())
+        .map(|line| line.text.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn media_lyrics_follow_line_changes_and_are_absent_when_disabled() {
+        let lyrics = haiku_lyrics::parse("[00:01]First line\n[00:03]Next line");
+        let mut cursor = haiku_lyrics::Cursor::default();
+        let mut updates = vec![];
+        for seconds in [1., 1.5, 2., 3., 3.5] {
+            if cursor.update(&lyrics, seconds) {
+                updates.push(current_lyric(true, &lyrics, cursor.current()));
+            }
+        }
+        assert_eq!(updates, [Some("First line".into()), Some("Next line".into())]);
+        let info = haiku_macos::system::MediaInfo {
+            title: "Track title".into(),
+            lyrics: current_lyric(false, &lyrics, Some(1)),
+            ..Default::default()
+        };
+        let value = serde_json::to_value(info).unwrap();
+        assert!(value.get("lyrics").is_none());
+        assert_eq!(value["title"], "Track title");
+        assert_eq!(current_lyric(true, &lyrics, None), None);
+    }
 }
 fn remote_command(data: &serde_json::Value, mode: Mode) -> Option<Command> {
     Some(match data["kind"].as_str()? {

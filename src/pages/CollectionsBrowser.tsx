@@ -1,4 +1,4 @@
-import { List, signal, Text, token, View } from "nsh";
+import { cleanup, List, signal, Text, token, View } from "nsh";
 import { Button as BaseButton } from "nsh/base";
 import { focus } from "../ui/Button";
 import type { Core } from "haiku/native";
@@ -42,7 +42,8 @@ export function PlaylistSidebar(props: { core: Core; current: Route; navigate: (
 /** User playlist overview. Virtual rows bound both list and three-column grid modes. */
 export function CollectionsBrowser(props: { core: Core; active: boolean; navigate: (route: Route) => void }) {
   const mirror = mirrorCollections(props.core);
-  const mode = signal("list");
+  const mode = signal((props.core.settings.get() as { playlistsViewMode: string }).playlistsViewMode);
+  cleanup(props.core.settings.onChange((next) => mode.set((next as { playlistsViewMode: string }).playlistsViewMode)));
   const creating = signal(false);
   const error = signal("");
   const playlists = () => mirror.collections().filter((p) => p.kind === "user");
@@ -65,27 +66,31 @@ export function CollectionsBrowser(props: { core: Core; active: boolean; navigat
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">歌单</Text>
         <Button label="新建歌单…" size="sm" onPress={() => creating.set(true)} />
       </View>
-      <ToggleGroup value={mode()} onChange={(value) => mode.set(value)}
+      <ToggleGroup value={mode()} onChange={(value) => {
+        void props.core.settings.update({ playlistsViewMode: value }).catch((e) => error.set(String(e)));
+      }}
         items={[{ id: "list", label: "列表" }, { id: "grid", label: "网格" }]} />
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     </View>
     <List each={rows()} keyExtractor={(row) => `${mode()}:${row.map((p) => p.id).join(",")}`}
-      estimatedItemSize={mode() === "grid" ? 216 : 72} class="flex-1 min-h-0"
+      estimatedItemSize={mode() === "grid" ? 244 : 72} class="flex-1 min-h-0"
       empty={<Text class="p-5 text-sm text-muted-foreground">创建歌单，把不同来源的音乐放在一起。</Text>}>
       {(row) => <View class="flex-row gap-4 px-(--content-inset) pb-3">
         <Each of={row()} key={(p) => p.id}>{(p) => <View class="flex-1 min-w-0 gap-2">
           <View class={mode() === "grid" ? "gap-2" : "flex-row items-center gap-3"}>
             <CollectionArtwork small={mode() === "list"} covers={covers(p().id)} />
             <View class="flex-1 min-w-0 gap-1">
-              <Button label={p().title} variant="ghost" onPress={() => props.navigate(collectionRoute(props.core, p().id))} />
+              <Button label={p().title} variant="ghost" class="items-start px-0" onPress={() => props.navigate(collectionRoute(props.core, p().id))} />
               <Text class="text-xs text-muted-foreground">{p().trackCount} 首歌曲</Text>
             </View>
-            <Menu trigger={<Button label="歌单操作…" size="sm" variant="ghost" onPress={() => {}} />}>
+            <Menu trigger={<Button label="歌单操作…" size="sm" variant="ghost" class="items-start px-0" onPress={() => {}} />}>
               <MenuItem onSelect={() => move(p().id, -1)}><Text>歌单上移</Text></MenuItem>
               <MenuItem onSelect={() => move(p().id, 1)}><Text>歌单下移</Text></MenuItem>
             </Menu>
           </View>
         </View>}</Each>
+        <If when={mode() === "grid" && row().length < 3}><View class="flex-1 min-w-0" /></If>
+        <If when={mode() === "grid" && row().length < 2}><View class="flex-1 min-w-0" /></If>
       </View>}
     </List>
     <If when={creating()}><PlaylistEditor core={props.core} onClose={() => creating.set(false)}

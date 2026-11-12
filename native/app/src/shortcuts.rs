@@ -1,6 +1,8 @@
 //! One durable shortcut authority; native callbacks enter the existing playback controller.
+#[cfg(test)]
+mod tests;
 use crate::{core::CoreBridge, settings::SettingsService};
-use haiku_macos::shortcuts::{GlobalShortcuts, SystemShortcuts};
+use haiku_macos::shortcuts::GlobalShortcuts;
 use haiku_store::{
     settings::SettingsStore,
     shortcuts::{self, Binding},
@@ -10,7 +12,56 @@ use nsh_core::{
     element::{Trace, Tracer},
     prelude::*,
 };
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
+
+/// Shared by live edits and backup reloads so both use the same registration rollback.
+pub(crate) struct Registration {
+    store: Arc<SettingsStore>,
+    backend: Arc<dyn GlobalShortcuts>,
+    applied: Mutex<Vec<Binding>>,
+    pub serial: Arc<tokio::sync::Mutex<()>>,
+}
+impl Registration {
+    pub(crate) fn new(store: Arc<SettingsStore>, backend: Arc<dyn GlobalShortcuts>) -> Arc<Self> {
+        let s = store.get();
+        Arc::new(Self {
+            applied: Mutex::new(shortcuts::effective(&s.shortcuts, &s.global_shortcuts)),
+            store,
+            backend,
+            serial: Arc::new(tokio::sync::Mutex::new(())),
+        })
+    }
+    fn commit(&self, next: &[Binding]) -> Result<(), String> {
+        let next = shortcuts::validate(next)?;
+        let mut previous = self.applied.lock().unwrap();
+        self.backend.replace(&next)?;
+        if let Err(error) = self.store.replace_shortcuts(&next) {
+            self.backend
+                .replace(&previous)
+                .map_err(|restore| format!("{error}; 注册回滚失败：{restore}"))?;
+            return Err(error);
+        }
+        *previous = next;
+        Ok(())
+    }
+    pub(crate) fn reload(&self) -> Result<(), String> {
+        let s = self.store.get();
+        let next = shortcuts::effective(&s.shortcuts, &s.global_shortcuts);
+        if let Err(error) = self.commit(&next) {
+            // Restore only shortcut preferences; keep the other restored settings.
+            self.store
+                .replace_shortcuts(&self.applied.lock().unwrap())
+                .map_err(|restore| format!("{error}; 设置回滚失败：{restore}"))?;
+            return Err(error);
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Default)]
 struct Listeners(Rc<RefCell<BTreeMap<u64, Callback<JsonValue>>>>);
 unsafe impl Trace for Listeners {
@@ -24,8 +75,7 @@ pub struct ShortcutsService {
     store: Arc<SettingsStore>,
     settings: Instance<SettingsService>,
     bridge: Rc<CoreBridge>,
-    backend: Arc<SystemShortcuts>,
-    serial: Arc<tokio::sync::Mutex<()>>,
+    registration: Arc<Registration>,
     listeners: Listeners,
     next: u64,
 }
@@ -34,14 +84,13 @@ impl ShortcutsService {
         store: Arc<SettingsStore>,
         settings: Instance<SettingsService>,
         bridge: Rc<CoreBridge>,
-        native: bool,
+        registration: Arc<Registration>,
     ) -> Instance<Self> {
         Instance::new(Self {
             store,
             settings,
             bridge,
-            backend: Arc::new(SystemShortcuts { native }),
-            serial: Arc::new(tokio::sync::Mutex::new(())),
+            registration,
             listeners: Listeners::default(),
             next: 0,
         })
@@ -50,19 +99,21 @@ impl ShortcutsService {
         let s = self.store.get();
         shortcuts::effective(&s.shortcuts, &s.global_shortcuts)
     }
+    pub(crate) fn refresh(this: &Instance<Self>) {
+        let snapshot = this.with(|s| s.snapshot());
+        this.with(|s| {
+            for cb in s.listeners.0.borrow().values() {
+                cb.post(snapshot.clone());
+            }
+        });
+    }
     async fn replace(
         this: Instance<Self>,
         reset: Option<Option<String>>,
         bindings: Option<Vec<Binding>>,
     ) -> Result<JsonValue, String> {
-        let (serial, store, backend, settings) = this.with(|s| {
-            (
-                s.serial.clone(),
-                s.store.clone(),
-                s.backend.clone(),
-                s.settings.clone(),
-            )
-        });
+        let (registration, settings) = this.with(|s| (s.registration.clone(), s.settings.clone()));
+        let serial = registration.serial.clone();
         let _guard = serial.lock().await;
         let previous = this.with(|s| s.current());
         let next = match reset {
@@ -85,25 +136,12 @@ impl ShortcutsService {
             }
         };
         let next = shortcuts::validate(&next)?;
-        blocking(move || {
-            backend.replace(&next)?;
-            if let Err(error) = store.replace_shortcuts(&next) {
-                backend
-                    .replace(&previous)
-                    .map_err(|restore| format!("{error}; 注册回滚失败：{restore}"))?;
-                return Err(error);
-            }
-            Ok(())
-        })
-        .await
-        .map_err(|e| e.to_string())??;
+        blocking(move || registration.commit(&next))
+            .await
+            .map_err(|e| e.to_string())??;
         SettingsService::refresh(settings).await?;
         let snapshot = this.with(|s| s.snapshot());
-        this.with(|s| {
-            for cb in s.listeners.0.borrow().values() {
-                cb.post(snapshot.clone());
-            }
-        });
+        Self::refresh(&this);
         Ok(snapshot)
     }
 }
@@ -111,7 +149,7 @@ impl ShortcutsService {
 impl ShortcutsService {
     /// Current complete bindings, defaults and macOS support. App IDs retain reference spelling.
     pub fn snapshot(&self) -> JsonValue {
-        serde_json::json!({"supported":self.backend.supported(),"bindings":self.current(),"defaults":shortcuts::defaults(),"labels":shortcuts::ACTIONS.iter().map(|(id,label,_)|(*id,*label)).chain([("showMainWindow","显示主窗口")]).collect::<BTreeMap<_,_>>()})
+        serde_json::json!({"supported":self.registration.backend.supported(),"bindings":self.current(),"defaults":shortcuts::defaults(),"labels":shortcuts::ACTIONS.iter().map(|(id,label,_)|(*id,*label)).chain([("showMainWindow","显示主窗口")]).collect::<BTreeMap<_,_>>()})
     }
     /// Validate and atomically replace the complete app/global group; rejection retains previous settings.
     pub async fn apply(this: Instance<Self>, bindings: JsonValue) -> Result<JsonValue, String> {
@@ -140,11 +178,15 @@ impl ShortcutsService {
     }
     /// Dispatch an app binding through the same Controller/collections path as global events and UI.
     pub async fn trigger(this: Instance<Self>, id: String) -> Result<(), String> {
-        let (bridge,settings) = this.with(|s| (s.bridge.clone(),s.settings.clone()));
+        let (bridge, settings) = this.with(|s| (s.bridge.clone(), s.settings.clone()));
         dispatch(&bridge, &id, settings).await
     }
 }
-pub(crate) async fn dispatch(bridge: &Rc<CoreBridge>, id: &str, settings:Instance<SettingsService>) -> Result<(), String> {
+pub(crate) async fn dispatch(
+    bridge: &Rc<CoreBridge>,
+    id: &str,
+    settings: Instance<SettingsService>,
+) -> Result<(), String> {
     use haiku_playback::Command;
     let command = match id {
         "togglePlayback" => Command::Toggle,
@@ -167,10 +209,14 @@ pub(crate) async fn dispatch(bridge: &Rc<CoreBridge>, id: &str, settings:Instanc
             return Ok(());
         }
         "toggleDesktopLyrics" => {
-            let visible=bridge.settings.get_untracked().desktop_lyrics.visible;
-            SettingsService::update(settings,serde_json::json!({"desktopLyrics":{"visible":!visible}})).await?;
+            let visible = bridge.settings.get_untracked().desktop_lyrics.visible;
+            SettingsService::update(
+                settings,
+                serde_json::json!({"desktopLyrics":{"visible":!visible}}),
+            )
+            .await?;
             return Ok(());
-        },
+        }
         _ => return Err("未知快捷键操作".into()),
     };
     bridge

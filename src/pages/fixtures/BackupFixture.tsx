@@ -7,8 +7,12 @@ export function BackupFixture(props: { dialog?: "export" | "import" }) {
   const ready = resource(async () => {
     const core = await Core.openIsolated();
     const id = core.collections.create("备份中的歌单");
+    const bindings = (core.shortcuts.snapshot() as { bindings: { id: string; scope: string; chord: string }[] }).bindings;
+    await core.shortcuts.apply(bindings.map(b => b.scope === "app" && b.id === "openSettings"
+      ? { ...b, chord: "meta+shift+," } : b));
     const path = `${core.dataDir()}/fixture.haikubak`;
     await core.backup.export(path, { includeGithubToken: false });
+    await core.shortcuts.resetAll();
     core.collections.rename(id, "恢复前的歌单", "");
     return { path };
   });

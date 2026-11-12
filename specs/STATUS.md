@@ -25,16 +25,16 @@
 | F04 推荐、发现与分类 | 部分实现 | `native/app/src/discovery.rs`、`haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | 单源推荐缓存/刷新、分类排序分页与连续电台已审阅；本机 M4-03 29/29、M4-04 33/33、M5-05 回归；AUDIT E1/E5 | home 丢弃 next，缺首屏2页/空货架补齐；单源与参考聚合要求有文档冲突；混合FM未接；G15 |
 | F05 搜索 | 部分实现 | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | 五实体单源页、280ms多源预览/完整第一页起播、历史/迟到隔离/分页已审阅；本机 E1/E5 | 搜索页无全部来源聚合；在线曲目详情/编辑无入口；G16/G19；真实搜索与键盘待人工 |
 | F06 队列与播放控制 | 部分实现 | `haiku-playback/src/{queue,controller,backend,network}.rs`、`native/app/src/{core,player_dock,seek_bar}.rs` | 核心模式/代次/重试/预载/会话/睡眠受控断言，本机 E1/E2；历史网络实播记录见 HANDOFF | 下载优先未接、albumProgress仅存储、睡眠/停止/静音/队列部分入口及行为设置缺失；全栏seek欠缺；G08/G09/G12/G17/G21 |
-| F07 音效与响度 | 部分实现 | `haiku-store/src/settings.rs`、`haiku-audio/src/{effects,loudness}.rs`、`haiku-playback/src/{backend,loudness_cache}.rs`、`src/shell/PlaybackSettings.tsx` | DSP/clamp/峰值/缓存/切歌保持与 Headless 已审阅；E1/E2 | EQ重置/自定义覆盖/删除确认缺失（G02）；固定软削波与8ms保护已批准；真实听感待人工 |
+| F07 音效与响度 | 已实现（M6-06b 待审阅） | `haiku-store/src/settings.rs`、`haiku-audio/src/{effects,loudness}.rs`、`haiku-playback/src/{backend,loudness_cache}.rs`、`src/shell/PlaybackSettings.tsx` | DSP/clamp/峰值/缓存/切歌保持已有 E1/E2；G02 已补，全参数重置/DSP一致、自定义覆盖/删除确认 Headless 通过，浅色截图见 m6-06b | 固定软削波与8ms保护已批准；真实听感待人工 |
 | F08 歌词与正在播放 | 部分实现 | `haiku-lyrics/src/{formats,providers,service,cursor}.rs`、`native/app/src/{presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 来源链/超时/编码/解析/手工选择/切歌取消、Rust独立时钟/虚拟歌词断言，E1/E2/E5 | 普通歌词显示设置、上游策略、远端有效元数据、高清/鉴权封面欠缺；G10/G18/G19；KaraokeLayer与静态动画按用户决定延期；G22 |
-| F09 桌面集成 | 部分实现 | `haiku-macos/src/{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}.rs`、`native/app/src/platform/`、`packaging/` | M6-01～05 历史已审阅提交；H记载workspace304/nsh test76/76，但本机无这些原始日志/截图/最终包；基础媒体接线E1/E2 | G01证据缺失、媒体信息附歌词未接、恢复快捷键不刷新、全栏seek/最终性能未齐；G04/G07/G21；实机清单见AUDIT |
+| F09 桌面集成 | 部分实现 | `haiku-macos/src/{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}.rs`、`native/app/src/platform/`、`packaging/` | M6-01～05 历史已审阅；基础 E1/E2；M6-06b 补 G04/G07，歌词关闭无字段/行边界及恢复注册/冲突回滚 Rust 回归通过，应用快捷键恢复 Headless 通过 | G01 历史原始证据缺失、全栏seek/最终性能未齐（G21）；真实媒体中心与全局按键待人工；实机清单见AUDIT |
 | F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/{local_scan,service}.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview,TrackEditor}.tsx` | 扫描/稀疏覆盖/4并发8秒/阈值/审阅撤销与持久化已审阅；本机 E1/E2/E5 | 高级查询/文件名回退、歌词刮削选项、完整编辑字段/刮削字段、封面缓存、备份根映射/停稳欠缺；G13/G19/G20 |
-| F11 喜欢、歌单与远端收藏 | 部分实现 | `haiku-store/src/{collections,playlist_core}.rs`、`native/app/src/{collections,favorite_refresh}.rs`、`src/pages/{CollectionPage,CollectionsBrowser,SourceDetailPage}.tsx` | CRDT/跨源身份、完整分页原子镜像/离线/单飞取消/只读/确认有执行证据；E1/E4/E5 | 网格模式不持久化、曲目排序入口、有效元数据/保护封面恢复未齐；G03/G18/G19；真实来源与favorite媒体命令待人工 |
+| F11 喜欢、歌单与远端收藏 | 部分实现 | `haiku-store/src/{collections,playlist_core}.rs`、`native/app/src/{collections,favorite_refresh}.rs`、`src/pages/{CollectionPage,CollectionsBrowser,SourceDetailPage}.tsx` | CRDT/跨源身份、完整分页原子镜像/离线/单飞取消/只读/确认有 E1/E4/E5；M6-06b 补 G03，网格/列表持久化重开、四种显示排序且保留 CRDT 原序回归通过 | 有效元数据/保护封面恢复未齐（G18/G19）；真实来源与favorite媒体命令待人工 |
 | F12 历史与听歌统计 | 部分实现 | `haiku-store/src/{history,stats}.rs`、`haiku-services/src/stats_upload.rs`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | 500/100历史、5秒/5000统计、排行热图/小时/里程碑、SHA1上传/去重/退避/账号隔离已审阅；E1/E4/E6 | 缺历史时间过滤、专辑排行/月分布展示（G11）；新记录鉴权封面/统一元数据有G18/G19；长期/真实服务待人工 |
 | F13 下载与媒体缓存 | 部分实现 | `native/app/src/{download_service,download_management,downloads}.rs`、`haiku-audio/src/media_cache.rs`、`src/pages/DownloadsPage.tsx`、`src/shell/DownloadSettings.tsx` | 下载状态/Range/重试/标签/安全命名、自动歌单与目录迁移、同音质缓存/LRU/pin已审阅；E1/E6 | 完成下载未接入播放解析（G17）；高清封面重取受512展开限制（G18）；watch_collections已改事件监听；真实文件/跨卷/权限待人工 |
 | F14 Haiku 账号 | 已验证 | `haiku-services/src/{account,stats_upload}.rs`、`native/app/src/account.rs`、`src/shell/AccountSettings.tsx` | 邮箱/冷却/单飞刷新/离线缓存/会话隔离/会员套餐，loopback与账户Headless已审阅；E1/E6 | 按D6取消功能会员门槛，不新增支付；真实服务器与Keychain授权/重启恢复待人工 |
-| F15 同步与备份 | 部分实现 | `haiku-services/src/{sync,backup}.rs`、`native/app/src/{sync,backup}.rs`、`src/shell/{SyncSettings,BackupSettings}.tsx` | Gist/codec/Loro、schema1/2/路径拒绝/安全副本/固定预览/主要热恢复消费者已审阅；E1/E6 | 备份后快捷键未注册刷新（G07）；实际扫描根与备份设置脱节、刮削未停稳（G13）；albumProgress播放链路G12；自建后端按D8暂缓 |
-| F16 设置、通知与日志 | 部分实现 | `haiku-store/src/{settings,shortcuts,logs}.rs`、`native/app/src/{settings,shortcuts,activity}.rs`、`src/shell/{Settings,About,Diagnostics}.tsx` | 设置/嵌套原子merge、诊断双频道轮换/脱敏/分页/通知有E1/E4；M6快捷键/声明/包仅历史H | D8保留的UI/普通歌词系统字体未接（G06）；相关缺失设置见各F；应用许可证/图标待决定（G23）；M6证据G01，strip警告G05 |
+| F15 同步与备份 | 部分实现 | `haiku-services/src/{sync,backup}.rs`、`native/app/src/{sync,backup,shortcuts}.rs`、`src/shell/{SyncSettings,BackupSettings}.tsx` | Gist/codec/Loro、schema1/2/路径拒绝/安全副本/固定预览/主要热恢复消费者已有 E1/E6；M6-06b 补 G07，恢复后即时注册、订阅刷新及拒绝回滚通过 | 实际扫描根与备份设置脱节、刮削未停稳（G13）；albumProgress播放链路G12；自建后端按D8暂缓；真实全局按键待人工 |
+| F16 设置、通知与日志 | 部分实现 | `haiku-store/src/{settings,shortcuts,logs}.rs`、`native/app/src/{settings,shortcuts,activity}.rs`、`src/shell/{Settings,About,Diagnostics}.tsx` | 设置/嵌套原子merge、诊断双频道轮换/脱敏/分页/通知有E1/E4；M6-06b 补 G02/G03/G04/G07 的设置消费者与回归，证据见 m6-06b | D8保留的UI/普通歌词系统字体未接（G06）；其他缺失设置见各F；应用许可证/图标待决定（G23）；历史M6证据G01，strip警告G05 |
 
 ## 2026-11-09 实施文档
 
@@ -1132,3 +1132,23 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 文档检查：git diff --check通过；未改代码、参考版、任务文件或HANDOFF，未补缺口、未提交git。
 - 待审阅决定：按缺口拆第二步；UI.md单来源home与参考SPEC聚合要求冲突；底栏等价NSH方案验收；动画延期是否维持。
 - 待用户决定：应用许可证、是否更换带macOS圆角/留白图标；人工确认细目见AUDIT末节。
+
+## 2026-11-12 M6-06b：G02/G03/G04/G07 已补（待审阅）
+
+- G02：播放设置增加全参数重置、覆盖当前自定义预设与删除确认；重置保留 enabled/customPresets，删除保留曲线，自定义曲线编辑保留覆盖目标。
+- G03：playlistsViewMode 默认网格、持久化并消费订阅；详情新增歌单顺序/最新加入/最早加入/按曲名，仅排序读快照，播放采用显示查询；非手工排序不执行移动。
+- 网格卡片标题/操作左对齐，末行保留三列宽度；未改变封面解析或其他歌单语义。
+- G04：参考字段 notificationLyrics 默认关；歌词设置中提供开关，使用既有行 signal 更新可选 media lyrics，原生按参考版替换标题；关闭省略该字段，无新增轮询。
+- G07：恢复后重新注册整组快捷键并刷新 Settings/Shortcuts 订阅；共享注册事务保留冲突/落盘回滚，恢复注册失败仅回滚快捷键设置并显示现有恢复错误。
+- 新增 Rust 回归：视图设置重开、四种排序/时间同值稳定/CRDT 原序保持、歌词关闭无字段/行边界、真实备份归档恢复新注册及拒绝回滚。
+- Headless：新增 EQ 重置/DSP一致/覆盖/删除确认与取消、视图切换持久化重开；Backup 断言恢复后新应用快捷键立即打开设置。
+- 根 tsconfig 启用 allowImportingTsExtensions，修复既有 QQ 插件 .ts 导入导致全应用 check 的 TS5097；未改插件。
+- cargo test --manifest-path native/Cargo.toml --workspace：309 通过、1 忽略（真实音频输出设备）；证据 cargo-test.log。
+- nsh check：首轮 TS5097，配置修复后通过；网格布局最终改动后再次通过，证据 nsh-check-final.log，保留初始/修复日志。
+- nsh build：通过；网格布局最终改动后再次通过，证据 nsh-build-final.log。
+- nsh test：首轮 79/80，既有下载缓存暂停/恢复时序测试失败；RUST_TEST_THREADS=1 nsh test -v 重跑 80/80（Rust 38 + Headless 42），证据 nsh-test.log、nsh-test-serial.log。未修改下载模块。
+- 均衡器浅色真实窗口：effects-light.png，运行日志 nsh-run-effects.log；网格浅色：playlists-grid-light.png，最终运行日志 nsh-run-grid-final.log。
+- 全部证据位于 .artifacts/m6-06b/，仅逐命令日志和两张截图；AUDIT 仅修改 G02/G03/G04/G07 四行。
+- 已知 block 0.1.6 future-incompat 与开发 host __eh_frame 提示；另如实记录工具链忽略 target-dir、Lofty 为最小 FLAC 夹具补 PADDING 提示，以及自动下载在歌单变化/备份恢复屏障期间的日志。
+- 待人工：真实系统媒体中心歌词显隐及全局按键恢复/冲突体验、主观音效听感；未扩展至其他缺口、其他平台或 live。
+- 在主仓库工作，未 /new、未提交 git、未改 Rex 会话/窗格、参考版、NSH 或依赖源码；无新增架构决定。

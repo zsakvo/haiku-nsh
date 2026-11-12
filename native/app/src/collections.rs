@@ -30,6 +30,8 @@ struct Query {
     search: String,
     #[serde(default)]
     source: String,
+    #[serde(default)]
+    sort: String,
 }
 struct CollectionSource {
     store: Collections,
@@ -40,8 +42,13 @@ impl CollectionSource {
     fn tracks(&self) -> Vec<Track> {
         let query = self.query.borrow();
         let needle = query.search.to_lowercase();
-        self.store
-            .tracks(&query.id)
+        let sort = if query.sort.is_empty() && query.id == LIKED_PLAYLIST_ID {
+            "newest"
+        } else {
+            &query.sort
+        };
+        let mut tracks: Vec<_> = self.store
+            .sorted_tracks(&query.id, sort)
             .into_iter()
             .map(|t| {
                 if t.source == "local" {
@@ -57,7 +64,11 @@ impl CollectionSource {
                             .to_lowercase()
                             .contains(&needle))
             })
-            .collect()
+            .collect();
+        if query.sort == "title" {
+            tracks.sort_by(|a, b| a.title.cmp(&b.title));
+        }
+        tracks
     }
 }
 impl TrackDataSource for CollectionSource {

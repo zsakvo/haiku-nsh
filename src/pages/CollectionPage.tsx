@@ -10,6 +10,7 @@ import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
+import { SettingSelect } from "../ui/SettingsControls";
 
 /** Retained likes/user playlist page with a Rust-owned virtual source and selection. */
 export function CollectionPage(props: { core: Core; id: string; active: boolean; onDeleted: () => void }) {
@@ -18,6 +19,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const player = mirrorCore(props.core).player;
   const search = signal("");
   const filter = signal("");
+  const sort = signal(props.id === "__liked__" ? "newest" : "manual");
   const selected = signal<string[]>([]);
   const editor = signal<unknown[] | "edit" | null>(null);
   const trackEditor = signal<string[] | null>(null);
@@ -48,7 +50,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
     }
   });
   const liked = props.id === "__liked__";
-  const query = () => ({ id: props.id, search: search(), source: filter() });
+  const query = () => ({ id: props.id, search: search(), source: filter(), sort: sort() });
   const source = resource(() => service.query(query()));
   cleanup(() => { if (source()) void service.releaseQuery(source()!); });
   effect(() => {
@@ -74,6 +76,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       if (name === "edit") { trackEditor.set(tracks.map((t) => t.id)); return; }
       if (name === "reveal") for (const track of tracks) await props.core.library.reveal(track.id);
       if (name === "move-up" || name === "move-down") {
+        if (sort() !== "manual") return;
         const all = service.tracks(props.id) as any[];
         const at = all.findIndex((t) => t.source === tracks[0]?.source && t.id === tracks[0]?.id);
         const to = name === "move-up" ? at - 1 : at + 1;
@@ -109,6 +112,10 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
         <AutoDownloadControls core={props.core} id={props.id} />
       </If>
       <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
+      <SettingSelect label="曲目排序" value={sort()} onChange={sort.set} items={[
+        { value: "manual", title: "歌单顺序" }, { value: "newest", title: "最新加入" },
+        { value: "oldest", title: "最早加入" }, { value: "title", title: "按曲名" },
+      ]} />
       <View class="flex-row gap-2 items-center">
         <View class="flex-1"><SearchField label={liked ? "筛选喜欢" : "筛选歌单"}
           value={search()} placeholder="标题、艺术家或专辑" onChange={(value) => search.set(value)} /></View>

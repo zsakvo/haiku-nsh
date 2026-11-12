@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[serde(default)]
 pub struct MediaInfo {
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lyrics: Option<String>,
     pub artist: String,
     pub album: String,
     pub duration: f64,
@@ -118,7 +120,8 @@ mod mac {
             install();
             let dict:id=msg_send![class!(NSMutableDictionary),dictionary];
             macro_rules! put {($key:ident,$value:expr)=>{{let value:id=$value;let _:()=msg_send![dict,setObject:value forKey:$key];}}}
-            put!(MPMediaItemPropertyTitle,string(&info.title));put!(MPMediaItemPropertyArtist,string(&info.artist));put!(MPMediaItemPropertyAlbumTitle,string(&info.album));
+            // The reference media center shows the current lyric in the title slot.
+            put!(MPMediaItemPropertyTitle,string(info.lyrics.as_deref().unwrap_or(&info.title)));put!(MPMediaItemPropertyArtist,string(&info.artist));put!(MPMediaItemPropertyAlbumTitle,string(&info.album));
             put!(MPMediaItemPropertyPlaybackDuration,msg_send![class!(NSNumber),numberWithDouble:info.duration.max(0.0)]);
             put!(MPNowPlayingInfoPropertyElapsedPlaybackTime,msg_send![class!(NSNumber),numberWithDouble:info.position.max(0.0)]);
             put!(MPNowPlayingInfoPropertyPlaybackRate,msg_send![class!(NSNumber),numberWithDouble:if info.playing {1.0f64}else{0.0f64}]);
