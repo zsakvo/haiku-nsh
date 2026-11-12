@@ -359,10 +359,13 @@ function classify(card: Card) {
   const subtype = Number(card.subtype);
   const jump = Number(card.jumptype);
   // RecommendFeed: 200/1700 songs, 500 playlists, 400 albums, 1000 charts; 510/513 are shortcuts.
+  // Cards without a Haiku target are skipped: 900 mini-apps, 910/920 star/lyric cards,
+  // 1100 live rooms and -1 web links.
   if ([200, 1700].includes(type) || [10046, 20007].includes(jump)) return 'track';
   if (type === 500 && [510, 513].includes(subtype)) return 'playlist-entry';
   if (type === 500 && jump === 10014) return 'playlist';
-  if (jump === 10002 || (type === 400 && [414, 416].includes(subtype))) return 'album';
+  // 10025 is a long-audio (audiobook) album; it opens through the regular album API.
+  if (type === 400 || [10002, 10025].includes(jump)) return 'album';
   if (jump === 10005 || type === 1000) return 'toplist';
   if (jump === 20001) return 'radio-entry';
 }
@@ -391,10 +394,12 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
       );
     const base = {
       id: String(shelf.id),
-      title: (shelf.title_template || shelf.title_content).replace(
-        /\{String\}/g,
-        shelf.title_content,
-      ),
+      // A bare "{String}" template with empty content would leave no title, and the host
+      // drops untitled shelves.
+      title:
+        (shelf.title_template || shelf.title_content)
+          .replace(/\{String\}/g, shelf.title_content)
+          .trim() || '为你推荐',
     };
     const tracks: Track[] = [];
     const playlists: Playlist[] = [];
@@ -421,7 +426,8 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
       } else if (kind === 'playlist-entry')
         entries.push({ title, cover: art, to: { playlist: id } });
       else if (kind === 'playlist') playlists.push({ id, title, cover: art });
-      else if (kind === 'album') albums.push({ id, title, cover: art });
+      else if (kind === 'album')
+        albums.push({ id, title, cover: art, artists: c.subtitle ? [c.subtitle] : [] });
       else if (kind === 'toplist') tops.push({ id, title, cover: art });
       else if (kind === 'radio-entry') entries.push({ title, cover: art, to: { radio: '99' } });
     }
