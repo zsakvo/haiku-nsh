@@ -27,3 +27,9 @@ export function ShellToolbar(props: { children?: JSX.Element; testID?: string })
   return <View testID={props.testID} class="shrink-0 flex-row items-center justify-end gap-2 px-(--content-inset)"
     style={{ height: chromeHeight() }} desktop={{ windowDrag: true }}>{props.children}</View>;
 }
+export function NavigationToolbar(props: { children?: JSX.Element }) {
+  return <View testID="navigation-toolbar"
+    class="shrink-0 flex-row items-start gap-(--navigation-button-gap) pt-(--navigation-toolbar-inset) px-(--navigation-toolbar-inset)"
+    style={{ height: Math.max(chromeHeight(), token("compact-control-height") + 2 * token("navigation-toolbar-inset")) }}
+    desktop={{ windowDrag: true }}>{props.children}</View>;
+}

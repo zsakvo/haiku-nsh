@@ -3,6 +3,7 @@ import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { Button } from "../ui/Button";
 import { SourceGrid, SourceTracks } from "./SourceContent";
+import { usePageRefresh } from "../shell/pageRefresh";
 
 /** Descriptor cards own each group's cursor. A failed connection leaves a direct settings path. */
 export function SourceLibraryPage(props: { core: Core; source: string; title?: string; active: boolean; navigate: (route: Route) => void; settings: () => void }) {
@@ -24,6 +25,10 @@ export function SourceLibraryPage(props: { core: Core; source: string; title?: s
       groups.set(groups().map((g) => g.card.id === group.card.id ? {...g,page:{...page,items:[...g.page.items,...page.items]}} : g));
     } catch (e) { error.set(String(e)); } finally { busy.set(""); }
   }
+  usePageRefresh(() => props.active, {
+    run: () => { error.set(""); data.refetch(); },
+    disabled: () => data.loading() || !!busy(),
+  });
   return <View testID="page-source-library" class="flex-1 min-h-0 pb-28"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
     <Scroll testID="source-library-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-3 pb-4">

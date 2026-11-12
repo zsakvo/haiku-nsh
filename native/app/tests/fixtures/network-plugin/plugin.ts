@@ -18,7 +18,7 @@ function tracks(ctx: Context & PageArgs) {
     : { items: [track("1", ctx)], next: "opaque:page/二", total: 2 };
 }
 let failAlbum = false;
-let homeOffline=false, homeFailOnce=false, radioBatch=0;
+let homeOffline=false, homeFailOnce=false, radioBatch=0,homeRecommendations=false;
 let searches: string[] = [];
 let playlistOffline = false;
 async function searching(keyword: string, ctx: Context) {
@@ -39,7 +39,12 @@ export default definePlugin({
   async home(ctx) {
     if(homeOffline||homeFailOnce){homeFailOnce=false;throw new Upstream("推荐来源暂时离线");}
     return {shelves:[
-      {id:"entries",title:"发现入口",type:"entries",items:ctx.refresh?[]:[{title:"华语分类",to:{category:"cn"}},{title:"林间频道",to:{radio:"forest"}}]},
+      {id:"entries",title:homeRecommendations?"为你推荐":"发现入口",type:"entries",items:homeRecommendations?[
+        {title:"猜你喜欢",to:{radio:"forest"}},
+        {title:"每日30首",cover:album(ctx).cover,to:{playlist:"playlist/夜"}},
+        {title:"百万收藏",cover:album(ctx).cover,to:{playlist:"playlist/百万"}},
+        {title:"新歌推荐",cover:album(ctx).cover,to:{playlist:"playlist/新"}},
+      ]:ctx.refresh?[]:[{title:"华语分类",to:{category:"cn"}},{title:"林间频道",to:{radio:"forest"}}]},
       {id:"tracks",title:"今日推荐",type:"tracks",items:[track("1",ctx),track("2",ctx)]},
       {id:"playlists",title:"精选歌单",type:"playlists",items:[playlist(ctx),{...playlist(ctx),id:"playlist/晨",title:"晨间轻听"}],more:{category:"cn"}},
       {id:"albums",title:"新专辑",type:"albums",items:[album(ctx)]},
@@ -56,6 +61,7 @@ export default definePlugin({
     async channels(){return [{id:"forest",title:"林间频道"},{id:"night",title:"深夜频道"},{id:"jazz",title:"爵士漫步"}];},
     async next(channelId,ctx){
       if(channelId!==undefined&&!channelId)throw new Error("empty radio id");
+      if(ctx.count===5)return Array.from({length:5},(_,i)=>({...track(`radio/${i}`,ctx),title:`林间频道 · ${i+1}`}));
       const start=radioBatch++*4;
       return [...(ctx.history.length?[ctx.history[0]]:[]),...Array.from({length:4},(_,i)=>({...track(`radio/${start+i}`,ctx),title:`${channelId===undefined?"私人 FM":"林间频道"} · ${start+i+1}`}))];
     },
@@ -78,7 +84,7 @@ export default definePlugin({
       ctx.log.info(`streams ${id} quality=${ctx.quality}`);
       return [{url:`${ctx.connection!.url}/song.flac`,format:"flac",quality:ctx.quality,expiresAt:Math.floor(Date.now()/1000)+3600}];
     },
-    async get(id, ctx) { if (id === "download-recover") downloadRecovered = true; if(id === "playlist-offline")playlistOffline=true; if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
+    async get(id, ctx) { if (id === "download-recover") downloadRecovered = true; if(id === "playlist-offline")playlistOffline=true; if(id === "playlist-online")playlistOffline=false; if(id === "home-recommendations")homeRecommendations=true; if(id === "home-offline")homeOffline=true; if(id === "home-online")homeOffline=false; if(id === "home-fail")homeFailOnce=true; if(id === "search-counts")return {...track("1",ctx),title:JSON.stringify(searches)}; if (id === "fail") failAlbum = true; return track("1",ctx); },
   },
   album: { async get(id, ctx) { guard(); return {info:album(ctx),tracks:tracks(ctx)}; } },
   artist: {
@@ -89,6 +95,7 @@ export default definePlugin({
   playlist: {
     async get(id, ctx) {
       if (playlistOffline) throw new Upstream("歌单来源离线");
+      if(id==="playlist/百万")return {info:playlist(ctx),tracks:{items:Array.from({length:7},(_,i)=>({...track(`favorites/${i}`,ctx),title:`收藏曲目 ${i+1}`}))}};
       return { info: playlist(ctx), tracks: tracks(ctx) };
     },
   },

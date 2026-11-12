@@ -1,11 +1,12 @@
 import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
 import { Menu as DesktopMenu, Window } from "nsh/desktop";
+import { Scrollbar } from "nsh/base";
 import { Core, PluginService, PlayerDock, NowPlaying } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
-import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
@@ -24,12 +25,14 @@ import { AboutContent } from "./About";
 import { nshChord, type ShortcutBinding } from "../state/shortcuts";
 import { Dialog } from "../ui/Surfaces";
 import { Button } from "../ui/Button";
-import { Menu, MenuItem } from "../ui/Surfaces";
 import { createCoreState } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
 import { CommandPalette } from "./CommandPalette";
 import { LyricsSearch } from "./LyricsSearch";
+import { createPageRefresh, PageRefreshContext } from "./pageRefresh";
+import { createPageSource, PageSourceContext } from "./pageSource";
+import { SourceChip } from "../ui/SourceChip";
 
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
@@ -40,8 +43,13 @@ export function AppShell(props: {
   backupPath?: string; initialBackupDialog?: "export" | "import";
   initialLyricsSearch?: boolean;
 } = {}) {
+  Scrollbar.setTheme({horizontal:{
+    class:"hidden pointer-events-none",thumbClass:"hidden pointer-events-none",
+  }});
   const appearance = createAppearance(props.initialMode);
   const nav = createNavigation(props.initialRoute);
+  const refresh = createPageRefresh();
+  const pageSource = createPageSource();
   const core = createCoreState();
   const searchRequest=signal<SearchRequest|undefined>(props.initialSearch);
   function openSearch(request:SearchRequest){searchRequest.set({...request});nav.navigate({kind:"search"});}
@@ -61,7 +69,11 @@ export function AppShell(props: {
   const closeOverlay = () => overlay.set(null);
   const goBack = () => { if (!overlay() && !nowPlaying()) nav.back(); };
   const goForward = () => { if (!overlay() && !nowPlaying()) nav.forward(); };
-  const shortcuts = { back: "mod+[", forward: "mod+]", commands: "mod+k", settings: "mod+," };
+  const navigationBlocked = () => !!overlay() || nowPlaying() || notifications() || about() || lyricsSearch();
+  const canRefresh = () => !navigationBlocked() && !!refresh.current() && !refresh.current()!.disabled();
+  const refreshPage = () => { if (canRefresh()) refresh.current()!.run(); };
+  const shortcuts = { back: "mod+[", forward: "mod+]", refresh: "mod+shift+r", commands: "mod+k", settings: "mod+," };
+  keymap.bind(shortcuts.refresh, refreshPage, { when: "always" });
   const appBindings = signal<Record<string,string>>({});
   const installed=new Map<string,{chord:string;stop:()=>void}>();
   const handlers:Record<string,()=>void>={navigateBack:goBack,navigateForward:goForward,openCommandPalette:showCommands,openSettings:showSettings,closeWindow:()=>Window.close()};
@@ -114,6 +126,7 @@ export function AppShell(props: {
       { label: "视图", submenu: [
         { label: "后退", shortcut: binding("navigateBack",shortcuts.back), disabled: !nav.canBack() || !!overlay(), onSelect: goBack },
         { label: "前进", shortcut: binding("navigateForward",shortcuts.forward), disabled: !nav.canForward() || !!overlay(), onSelect: goForward },
+        { label: "刷新", shortcut: shortcuts.refresh, disabled: !canRefresh(), onSelect: refreshPage },
         { type: "separator" }, { label: "命令面板…", shortcut: binding("openCommandPalette",shortcuts.commands), onSelect: showCommands },
         { label: "通知中心…", onSelect: showNotifications },
         { role: "toggleFullScreen" },
@@ -132,14 +145,9 @@ export function AppShell(props: {
     }
     closeOverlay();
   }
-  return <ShellFrame>
+  return <PageSourceContext.Provider value={pageSource}><PageRefreshContext.Provider value={refresh}><ShellFrame>
     <ShellSidebar>
-      <SidebarChrome>
-        <IconButton sidebar icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
-          disabled={!nav.canBack()} onPress={goBack} />
-        <IconButton sidebar icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
-          disabled={!nav.canForward()} onPress={goForward} />
-      </SidebarChrome>
+      <SidebarChrome />
       <SidebarSearch>
         <CommandTrigger shortcut={keymap.label(binding("openCommandPalette",shortcuts.commands))} onPress={showCommands} />
       </SidebarSearch>
@@ -166,11 +174,19 @@ export function AppShell(props: {
       </View>
     </ShellSidebar>
     <WindowPanel>
-      <ShellToolbar>
-        <Menu trigger={<Button label="更多" size="sm" variant="ghost" onPress={() => {}} />}>
-          <MenuItem onSelect={showNotifications}><Text>通知中心…</Text></MenuItem>
-        </Menu>
-      </ShellToolbar>
+      <NavigationToolbar>
+        <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
+          disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />
+        <IconButton navigation testID="nav-forward" icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
+          disabled={!nav.canForward() || navigationBlocked()} onPress={goForward} />
+        <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}
+          disabled={!canRefresh()} onPress={refreshPage} />
+        <View class="flex-1" />
+        <If when={!!pageSource.current()?.items().length}>
+          <SourceChip items={pageSource.current()!.items()} value={pageSource.current()!.value()}
+            disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
+        </If>
+      </NavigationToolbar>
       <View class="flex-1 min-h-0">
         {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
@@ -240,5 +256,5 @@ export function AppShell(props: {
         { id: "settings", label: "打开设置…", group: "应用", shortcut: binding("openSettings",shortcuts.settings) },
         ...modes.map((mode) => ({ id: `mode:${mode.id}`, label: `外观：${mode.label}`, group: "外观", checked: appearance.mode() === mode.id })),
       ]} />
-  </ShellFrame>;
+  </ShellFrame></PageRefreshContext.Provider></PageSourceContext.Provider>;
 }

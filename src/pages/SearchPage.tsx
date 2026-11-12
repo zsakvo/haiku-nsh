@@ -5,9 +5,10 @@ import { searchableSources, type SearchKind, type SearchRequest, type SearchPage
 import type { Route } from "../shell/navigation";
 import { SearchField } from "../ui/SearchField";
 import { Button } from "../ui/Button";
-import { SettingSelect } from "../ui/SettingsControls";
 import { Dialog } from "../ui/Surfaces";
 import { SourceGrid, SourceTracks } from "./SourceContent";
+import { usePageRefresh } from "../shell/pageRefresh";
+import { usePageSource } from "../shell/pageSource";
 
 /** One retained search workspace; every response is checked against the full current query identity. */
 export function SearchPage(props: {core:Core;active:boolean;snapshot:PluginSnapshot;request?:SearchRequest;navigate:(route:Route)=>void;settings:()=>void}) {
@@ -41,10 +42,21 @@ export function SearchPage(props: {core:Core;active:boolean;snapshot:PluginSnaps
   });
   function changeQuery(value:string) {epoch++;query.set(value);results.set([]);next.set(null);error.set("");moreBusy.set(false);}
   function submit(value=query()) { const q=value.trim();changeQuery(q);if(q)props.core.history.search(q);first.refetch(); }
+  usePageRefresh(() => props.active, {
+    run: () => { error.set(""); first.refetch(); },
+    disabled: () => !identity() || first.loading() || moreBusy() || confirm(),
+  });
   async function selectSource(value:string) {
     epoch++;source.set(value);error.set("");
     try {await props.core.settings.update({searchSourceId:value});}catch(e){error.set(String(e));}
   }
+  usePageSource({
+    active:()=>props.active, value:source,
+    items:()=>available().map(s=>({
+      id:s.sourceId,title:s.title,logo:props.snapshot.packages.find(p=>p.id===s.pluginId)?.logo,
+    })),
+    select:(value)=>void selectSource(value),
+  });
   async function more() {
     const key=identity(),version=epoch,cursor=next();if(!key||!cursor||moreBusy())return;
     moreBusy.set(true);error.set("");
@@ -65,7 +77,6 @@ export function SearchPage(props: {core:Core;active:boolean;snapshot:PluginSnaps
       <View class="flex-row gap-2 items-center">
         <View class="flex-1"><SearchField label="搜索词" value={query()} onChange={changeQuery} onSubmit={()=>submit()} placeholder="搜索音乐、歌手或节目" /></View>
         <Button label="搜索" size="sm" onPress={()=>submit()} disabled={!query().trim()||!source()} />
-        <SettingSelect label="来源" value={source()} items={available().map(s=>({value:s.sourceId,title:s.title}))} onChange={v=>void selectSource(v)} />
       </View>
       <View class="flex-row gap-1" testID="search-tabs"><Each of={types()} key={t=>t.id}>{t=><Button label={t().label} size="sm"
         variant={kind()===t().id?"primary":"ghost"} onPress={()=>{epoch++;kind.set(t().id);}} />}</Each></View>

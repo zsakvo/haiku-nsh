@@ -2,11 +2,12 @@ import { cleanup, resource, signal, Text, View } from "nsh";
 import { Core } from "haiku/native";
 import { AppShell } from "../../shell/AppShell";
 import { Button } from "../../ui/Button";
-export function DiscoveryFixture(props:{page?:"home"|"tags"|"playlists"|"radio";scenario?:"offline"|"failure";controls?:boolean}) {
+export function DiscoveryFixture(props:{page?:"home"|"tags"|"playlists"|"radio";scenario?:"offline"|"failure";controls?:boolean;recommendations?:boolean}) {
   const queue=signal(""),note=signal("");let stop:(()=>void)|undefined;cleanup(()=>stop?.());
   const ready=resource(async()=>{
     const core=await Core.openIsolated();const fixture=await core.sources.startNetworkFixture() as {sourceId:string};
     await core.player.setVolume(0);await core.settings.update({homeSourceId:fixture.sourceId,categorySourceId:fixture.sourceId,radioSourceId:fixture.sourceId});
+    if(props.recommendations)await core.sources.invoke(fixture.sourceId,"track.get",["home-recommendations"],{});
     if(props.scenario==="offline"){
       await core.sources.home(fixture.sourceId,false);
       await core.sources.invoke(fixture.sourceId,"track.get",["home-offline"],{});
@@ -22,6 +23,10 @@ export function DiscoveryFixture(props:{page?:"home"|"tags"|"playlists"|"radio";
     <If when={props.controls}><View class="flex-row gap-2 items-center"><Text>{queue()}</Text><Text>{note()}</Text>
       <Button label="下一首夹具" onPress={()=>void ready()!.core.player.next()} />
       <Button label="恢复来源夹具" onPress={()=>void ready()!.core.sources.invoke(ready()!.fixture.sourceId,"track.get",["home-online"],{}).then(()=>note.set("来源已恢复"))} />
+      <If when={props.recommendations}>
+        <Button label="歌单离线夹具" onPress={()=>void ready()!.core.sources.invoke(ready()!.fixture.sourceId,"track.get",["playlist-offline"],{}).then(()=>note.set("歌单已离线"))} />
+        <Button label="恢复歌单夹具" onPress={()=>void ready()!.core.sources.invoke(ready()!.fixture.sourceId,"track.get",["playlist-online"],{}).then(()=>note.set("歌单已恢复"))} />
+      </If>
     </View></If>
   </If><If when={!!ready.error()}><Text>{String(ready.error())}</Text></If></View>;
 }

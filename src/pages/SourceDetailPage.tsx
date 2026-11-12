@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { SourceGrid, SourceTracks } from "./SourceContent";
 import { Dialog } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
+import { usePageRefresh } from "../shell/pageRefresh";
 
 /** One retained page per EntityRef. Resources reject stale loads; pagination also checks its epoch. */
 export function SourceDetailPage(props: { core: Core; reference: string; active: boolean; navigate: (route: Route) => void }) {
@@ -70,6 +71,10 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
     const r = info()?.reference;
     return r ? collections.collections().find((p) => p.id === `favorite:${r.source}:${r.id}`)?.id : undefined;
   };
+  usePageRefresh(() => props.active, {
+    run: () => first.refetch(),
+    disabled: () => first.loading() || busy() || unfavorite(),
+  });
   async function act(work: () => Promise<unknown>) {
     busy.set(true); error.set("");
     try { await work(); } catch (e) { error.set(String(e)); } finally { busy.set(false); }

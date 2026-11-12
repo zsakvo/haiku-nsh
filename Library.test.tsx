@@ -26,6 +26,22 @@ test("local library scan, groups, recycled selection, sparse batch edit and filt
     expect(app.texts()).toContain("已选择 1 首");
     console.log("library: album EntityRef/history and virtual cell recycling preserve ID selection");
 
+    await app.press("移除待刷新文件");
+    await app.waitFor("text:fixture-file-removed");
+    expect(app.shows("label:Elsewhere")).toBe(true);
+    await app.press("id:nav-refresh");
+    await app.waitUntil(() => !app.shows("label:Elsewhere"));
+    expect(app.texts()).toContain("已选择 1 首");
+    await app.press("id:nav-forward");
+    await app.waitFor("label:Song Beta");
+    await app.keyboard.press("mod+shift+r");
+    await app.waitUntil(() => app.enabled("id:nav-refresh"));
+    expect(app.shows("label:Song Alpha")).toBe(true);
+    expect(app.shows("label:Elsewhere")).toBe(false);
+    await app.press("id:nav-back");
+    expect(app.texts()).toContain("已选择 1 首");
+    console.log("library: toolbar refresh rescans disk; Cmd+Shift+R refreshes the retained album without changing history or selection");
+
     await app.keyboard.down("mod");
     await app.press("label:Song Beta");
     await app.keyboard.up("mod");

@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Surfaces";
 import { EmptyState } from "../ui/EmptyState";
 import { Tooltip } from "../ui/Surfaces";
+import { usePageRefresh } from "../shell/pageRefresh";
 
 /** Small bounded charts use TSX views and semantic token colors; Rust performs all aggregation. */
 export function StatsPage(props: { core: Core; active: boolean }) {
@@ -17,6 +18,10 @@ export function StatsPage(props: { core: Core; active: boolean }) {
     (source) => props.core.stats.aggregate(source.range),
   );
   const data = () => aggregate() as any;
+  usePageRefresh(() => props.active, {
+    run: () => aggregate.refetch(),
+    disabled: () => aggregate.loading() || confirming(),
+  });
   const maxHour = () => Math.max(1, ...(data()?.hours ?? []));
   const maxDay = () => Math.max(1, ...Object.values(data()?.days ?? {}).map(Number));
   const days = () => {

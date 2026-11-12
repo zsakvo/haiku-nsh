@@ -12,6 +12,7 @@ import { TrackEditor } from "./TrackEditor";
 import { ScrapeReview } from "./ScrapeReview";
 import { mirrorScrape } from "../state/scrape";
 import { SettingSelect } from "../ui/SettingsControls";
+import { usePageRefresh } from "../shell/pageRefresh";
 
 const views = [{ id: "tracks", label: "歌曲" }, { id: "albums", label: "专辑" }, { id: "artists", label: "艺术家" }];
 const sorts = [{ id: "title", label: "标题" }, { id: "artist", label: "艺术家" }, { id: "album", label: "专辑" },
@@ -80,6 +81,16 @@ export function LibraryPage(props: {
     const paths = props.injectedFolders ?? await LibraryService.pickFolders();
     if (paths.length) { await library.addRoots(paths); await library.scan(); }
   }
+  usePageRefresh(() => props.active, {
+    disabled: () => busy() || mirrors.library().scanning || !roots().length
+      || !!editor() || rootsOpen() || reviewOpen() || !!playlistTracks() || !!scrapeIds().length || source.loading(),
+    run: () => void act(async () => {
+      await library.scan();
+      if (!source()) source.refetch();
+      groups.refetch();
+      detail.refetch();
+    }),
+  });
   async function action(command: string, ids: string[]) {
     if (command === "scrape") { scrapeIds.set(ids); return; }
     if (command === "edit") { editor.set(ids); return; }

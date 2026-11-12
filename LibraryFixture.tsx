@@ -4,6 +4,7 @@ import { AppShell } from "./src/shell/AppShell";
 import { mirrorCore } from "./src/state/core";
 import { Button } from "./src/ui/Button";
 import { prepareLibrary, removeLibrary } from "./src/pages/fixtures/libraryAudio";
+import { unlink } from "fs/promises";
 
 // A test entry, sharing the same Core as the real shell. It never touches the normal data root.
 function Fixture() {
@@ -25,8 +26,14 @@ function Fixture() {
 function Probe(props: { core: Core; root: string }) {
   const mirrors = mirrorCore(props.core);
   const cleaned = signal(false);
+  const removed = signal(false);
   return <View>
     <Text testID="fixture-player">{`status:${mirrors.player().status};current:${mirrors.player().current?.title ?? ""};queue:${mirrors.player().tracks.map((t) => t.title).join("|")}`}</Text>
+    <Button label="移除待刷新文件" disabled={removed()} onPress={() => void (async () => {
+      await unlink(`${props.root}/2.flac`);
+      removed.set(true);
+    })()} />
+    <If when={removed()}><Text>fixture-file-removed</Text></If>
     <Button label="清理测试数据" onPress={() => void (async () => {
       await props.core.player.clear();
       for (const root of props.core.library.roots()) await props.core.library.removeRoot(root);

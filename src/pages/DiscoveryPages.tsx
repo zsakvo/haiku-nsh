@@ -7,13 +7,16 @@ import { CardShelf, ErrorState, Shelf, Skeleton } from "../ui/Discovery";
 import { EmptyState } from "../ui/EmptyState";
 import { SettingSelect } from "../ui/SettingsControls";
 import { entityRoute, SourceGrid, SourceTracks } from "./SourceContent";
-type HomeShelf={id:string;title:string;kind:string;items:any[];entries:{title:string;to:any}[];more?:any};
+import { usePageRefresh } from "../shell/pageRefresh";
+import { usePageSource } from "../shell/pageSource";
+import { HomeEntries, type HomeEntry } from "./HomeEntries";
+type HomeShelf={id:string;title:string;kind:string;items:any[];entries:HomeEntry[];more?:any};
 type HomeFeed={shelves:HomeShelf[];cached:boolean};
 type Categories={groups:{title:string;items:{id:string;title:string}[]}[];sorts?:{id:string;title:string}[]};
 function sources(snapshot:PluginSnapshot, capability:string) {
   return snapshot.sources.filter(s=>s.enabled).flatMap(s=>{
     const p=snapshot.packages.find(p=>p.id===s.pluginId&&p.enabled&&p.capabilities.includes(capability));
-    return p?[{id:s.sourceId,title:s.displayName||p.name,caps:p.capabilities}]:[];
+    return p?[{id:s.sourceId,title:s.displayName||p.name,logo:p.logo,caps:p.capabilities}]:[];
   });
 }
 type Props={core:Core;active:boolean;snapshot:PluginSnapshot;route:Route;navigate:(route:Route)=>void;settings:()=>void};
@@ -24,12 +27,16 @@ function useSource(props:Props,capability:string,key:string) {
   async function select(id:string){selected.set(id);await props.core.settings.update({[key]:id});}
   return {selected,available,select};
 }
-function SourcePicker(props:{state:ReturnType<typeof useSource>;onChange?:(id:string)=>void}) {
-  return <SettingSelect label="来源" value={props.state.selected()} items={props.state.available().map(s=>({value:s.id,title:s.title}))} onChange={v=>{props.onChange?.(v);void props.state.select(v);}} />;
+function useToolbarSource(active:()=>boolean,state:ReturnType<typeof useSource>,onChange?:()=>void) {
+  usePageSource({
+    active, items:state.available, value:state.selected,
+    select:(id)=>{onChange?.();void state.select(id).catch(console.error);},
+  });
 }
 function MissingSource(props:{settings:()=>void}) {return <EmptyState title="还没有可用来源" description="在设置中启用支持此功能的音乐来源。" action={{label:"管理来源…",onPress:props.settings}} />;}
 export function HomePage(props:Props) {
   const state=useSource(props,"home","homeSourceId");
+  useToolbarSource(()=>props.active,state);
   const feeds=signal<Record<string,HomeFeed>>({}),errors=signal<Record<string,string>>({}),revision=signal(0);
   let version=0,lastRefresh=0,closed=false;cleanup(()=>{closed=true;version++;});
   const current=()=>feeds()[state.selected()];
@@ -48,31 +55,37 @@ export function HomePage(props:Props) {
     }catch(e){if(valid())errors.set({...errors(),[source]:String(e)});}
   });
   const refresh=()=>revision.set(revision()+1);
+  usePageRefresh(() => props.active, { run: refresh, disabled: () => !state.selected() || home.loading() });
   function link(link:any) {
     const ref=link.reference;
     if(ref.kind==="category"){props.navigate({kind:"categories",source:ref.source,category:ref.id});return;}
-    if(ref.kind==="radio") {props.navigate({kind:"radio",source:ref.source});void props.core.player.startRadio(ref.source,ref.id);return;}
+    if(ref.kind==="radio") {props.navigate({kind:"radio",source:ref.source});return;}
     props.navigate(entityRoute(link));
   }
   return <View testID="page-home" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="px-(--content-inset) pb-3 gap-3"><View class="flex-row items-center justify-between gap-3">
-      <Text role="header" class="text-xl font-semibold text-foreground">推荐</Text><If when={!!state.available().length}><SourcePicker state={state} /></If>
-    </View><View class="flex-row"><Button label="刷新推荐" size="sm" loading={home.loading()} disabled={!state.selected()} onPress={refresh} /></View></View>
-    <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <Scroll testID="home-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-6 pb-4">
-      <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
-      <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
-      <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
-      <Each of={current()?.shelves??[]} key={s=>s.id}>{s=><Shelf id={`shelf-${s().id}`} title={s().title} more={s().more?()=>link(s().more):undefined}>
-        <If when={s().kind==="tracks"}><SourceTracks core={props.core} tracks={s().items} active={props.active} fit /></If>
-        <If when={s().kind==="entries"}><View class="flex-row flex-wrap gap-2"><Each of={s().entries} key={e=>JSON.stringify(e.to.reference)}>{e=><Button label={e().title} size="sm" onPress={()=>link(e().to)} />}</Each></View></If>
-        <If when={s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items} open={e=>props.navigate(entityRoute(e))} /></If>
-      </Shelf>}</Each>
+    <Scroll testID="home-scroll" class="flex-1" contentClass="flex-col min-h-full px-(--content-inset) pb-4">
+      <View testID="home-heading" class="pt-2 pb-(--home-title-bottom-gap)">
+        <Text role="header" class="text-2xl font-semibold text-foreground">推荐</Text>
+      </View>
+      <View class="flex-1 gap-6">
+        <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
+        <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
+        <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
+        <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
+        <Each of={current()?.shelves??[]} key={s=>s.id}>{s=><Shelf id={`shelf-${s().id}`} title={s().title} more={s().more?()=>link(s().more):undefined}>
+          <If when={s().kind==="tracks"}><SourceTracks core={props.core} tracks={s().items} active={props.active} fit /></If>
+          <If when={s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
+            fallbackCover={current()?.shelves.filter(s=>s.kind==="tracks").flatMap(s=>s.items).find(e=>e.cover)?.cover} open={e=>link(e.to)} /></If>
+          <If when={s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
+            listening={s().kind==="albums"||s().kind==="programs"} open={e=>props.navigate(entityRoute(e))} /></If>
+        </Shelf>}</Each>
+      </View>
     </Scroll>
   </View>;
 }
 export function CategoriesPage(props:Props) {
   const state=useSource(props,"categories.list","categorySourceId"), category=signal(""),title=signal(""),sort=signal("");
+  useToolbarSource(()=>props.active,state,()=>{category.set("");sort.set("");});
   const items=signal<any[]>([]),next=signal<string|null>(null),error=signal(""),busy=signal(false);
   let epoch=0,closed=false;cleanup(()=>{closed=true;epoch++;});
   effect(()=>{const r=props.route;if(r.kind==="categories"&&r.source){state.selected.set(r.source);category.set(r.category??"");title.set("");}});
@@ -90,8 +103,12 @@ export function CategoriesPage(props:Props) {
       if(!closed&&v===epoch&&identity()===key){items.set([...items(),...page.items]);next.set(page.next??null);}}
     catch(e){if(v===epoch)error.set(String(e));}finally{if(v===epoch)busy.set(false);}}
   function choose(id:string,name:string){category.set(id);title.set(name);}
+  usePageRefresh(() => props.active, {
+    run: () => { groups.refetch(); if (category()) result.refetch(); },
+    disabled: () => !state.selected() || groups.loading() || result.loading() || busy(),
+  });
   return <View testID="page-categories" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">分类</Text><If when={!!state.available().length}><SourcePicker state={state} onChange={()=>{category.set("");sort.set("");}} /></If></View>
+    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">分类</Text></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
     <Scroll testID="categories-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-4 pb-4">
       <If when={!!groups.error()}><ErrorState message={String(groups.error())} retry={()=>groups.refetch()} /></If>
@@ -113,6 +130,7 @@ export function CategoriesPage(props:Props) {
 }
 export function RadioPage(props:Props) {
   const state=useSource(props,"radio.next","radioSourceId"),error=signal(""),player=signal<any>(props.core.player.snapshot());
+  useToolbarSource(()=>props.active,state);
   effect(()=>{
     if(!props.active)return;
     player.set(props.core.player.snapshot());
@@ -125,8 +143,12 @@ export function RadioPage(props:Props) {
     async s=>await props.core.sources.radioChannels(s) as any[]);
   async function start(id?:string){error.set("");try{await props.core.player.startRadio(state.selected(),id??null);}catch(e){error.set(String(e));}}
   const radio=()=>player().radio?.source===state.selected()?player().radio:null;
+  usePageRefresh(() => props.active, {
+    run: () => channels.refetch(),
+    disabled: () => channels.loading() || !state.available().some(p => p.id === state.selected() && p.caps.includes("radio.channels")),
+  });
   return <View testID="page-radio" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text><If when={!!state.available().length}><SourcePicker state={state} /></If></View>
+    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
     <If when={!!state.available().length}><View class="px-(--content-inset) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel}
       variant={!!radio()&&!radio().channel?"primary":"secondary"} onPress={()=>void start()} /></View></Shelf>

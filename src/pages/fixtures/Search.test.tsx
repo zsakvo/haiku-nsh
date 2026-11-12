@@ -8,6 +8,9 @@ test("search playback, types/sources, stale queries, pagination, errors and hist
   const app=await open("../../../SearchFixture.tsx",options);
   await app.waitFor("text:搜索历史");
   await app.waitFor("id:search-tabs >> role:button[曲目]");
+  expect(app.shows("id:navigation-toolbar >> id:source-chip")).toBe(true);
+  expect(app.shows("id:page-search >> label:来源")).toBe(false);
+  expect(app.spanStyle("id:source-chip >> text:/^回声音乐库$/").fontSize).toBe(12);
   await replace(app,"label:搜索词","潮汐");await app.press("id:page-search >> role:button[搜索]");
   await app.waitFor("text:已显示 5 项");
   await app.press("label:潮汐 · 2");await app.press("label:潮汐 · 2");
@@ -22,6 +25,7 @@ test("search playback, types/sources, stale queries, pagination, errors and hist
   await app.wait(1100);expect(app.shows("label:慢请求 · 1")).toBe(false);
   await replace(app,"label:搜索词","慢请求");await app.wait(100);
   await app.press("label:来源");await app.press("role:option[轻量曲库]");
+  await app.waitFor("id:source-chip >> text:/^轻量曲库$/");
   await app.waitFor("label:轻量 慢请求");await app.wait(1100);
   expect(app.shows("label:慢请求 · 1")).toBe(false);
   expect(app.shows("id:search-tabs >> role:button[专辑]")).toBe(false);
