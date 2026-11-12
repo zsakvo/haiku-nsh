@@ -154,8 +154,16 @@ async function authorizeQQ(ctx: Context, redirect: string): Promise<Login> {
     pt_3rd_aid: '100497308',
   });
   const jar: Record<string, string> = {};
-  await authorizationResponse(ctx, `https://ssl.ptlogin2.graph.qq.com/check_sig?${params}`, jar);
-  if (!jar.p_skey) throw new ParseError('QQ check_sig missing p_skey');
+  const check = await authorizationResponse(
+    ctx,
+    `https://ssl.ptlogin2.graph.qq.com/check_sig?${params}`,
+    jar,
+  );
+  if (!jar.p_skey) {
+    // Names only (no values) so a real-login failure can be diagnosed from the error text.
+    const names = Object.keys(jar).join(',') || 'none';
+    throw new ParseError(`QQ check_sig missing p_skey (status ${check.status}, cookies: ${names})`);
+  }
   const response = await authorizationResponse(
     ctx,
     'https://graph.qq.com/oauth2.0/authorize',
