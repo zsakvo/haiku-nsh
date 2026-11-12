@@ -215,6 +215,11 @@ pub struct Core {
 impl Core {
     /// Initialize the data root and the unique playback service of this engine.
     pub async fn open() -> Result<Instance<Self>, JsError> {
+        // Several surfaces call open() concurrently at startup. Without this lock each saw an
+        // empty slot across the awaits below and built its own Core; one that failed left its
+        // caller (e.g. the shell's plugin list) permanently empty. Callers now share one build.
+        static OPENING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+        let _opening = OPENING.lock().await;
         let slot = global::<Option<Instance<Core>>>();
         if let Some(core) = slot.get() {
             return Ok(core);
