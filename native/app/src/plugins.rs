@@ -660,6 +660,7 @@ impl PluginService {
         this: Instance<Self>,
         location: String,
     ) -> Result<JsonValue, String> {
+        let location = local_location(&location)?;
         let host = Self::host(&this);
         background(async move {
             host.import_location(&location)
@@ -693,7 +694,7 @@ impl PluginService {
         location: String,
         #[args(status)] callback: Callback<String>,
     ) -> Result<Stop, String> {
-        let path = std::path::PathBuf::from(location);
+        let path = std::path::PathBuf::from(local_location(&location)?);
         let first_path = path.clone();
         let first = background(async move { crate::plugin_tools::directory_hash(&first_path) })
             .await
@@ -946,4 +947,26 @@ impl PluginService {
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())
     }
+}
+
+/// Normalize a typed import location: trim spaces/quotes, expand `~`, and name the
+/// missing path instead of surfacing a bare "os error 2". HTTPS URLs pass through.
+fn local_location(input: &str) -> Result<String, String> {
+    let value = input.trim().trim_matches(|c| c == '"' || c == '\'');
+    if value.is_empty() {
+        return Err("请填写插件目录、ZIP 或 .ts 文件路径".into());
+    }
+    if value.starts_with("https://") {
+        return Ok(value.into());
+    }
+    let path = match value.strip_prefix("~/") {
+        Some(rest) => std::env::var_os("HOME")
+            .map(|home| std::path::PathBuf::from(home).join(rest))
+            .ok_or("无法展开 ~：未设置 HOME")?,
+        None => std::path::PathBuf::from(value),
+    };
+    if !path.exists() {
+        return Err(format!("找不到路径：{}", path.display()));
+    }
+    Ok(path.to_string_lossy().into_owned())
 }
