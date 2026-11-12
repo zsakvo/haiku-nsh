@@ -37,6 +37,12 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-12 更新：M6-06 审计已提交（2bcf20b），用户对 AUDIT 待决项的决定
+- G15：首页**保持单来源**（UI.md 为准，不做多源聚合）；仍补首屏 2 页/续页 1 页与空货架补齐。混合来源 FM 不做。
+- G23：应用许可证 **GPL-3.0**（需补 LICENSE、关于页与第三方声明文字）；Dock 图标**保持现在的满版方图**。
+- G22：正在播放升起/收起动画**维持静态并延期**，不派调查。
+- 补缺口顺序：M6-06b（G02/G03/G04/G07，已派发）→ 中缺口 G08–G12 + G23 许可证文字 → 大缺口 G14/G16/G17/G18/G19/G20/G13/G21，逐个拆任务。G01 证据按“如实标注”处理，最终另派基线/发行包验收。
+
 ## 2026-11-12 更新：M6-07 qq-music 重写已验收并提交（用户临时插入，M6-06 审计顺延）
 - 按 `/Users/zsakvo/temp/QQMusicApi`（108617f，GPL-3.0）重写 `dev-plugins/qq-music` v3.0.0：删除 2400 行 `protocol.js`，拆为 `plugin.ts`（能力映射）/`api.ts`（musicu 批量请求、comm、zzc 签名、错误映射）/`auth.ts`（QQ/微信扫码、短信、Cookie、refresh、logout）/`types.ts`（上游响应类型）/`crypto.ts`（签名、QRC 3DES、QIMEI）；新增 `radio.next`（私人电台 99）。
 - 审阅决定：QQ 扫码 check_sig 与 OAuth authorize 需读 302 中间响应，`auth.ts` 用裸 fetch（`redirect: 'manual'`），不扩展 SDK；`sdk/tsconfig.json` 与 haiku-plugin CLI 生成的 tsconfig 加 `allowImportingTsExtensions`（jsrt 要求 `.ts` 精确导入）；任务中的行数上限因格式化展开取消。
