@@ -3573,7 +3573,7 @@
       "body": "",
       "status": 302,
       "headers": {
-        "Set-Cookie": "p_skey=fake-p-skey; Path=/",
+        "Set-Cookie": "p_skey=fake-p-skey; Path=/; Domain=graph.qq.com\r\nSet-Cookie: p_skey=; Path=/; Domain=qq.com; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
         "Location": "https://fixture.invalid/must-not-follow"
       }
     },

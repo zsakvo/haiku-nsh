@@ -91,12 +91,16 @@ function state(value: Json): QRState {
 }
 function setCookies(response: Response): Record<string, string> {
   const lines = response.headers.getSetCookie();
+  // ptlogin also clears the same names on sibling domains (empty value, past Expires),
+  // in any order; skip those so they cannot overwrite the real p_skey/qrsig.
   return Object.fromEntries(
-    lines.map((line) => {
-      const first = line.split(';')[0];
-      const at = first.indexOf('=');
-      return [first.slice(0, at).trim(), first.slice(at + 1)];
-    }),
+    lines
+      .map((line) => {
+        const first = line.split(';')[0];
+        const at = first.indexOf('=');
+        return [first.slice(0, at).trim(), first.slice(at + 1).trim()];
+      })
+      .filter(([name, value]) => name && value),
   );
 }
 async function authorizationResponse(
