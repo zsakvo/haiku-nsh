@@ -1,0 +1,75 @@
+{
+  "routes": [],
+  "cases": [
+    {
+      "name": "search.track",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "周杰伦",
+          "limit": 1
+        }
+      ]
+    },
+    {
+      "name": "search.album",
+      "path": "search.album",
+      "args": [
+        {
+          "keyword": "周杰伦",
+          "limit": 1
+        }
+      ]
+    },
+    {
+      "name": "search.artist",
+      "path": "search.artist",
+      "args": [
+        {
+          "keyword": "周杰伦",
+          "limit": 1
+        }
+      ]
+    },
+    {
+      "name": "search.playlist",
+      "path": "search.playlist",
+      "args": [
+        {
+          "keyword": "周杰伦",
+          "limit": 1
+        }
+      ]
+    },
+    {
+      "name": "encrypted QRC and translation",
+      "path": "track.lyrics",
+      "args": [
+        "0039MnYb0qxYhV"
+      ]
+    },
+    {
+      "name": "toplist.get",
+      "path": "toplist.get",
+      "args": [
+        "26"
+      ],
+      "context": {
+        "limit": 1
+      }
+    },
+    {
+      "name": "toplist.list",
+      "path": "toplist.list",
+      "args": []
+    },
+    {
+      "name": "home mixed shelves",
+      "path": "home",
+      "args": [],
+      "context": {
+        "refresh": false
+      }
+    }
+  ]
+}

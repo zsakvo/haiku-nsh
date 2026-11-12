@@ -21,7 +21,7 @@
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/ui/`、`src/shell/`、`src/pages/PlaceholderPage.tsx`、`native/app/src/platform/` | M1-01/M1-01b 已审阅；M1-01c 与侧栏布局反馈修订 check/build/test 通过、原有 Headless 4/4，主窗口与设置浅色截图已查看 | 页面内容、来源选择、PlayerDock 待后续任务；仅有已知警告例外 |
 | F02 插件包与来源生命周期 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/{host,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | workspace 228 通过/1 忽略；QQ CLI 契约 34/34；tsc、nsh check/build、nsh test 17/17；`.artifacts/m2-05/` | 目录监听为 500ms 内容哈希轮询；record/live 仍为基础实现；系统文件选择器与真实热重载体验待人工确认 |
-| F03 来源认证与用户内容 | M2 范围已实现，M2-05 待审阅 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout 离线契约；QR PNG、过期刷新/取消、SMS cooldown、cookie/web 表单与事件 Stop 回归；`.artifacts/m2-05/` | web 按已接受方案手动粘贴 Cookie + 完成 URL；真实 QQ 登录/风控/VIP/地区、Subsonic/飞牛远程连接仍待人工；QQ 短信额外安全验证提示改用扫码 |
+| F03 来源认证与用户内容 | M2 范围已实现；M6-07 QQ v3 重写与可读性整理完成 | `haiku-plugins/src/source.rs`、`dev-plugins/qq-music/`、`plugins/feiniu/plugin.ts`、`native/app/src/plugins.rs` | QQ/微信 QR、SMS、Cookie、refresh/logout；v3 check、59/59 离线契约、全插件 tsc、haiku-plugins 22/22；`.artifacts/m2-05/`、`.artifacts/m6-07/*-types.log`、`.artifacts/m6-07/cargo-test-haiku-plugins-final-tidy.log` | web 沿用手动粘贴方案；真实 QQ 扫码/短信/VIP/风控、远程库连接待人工；QQ live 8/9，榜单 limit=1 触及 100 页上限；SMS 安全验证改用扫码 |
 | F04 推荐、发现与分类 | 部分实现（推荐/分类/电台，M4-03 已验收） | `native/app/src/discovery.rs`、`native/crates/haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | M4-03 审阅复跑29/29；M4-04 Discovery回归通过，分类显示名/电台secondary/推荐货架间距已改；分类歌单与电台浅色截图齐全；恢复NowPlaying常驻后Search含Escape定向及完整均通过 | 真实来源首页/电台待人工确认 |
 | F05 搜索 | 部分实现（搜索页与命令面板；M4-02 fixture 验收完成，待审阅） | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | M4-02：workspace 244 通过/1 忽略；最终 nsh check/build 通过，nsh test 25/25；五张浅色实机截图齐全 | 五种实体、来源筛选、分页、历史、防旧结果覆盖、280ms 面板预览与完整第一页起播已实现；真实来源搜索与实机键盘体验待人工确认 |
 | F06 队列与播放控制 | 部分实现（本地与来源播放，M4-01 待审阅） | `haiku-playback::{controller,backend,network}`、`native/app/src/{core,sources,player_dock,seek_bar}.rs` | M4-01：workspace 243 通过/1 忽略，假后端/时钟覆盖候选、过期、重试、提前 EOF 与缓存；nsh test 22/22；真实 macOS loopback 日志进度 0→23 秒、来源封面媒体快照和浅色 Dock 截图通过 | 真实上游、实际听感与多曲无缝未覆盖；入场动画沿用静态方案 |
@@ -1093,3 +1093,26 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - icon-inspection.log：包内 AppIcon.icns 的 1024×1024 表示四角 alpha=1，NSH 未为图片内容加透明圆角；未自行加工，Finder/Dock 实际呈现待人工。
 - 所有证据在 .artifacts/m6-05/；未覆盖 Finder 双击、Gatekeeper 提示、真实 Keychain、其他架构/平台、签名公证、自动更新、DMG 与 F01–F16 全量审计。
 - 已更新 F09/F16；保留改动，未提交 git；未切换工作树、未改 Rex 会话/窗格、参考版、NSH/依赖源码或其他 specs 文件，未做 GUI 自动化。
+
+## 2026-11-12 M6-07：QQMusicApi v3 重写与可读性整理（验收通过）
+
+- 在指定主仓库完成，QQMusicApi 108617f 保持只读；未提交 git。
+- 从头重写 qq.music 3.0.0，删除 protocol.js/protocol.d.ts，保留 logo；使用原生 ID、Page/Detail 与最小响应 interface。
+- 保留四类搜索、曲目/播放/歌词、专辑/歌手/歌单/榜单详情、首页、分类、用户内容和刮削；补充私人电台频道 99。
+- 保留 12 档文件候选及音质/格式回退；QRC 使用 QQ 非标准 3DES，逐字转 krc，普通歌词返回 lrc，保留翻译。
+- 凭据由宿主保存，插件不写 ctx.storage；me.playlists 区分 owned，Cookie 登录从自建歌单补齐 encrypt_uin。
+- 请求、批量、平台参数、签名重试及错误处理集中于 api.ts；Android CGI 依赖的 QIMEI/GetSession 仅做最小实现并缓存于内存。
+- categories 保留两个公共 yqq tag CGI；未移植评论、MV、私信、上传、乐谱、完整设备持久化和其他电台。
+- 依审阅授权，check_sig/OAuth authorize 通过小函数使用裸 fetch、redirect: manual、ctx.signal，读取中间 302 的 Set-Cookie/Location。
+- 前轮可读性整理：四个 TS 按 Prettier printWidth=100/singleQuote 格式化，拆开多声明和同行语句，补充字段别名来源注释。
+- 提取 classify(card)，保持首页分类优先级与货架顺序；album.get 合并数字 ID 判断，streams 只读取一次 credential(ctx)。
+- sdk/tsconfig.json 与 CLI check/new 模板生成的 tsconfig 启用 allowImportingTsExtensions，保留 noEmit；移除全部 TS5097 expect-error。
+- 上游响应 interface 及字段别名注释原样迁入 types.ts；api/auth 的 Credential、Envelope、LoginResult、LoginUser 一并集中，使用 import type 引入；无行为变更。
+- SDK files 中已有入口，其 import 覆盖 api/auth/crypto/types，无需重复列出；未改 haiku.d.ts 或扩展 SDK 能力。
+- 最终复验：haiku-plugin check 通过（cli-check-complete-types.log）；test 59/59（cli-test-complete-types.log），包括裸 fetch replay。
+- 最终复验：TypeScript 5.9.3 全插件 tsc --noEmit -p sdk/tsconfig.json 通过，tsc-all-plugins-final-types.log（成功无诊断输出）。
+- 上轮验收：cargo test --manifest-path native/Cargo.toml -p haiku-plugins，22/22，doc-tests 0；cargo-test-haiku-plugins-final-tidy.log；本轮未重跑。
+- 审阅者已接受格式化展开导致的行数增加，取消任务第 1 节全部行数上限；保留正常排版，不再压缩代码。
+- 本轮只重跑 CLI check、CLI test、全插件 tsc；日志在 .artifacts/m6-07/，使用 -types 后缀，保留此前 -tidy 日志。
+- 本轮未重跑 live；保留此前公开能力一次运行的 cli-live.log：8/9（含描述符），toplist.get limit=1 触及契约器 100 页上限。
+- 待人工：真实 QQ/微信扫码、短信/风控、Cookie 刷新字段完整性、VIP/地区/设备播放权限、私人电台和收藏内容。

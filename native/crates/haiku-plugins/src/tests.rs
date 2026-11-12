@@ -1114,9 +1114,16 @@ async fn contract_intercepts_bare_fetch_and_traverses_detail_tracks() {
 }
 
 #[tokio::test]
-async fn qq_music_v2_offline_contract() {
+async fn qq_music_v3_rewrite_offline_contract() {
     let package =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev-plugins/qq-music");
+    let descriptor = describe_package(&package).await.unwrap();
+    assert_eq!(descriptor.version, "3.0.0");
+    assert_eq!(
+        descriptor.auth.as_ref().unwrap()["qrcode"]["variants"],
+        json!({"qq":"QQ","wx":"微信"})
+    );
+    assert!(descriptor.capabilities.iter().any(|p| p == "radio.next"));
     let report = crate::contract::run_contract(&package, crate::contract::ContractMode::Replay)
         .await
         .unwrap();
@@ -1126,6 +1133,40 @@ async fn qq_music_v2_offline_contract() {
         report.summary(),
         serde_json::to_string_pretty(&report).unwrap()
     );
+}
+
+#[tokio::test]
+async fn qq_music_zzc_signature_vectors() {
+    let package =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev-plugins/qq-music");
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let entry = r#"import {definePlugin} from 'haiku';
+      import {sign} from './crypto.ts';
+      export default definePlugin({id:'qq.crypto',name:'QQ crypto vectors',version:'1.0.0',
+        track:{streams:async(text)=>[{url:'https://fixture.invalid/'+sign(text)}]}});"#;
+    host.install_files(
+        BTreeMap::from([
+            ("plugin.ts".into(), entry.as_bytes().to_vec()),
+            ("crypto.ts".into(), std::fs::read(package.join("crypto.ts")).unwrap()),
+        ]),
+        false,
+    )
+    .await
+    .unwrap();
+    let source = host.activate("qq.crypto").await.unwrap();
+    // Fixed upstream zzc vectors cover byte hashing, base64 filtering and index selection.
+    for (payload, expected) in [
+        ("{}", "zzcf8e26805gyafigxmxjehoe02mvsjjgtwzw6f1a05f9"),
+        ("你好", "zzc498195bhsltecd02mnh9mfia9rqpoabpe947ebf30"),
+        ("{\"comm\":{},\"req_0\":{\"module\":\"x\",\"method\":\"y\",\"param\":{}}}", "zzc536875c7c4b88vlg8jbqbfoarcu4zyfpq75bbc012"),
+    ] {
+        let result = source
+            .invoke("track.streams", vec![json!(payload)], json!({}), None)
+            .await
+            .unwrap();
+        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}"));
+    }
 }
 
 #[tokio::test]

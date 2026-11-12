@@ -37,6 +37,11 @@
 | M1-01/01b/01c | `cf3fde5` `d7291cf` `e041101` `b364b75` | 设计系统、主题 token（17 品牌色，默认橙）、组件、外壳；用户已确认 UI。`b364b75` 由用户直接让 Codex 改：后退/前进/搜索在侧栏，下载/设置在侧栏底部 |
 | M1-02 | `6631b82` | 播放核心：Queue、Controller（generation、预加载、错误跳曲）、睡眠定时、会话恢复；`Core`/`core.player` 导出与 CoreBridge（位置只走 Rust signal）。workspace 177 测试通过 |
 
+## 2026-11-12 更新：M6-07 qq-music 重写已验收并提交（用户临时插入，M6-06 审计顺延）
+- 按 `/Users/zsakvo/temp/QQMusicApi`（108617f，GPL-3.0）重写 `dev-plugins/qq-music` v3.0.0：删除 2400 行 `protocol.js`，拆为 `plugin.ts`（能力映射）/`api.ts`（musicu 批量请求、comm、zzc 签名、错误映射）/`auth.ts`（QQ/微信扫码、短信、Cookie、refresh、logout）/`types.ts`（上游响应类型）/`crypto.ts`（签名、QRC 3DES、QIMEI）；新增 `radio.next`（私人电台 99）。
+- 审阅决定：QQ 扫码 check_sig 与 OAuth authorize 需读 302 中间响应，`auth.ts` 用裸 fetch（`redirect: 'manual'`），不扩展 SDK；`sdk/tsconfig.json` 与 haiku-plugin CLI 生成的 tsconfig 加 `allowImportingTsExtensions`（jsrt 要求 `.ts` 精确导入）；任务中的行数上限因格式化展开取消。
+- 证据：离线契约 59/59，全插件 tsc、haiku-plugins 22/22（审阅者复跑）；免登录 live 8/9（toplist.get limit 1 触契约器 100 页上限，非插件问题）。待人工：真实扫码/短信风控/Cookie 刷新/VIP 播放/私人电台。下一步回到 M6-06 审计。
+
 ## 2026-11-12 更新：M6-05 已验收并提交
 
 - 打包：`nsh package --target macos`，发行入口 `packaging/{App.tsx,nsh.json}`（fs capability 为空，测试路径不进发行包）；图标 `assets/app-icon.png`（用户选定 Flutter 版 icon-v2，满版方图，NSH 不加圆角，`.icns` 四角不透明）。产物 `.artifacts/m6-05/release/Haiku.app` 约 84MB，adhoc 签名、未公证。

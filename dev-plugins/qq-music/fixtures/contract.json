@@ -1,52 +1,13 @@
 {
   "login": {
-    "cookie": "uin=12345; qm_keyst=fake-only-key"
+    "cookie": "uin=12345; qm_keyst=fake-initial-key; refresh_token=fake-refresh-token; refresh_key=fake-refresh-key"
   },
   "routes": [
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "requestJson": {
-        "req_0": {
-          "method": "CgiGetTrackInfo",
-          "param": {
-            "ids": [
-              1
-            ]
-          }
-        }
-      },
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {
-            "tracks": [
-              {
-                "id": 1,
-                "mid": "mid1",
-                "title": "Fixture Song 1",
-                "interval": 180,
-                "singer": [
-                  {
-                    "name": "Fixture Artist"
-                  }
-                ],
-                "album": {
-                  "name": "Fixture Album",
-                  "mid": "album1"
-                }
-              }
-            ]
-          }
-        }
-      }
-    },
     {
       "path": "/tme/trpc/proxy",
       "method": "POST",
       "body": {
-        "data": "{\"data\": {\"q16\": \"fixture-q16\", \"q36\": \"fixture-q36\"}}"
+        "data": "{\"data\": {\"q16\": \"0000000000000000\", \"q36\": \"000000000000000000000000000000000000\"}}"
       }
     },
     {
@@ -58,15 +19,25 @@
           "code": 0,
           "data": {
             "session": {
-              "uid": "fixture-uid",
-              "sid": "fixture-sid"
+              "uid": "fake-device-uid",
+              "sid": "fake-device-sid"
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
-          "method": "GetSession"
+          "module": "music.getSession.session",
+          "method": "GetSession",
+          "param": {
+            "uid": "",
+            "vkey": 0,
+            "caller": 0
+          }
+        },
+        "comm": {
+          "ct": 11,
+          "cv": 14090008
         }
       }
     },
@@ -76,142 +47,266 @@
       "body": {
         "code": 0,
         "req_0": {
-          "code": 500003,
+          "code": 0,
+          "data": {
+            "nick": "Fixture User",
+            "headurl": "https://fixture.invalid/avatar.png"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.UserInfo.userInfoServer",
+          "method": "GetLoginUserInfo",
+          "param": {}
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "musicid": 12345,
+            "str_musicid": "12345",
+            "musickey": "fake-renewed-key",
+            "loginType": 2,
+            "openid": "fake-openid",
+            "access_token": "fake-access",
+            "refresh_token": "fake-refresh-token",
+            "expired_at": 9999999999,
+            "refresh_key": "fake-refresh-key",
+            "encryptUin": "fake-euin"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "Login",
+          "param": {
+            "loginMode": 2
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "musicid": 12345,
+            "str_musicid": "12345",
+            "musickey": "fake-login-key",
+            "loginType": 2,
+            "openid": "fake-openid",
+            "access_token": "fake-access",
+            "refresh_token": "fake-refresh-token",
+            "expired_at": 9999999999,
+            "refresh_key": "fake-refresh-key",
+            "encryptUin": "fake-euin"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "Login",
+          "param": {
+            "loginMode": 1
+          }
+        },
+        "comm": {
+          "tmeLoginMethod": 3,
+          "tmeLoginType": 0
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "musicid": 12345,
+            "str_musicid": "12345",
+            "musickey": "W_X-fake-key",
+            "loginType": 1,
+            "openid": "fake-openid",
+            "access_token": "fake-access",
+            "refresh_token": "fake-refresh-token",
+            "expired_at": 9999999999,
+            "refresh_key": "fake-refresh-key",
+            "encryptUin": "fake-euin"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "Login",
+          "param": {
+            "strAppid": "wx48db31d50e334801"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "musicid": 12345,
+            "str_musicid": "12345",
+            "musickey": "fake-login-key",
+            "loginType": 2,
+            "openid": "fake-openid",
+            "access_token": "fake-access",
+            "refresh_token": "fake-refresh-token",
+            "expired_at": 9999999999,
+            "refresh_key": "fake-refresh-key",
+            "encryptUin": "fake-euin"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "QQConnectLogin.LoginServer",
+          "method": "QQLogin",
+          "param": {
+            "code": "fake-oauth-code"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
           "data": {}
         }
       },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "Logout",
+          "param": {}
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "SendPhoneAuthCode",
+          "param": {
+            "phoneNo": "10000000000"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 100001,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "SendPhoneAuthCode",
+          "param": {
+            "phoneNo": "10000000001"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 20276,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.login.LoginServer",
+          "method": "SendPhoneAuthCode",
+          "param": {
+            "phoneNo": "10000000002"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
       "requestJson": {
         "req_0": {
           "method": "DoSearchForQQMusicMobile",
           "param": {
-            "query": "bad"
+            "query": "sign-required"
           }
+        }
+      },
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 2000
         }
       }
     },
     {
-      "path": "/cgi-bin/musicu.fcg",
+      "path": "/cgi-bin/musics.fcg",
       "method": "POST",
+      "requestJson": {
+        "req_0": {
+          "method": "DoSearchForQQMusicMobile",
+          "param": {
+            "query": "sign-required"
+          }
+        }
+      },
       "body": {
         "code": 0,
         "req_0": {
           "code": 0,
           "data": {
-            "tracks": [
-              {
-                "id": 1,
-                "mid": "mid1",
-                "title": "Fixture Song 1",
-                "interval": 180,
-                "type": 0,
-                "singer": [
-                  {
-                    "mid": "singer1",
-                    "name": "Fixture Artist"
-                  }
-                ],
-                "album": {
-                  "mid": "album1",
-                  "name": "Fixture Album"
-                },
-                "file": {
-                  "media_mid": "media1",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
-                }
-              }
-            ]
-          }
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "CgiGetTrackInfo",
-          "param": {
-            "mids": [
-              "mid1"
-            ]
-          }
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {
-            "tracks": [
-              {
-                "id": 2,
-                "mid": "mid2",
-                "title": "Fixture Song 2",
-                "interval": 180,
-                "type": 0,
-                "singer": [
-                  {
-                    "mid": "singer1",
-                    "name": "Fixture Artist"
-                  }
-                ],
-                "album": {
-                  "mid": "album1",
-                  "name": "Fixture Album"
-                },
-                "file": {
-                  "media_mid": "media2",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
-                }
-              }
-            ]
-          }
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "CgiGetTrackInfo",
-          "param": {
-            "mids": [
-              "mid2"
-            ]
-          }
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 500003,
-          "data": {}
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "CgiGetTrackInfo",
-          "param": {
-            "mids": [
-              "missing"
-            ]
-          }
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {
+            "meta": {
+              "sum": 1,
+              "nextpage": -1,
+              "searchid": "fake-signed-search"
+            },
             "body": {
               "item_song": [
                 {
@@ -227,27 +322,232 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media1",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
               ]
-            },
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 999,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.search.SearchCgiService",
+          "method": "DoSearchForQQMusicMobile",
+          "param": {
+            "query": "bad"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 2001,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.search.SearchCgiService",
+          "method": "DoSearchForQQMusicMobile",
+          "param": {
+            "query": "limited"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 1000,
+          "data": {}
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.search.SearchCgiService",
+          "method": "DoSearchForQQMusicMobile",
+          "param": {
+            "query": "refresh-once"
+          }
+        },
+        "comm": {
+          "authst": "fake-initial-key"
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
             "meta": {
-              "sum": 2,
-              "nextpage": 2
+              "sum": 1,
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
+            "body": {
+              "item_song": [
+                {
+                  "id": 1,
+                  "mid": "mid1",
+                  "title": "Fixture Song 1",
+                  "interval": 180,
+                  "type": 0,
+                  "singer": [
+                    {
+                      "mid": "singer1",
+                      "name": "Fixture Artist"
+                    }
+                  ],
+                  "album": {
+                    "id": 123,
+                    "mid": "album1",
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
+                  },
+                  "file": {
+                    "media_mid": "media1",
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
+                  }
+                }
+              ]
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
+          "method": "DoSearchForQQMusicMobile",
+          "param": {
+            "query": "refresh-once"
+          }
+        },
+        "comm": {
+          "authst": "fake-renewed-key"
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "meta": {
+              "sum": 2,
+              "nextpage": 2,
+              "searchid": "fake-search"
+            },
+            "body": {
+              "item_song": [
+                {
+                  "id": 1,
+                  "mid": "mid1",
+                  "title": "Fixture Song 1",
+                  "interval": 180,
+                  "type": 0,
+                  "singer": [
+                    {
+                      "mid": "singer1",
+                      "name": "Fixture Artist"
+                    }
+                  ],
+                  "album": {
+                    "id": 123,
+                    "mid": "album1",
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
+                  },
+                  "file": {
+                    "media_mid": "media1",
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 0,
@@ -264,6 +564,11 @@
         "req_0": {
           "code": 0,
           "data": {
+            "meta": {
+              "sum": 2,
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
             "body": {
               "item_song": [
                 {
@@ -279,27 +584,39 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media2",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
               ]
-            },
-            "meta": {
-              "sum": 2,
-              "nextpage": -1
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 0,
@@ -316,6 +633,11 @@
         "req_0": {
           "code": 0,
           "data": {
+            "meta": {
+              "sum": 1,
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
             "body": {
               "singer": [
                 {
@@ -323,16 +645,13 @@
                   "singerName": "Fixture Artist"
                 }
               ]
-            },
-            "meta": {
-              "sum": 1,
-              "nextpage": -1
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 1,
@@ -349,18 +668,20 @@
         "req_0": {
           "code": 0,
           "data": {
-            "body": {
-              "singer": []
-            },
             "meta": {
               "sum": 1,
-              "nextpage": -1
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
+            "body": {
+              "singer": []
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 1,
@@ -377,25 +698,32 @@
         "req_0": {
           "code": 0,
           "data": {
+            "meta": {
+              "sum": 1,
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
             "body": {
               "item_album": [
                 {
-                  "id": 123,
-                  "name": "Fixture Album",
+                  "albumID": 123,
                   "albummid": "album1",
-                  "singer_list": []
+                  "albumName": "Fixture Album",
+                  "singer_list": [
+                    {
+                      "mid": "singer1",
+                      "name": "Fixture Artist"
+                    }
+                  ]
                 }
               ]
-            },
-            "meta": {
-              "sum": 1,
-              "nextpage": -1
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 2,
@@ -412,18 +740,20 @@
         "req_0": {
           "code": 0,
           "data": {
-            "body": {
-              "item_album": []
-            },
             "meta": {
               "sum": 1,
-              "nextpage": -1
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
+            "body": {
+              "item_album": []
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 2,
@@ -440,24 +770,25 @@
         "req_0": {
           "code": 0,
           "data": {
+            "meta": {
+              "sum": 1,
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
             "body": {
               "item_songlist": [
                 {
                   "dissid": 1,
-                  "dissname": "Fixture Playlist",
-                  "song_count": 2
+                  "dissname": "Fixture Playlist"
                 }
               ]
-            },
-            "meta": {
-              "sum": 1,
-              "nextpage": -1
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 3,
@@ -474,23 +805,151 @@
         "req_0": {
           "code": 0,
           "data": {
-            "body": {
-              "item_songlist": []
-            },
             "meta": {
               "sum": 1,
-              "nextpage": -1
+              "nextpage": -1,
+              "searchid": "fake-search"
+            },
+            "body": {
+              "item_songlist": []
             }
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.search.SearchCgiService",
           "method": "DoSearchForQQMusicMobile",
           "param": {
             "search_type": 3,
             "page_num": 2
           }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 1,
+              "mid": "mid1",
+              "title": "Fixture Song 1",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media1",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "mid1"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 1,
+              "mid": "mid1",
+              "title": "Fixture Song 1",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media1",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 1
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
         }
       }
     },
@@ -505,19 +964,64 @@
             "expiration": 600,
             "midurlinfo": [
               {
+                "filename": "AI00media1.flac",
+                "result": 0,
+                "purl": "AI00mid1.flac?vkey=fake"
+              },
+              {
                 "filename": "F000media1.flac",
                 "result": 0,
-                "purl": "F000media1.flac?vkey=fake"
+                "purl": "F000mid1.flac?vkey=fake"
+              },
+              {
+                "filename": "O801media1.ogg",
+                "result": 0,
+                "purl": "O801mid1.ogg?vkey=fake"
               },
               {
                 "filename": "M800media1.mp3",
                 "result": 0,
-                "purl": "M800media1.mp3?vkey=fake"
+                "purl": "M800mid1.mp3?vkey=fake"
+              },
+              {
+                "filename": "O800media1.ogg",
+                "result": 0,
+                "purl": "O800mid1.ogg?vkey=fake"
+              },
+              {
+                "filename": "O600media1.ogg",
+                "result": 0,
+                "purl": "O600mid1.ogg?vkey=fake"
               },
               {
                 "filename": "M500media1.mp3",
                 "result": 0,
-                "purl": "M500media1.mp3?vkey=fake"
+                "purl": "M500mid1.mp3?vkey=fake"
+              },
+              {
+                "filename": "C400media1.m4a",
+                "result": 0,
+                "purl": "C400mid1.m4a?vkey=fake"
+              },
+              {
+                "filename": "Q000media1.flac",
+                "result": 0,
+                "purl": "Q000fixture.flac?vkey=fake"
+              },
+              {
+                "filename": "C600media1.m4a",
+                "result": 0,
+                "purl": "C600fixture.m4a?vkey=fake"
+              },
+              {
+                "filename": "O400media1.ogg",
+                "result": 0,
+                "purl": "O400fixture.ogg?vkey=fake"
+              },
+              {
+                "filename": "C200media1.m4a",
+                "result": 0,
+                "purl": "C200fixture.m4a?vkey=fake"
               }
             ]
           }
@@ -525,7 +1029,13 @@
       },
       "requestJson": {
         "req_0": {
-          "method": "UrlGetVkey"
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "mid1"
+            ]
+          }
         }
       }
     },
@@ -537,14 +1047,58 @@
         "req_0": {
           "code": 0,
           "data": {
-            "crypt": 1,
-            "lyric": "d6a2be95d6447372ec113cb3a022603e897b1cede88ba7c7ea2aab34a6111224aa7401f9e9a6e797"
+            "track_info": {
+              "id": 2,
+              "mid": "mid2",
+              "title": "Fixture Song 2",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media2",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
           }
         }
       },
       "requestJson": {
         "req_0": {
-          "method": "GetPlayLyricInfo"
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "mid2"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
         }
       }
     },
@@ -556,6 +1110,1140 @@
         "req_0": {
           "code": 0,
           "data": {
+            "track_info": {
+              "id": 2,
+              "mid": "mid2",
+              "title": "Fixture Song 2",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media2",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 2
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "AI00media2.flac",
+                "result": 0,
+                "purl": "AI00mid2.flac?vkey=fake"
+              },
+              {
+                "filename": "F000media2.flac",
+                "result": 0,
+                "purl": "F000mid2.flac?vkey=fake"
+              },
+              {
+                "filename": "O801media2.ogg",
+                "result": 0,
+                "purl": "O801mid2.ogg?vkey=fake"
+              },
+              {
+                "filename": "M800media2.mp3",
+                "result": 0,
+                "purl": "M800mid2.mp3?vkey=fake"
+              },
+              {
+                "filename": "O800media2.ogg",
+                "result": 0,
+                "purl": "O800mid2.ogg?vkey=fake"
+              },
+              {
+                "filename": "O600media2.ogg",
+                "result": 0,
+                "purl": "O600mid2.ogg?vkey=fake"
+              },
+              {
+                "filename": "M500media2.mp3",
+                "result": 0,
+                "purl": "M500mid2.mp3?vkey=fake"
+              },
+              {
+                "filename": "C400media2.m4a",
+                "result": 0,
+                "purl": "C400mid2.m4a?vkey=fake"
+              },
+              {
+                "filename": "Q000media2.flac",
+                "result": 0,
+                "purl": "Q000fixture.flac?vkey=fake"
+              },
+              {
+                "filename": "C600media2.m4a",
+                "result": 0,
+                "purl": "C600fixture.m4a?vkey=fake"
+              },
+              {
+                "filename": "O400media2.ogg",
+                "result": 0,
+                "purl": "O400fixture.ogg?vkey=fake"
+              },
+              {
+                "filename": "C200media2.m4a",
+                "result": 0,
+                "purl": "C200fixture.m4a?vkey=fake"
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "mid2"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 3,
+              "mid": "vip",
+              "title": "Fixture Song 3",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media3",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              },
+              "pay": {
+                "pay_play": 1
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "vip"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 3,
+              "mid": "vip",
+              "title": "Fixture Song 3",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media3",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              },
+              "pay": {
+                "pay_play": 1
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 3
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "AI00media3.flac",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "F000media3.flac",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "O801media3.ogg",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "M800media3.mp3",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "O800media3.ogg",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "O600media3.ogg",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "M500media3.mp3",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "C400media3.m4a",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "Q000media3.flac",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "C600media3.m4a",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "O400media3.ogg",
+                "result": 104003,
+                "purl": ""
+              },
+              {
+                "filename": "C200media3.m4a",
+                "result": 104003,
+                "purl": ""
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "vip"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 4,
+              "mid": "expired",
+              "title": "Fixture Song 4",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media4",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "expired"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 4,
+              "mid": "expired",
+              "title": "Fixture Song 4",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media4",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 4
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "AI00media4.flac",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "F000media4.flac",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "O801media4.ogg",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "M800media4.mp3",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "O800media4.ogg",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "O600media4.ogg",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "M500media4.mp3",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "C400media4.m4a",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "Q000media4.flac",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "C600media4.m4a",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "O400media4.ogg",
+                "result": 104004,
+                "purl": ""
+              },
+              {
+                "filename": "C200media4.m4a",
+                "result": 104004,
+                "purl": ""
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "expired"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 5,
+              "mid": "plain",
+              "title": "Fixture Song 5",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media5",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "plain"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 5,
+              "mid": "plain",
+              "title": "Fixture Song 5",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media5",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 5
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "AI00media5.flac",
+                "result": 0,
+                "purl": "AI00plain.flac?vkey=fake"
+              },
+              {
+                "filename": "F000media5.flac",
+                "result": 0,
+                "purl": "F000plain.flac?vkey=fake"
+              },
+              {
+                "filename": "O801media5.ogg",
+                "result": 0,
+                "purl": "O801plain.ogg?vkey=fake"
+              },
+              {
+                "filename": "M800media5.mp3",
+                "result": 0,
+                "purl": "M800plain.mp3?vkey=fake"
+              },
+              {
+                "filename": "O800media5.ogg",
+                "result": 0,
+                "purl": "O800plain.ogg?vkey=fake"
+              },
+              {
+                "filename": "O600media5.ogg",
+                "result": 0,
+                "purl": "O600plain.ogg?vkey=fake"
+              },
+              {
+                "filename": "M500media5.mp3",
+                "result": 0,
+                "purl": "M500plain.mp3?vkey=fake"
+              },
+              {
+                "filename": "C400media5.m4a",
+                "result": 0,
+                "purl": "C400plain.m4a?vkey=fake"
+              },
+              {
+                "filename": "Q000media5.flac",
+                "result": 0,
+                "purl": "Q000fixture.flac?vkey=fake"
+              },
+              {
+                "filename": "C600media5.m4a",
+                "result": 0,
+                "purl": "C600fixture.m4a?vkey=fake"
+              },
+              {
+                "filename": "O400media5.ogg",
+                "result": 0,
+                "purl": "O400fixture.ogg?vkey=fake"
+              },
+              {
+                "filename": "C200media5.m4a",
+                "result": 0,
+                "purl": "C200fixture.m4a?vkey=fake"
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "plain"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 6,
+              "mid": "none",
+              "title": "Fixture Song 6",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media6",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "none"
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 6,
+              "mid": "none",
+              "title": "Fixture Song 6",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media6",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  2000,
+                  0,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.pf_song_detail_svr",
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_id": 6
+          }
+        },
+        "comm": {
+          "ct": 24,
+          "cv": 4747474
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "AI00media6.flac",
+                "result": 0,
+                "purl": "AI00none.flac?vkey=fake"
+              },
+              {
+                "filename": "F000media6.flac",
+                "result": 0,
+                "purl": "F000none.flac?vkey=fake"
+              },
+              {
+                "filename": "O801media6.ogg",
+                "result": 0,
+                "purl": "O801none.ogg?vkey=fake"
+              },
+              {
+                "filename": "M800media6.mp3",
+                "result": 0,
+                "purl": "M800none.mp3?vkey=fake"
+              },
+              {
+                "filename": "O800media6.ogg",
+                "result": 0,
+                "purl": "O800none.ogg?vkey=fake"
+              },
+              {
+                "filename": "O600media6.ogg",
+                "result": 0,
+                "purl": "O600none.ogg?vkey=fake"
+              },
+              {
+                "filename": "M500media6.mp3",
+                "result": 0,
+                "purl": "M500none.mp3?vkey=fake"
+              },
+              {
+                "filename": "C400media6.m4a",
+                "result": 0,
+                "purl": "C400none.m4a?vkey=fake"
+              },
+              {
+                "filename": "Q000media6.flac",
+                "result": 0,
+                "purl": "Q000fixture.flac?vkey=fake"
+              },
+              {
+                "filename": "C600media6.m4a",
+                "result": 0,
+                "purl": "C600fixture.m4a?vkey=fake"
+              },
+              {
+                "filename": "O400media6.ogg",
+                "result": 0,
+                "purl": "O400fixture.ogg?vkey=fake"
+              },
+              {
+                "filename": "C200media6.m4a",
+                "result": 0,
+                "purl": "C200fixture.m4a?vkey=fake"
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.vkey.GetVkey",
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "none"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "lyric": "[00:01.00]Plain lyric",
+            "trans": "[00:01.00]翻译"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musichallSong.PlayLyricInfo",
+          "method": "GetPlayLyricInfo",
+          "param": {
+            "songMid": "plain"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "lyric": "[00:01.00]Plain lyric",
+            "trans": "[00:01.00]翻译"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musichallSong.PlayLyricInfo",
+          "method": "GetPlayLyricInfo",
+          "param": {
+            "songId": 5
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "lyric": ""
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musichallSong.PlayLyricInfo",
+          "method": "GetPlayLyricInfo",
+          "param": {
+            "songMid": "none"
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "lyric": ""
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musichallSong.PlayLyricInfo",
+          "method": "GetPlayLyricInfo",
+          "param": {
+            "songId": 6
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "lyric": "d6a2be95d6447372ec113cb3a022603e897b1cede88ba7c7ea2aab34a6111224aa7401f9e9a6e797",
+            "trans": "[00:01.00]Hello"
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musichallSong.PlayLyricInfo",
+          "method": "GetPlayLyricInfo",
+          "param": {}
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "basicInfo": {
+              "id": 123,
+              "mid": "album1",
+              "name": "Fixture Album",
+              "publishDate": "2026-01-01"
+            },
+            "singer": {
+              "singerList": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ]
+            }
+          }
+        },
+        "req_1": {
+          "code": 0,
+          "data": {
+            "totalNum": 2,
             "songList": [
               {
                 "songInfo": {
@@ -571,35 +2259,44 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media1",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
               }
-            ],
-            "totalNum": 2,
-            "albumMid": "album1"
-          }
-        },
-        "req_1": {
-          "code": 0,
-          "data": {
-            "basicInfo": {
-              "name": "Fixture Album",
-              "mid": "album1",
-              "publishDate": "2001-01-01"
-            }
+            ]
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musichallAlbum.AlbumInfoServer",
+          "method": "GetAlbumDetail",
+          "param": {}
+        },
+        "req_1": {
+          "module": "music.musichallAlbum.AlbumSongList",
           "method": "GetAlbumSongList",
           "param": {
             "begin": 0
@@ -615,6 +2312,22 @@
         "req_0": {
           "code": 0,
           "data": {
+            "singer_list": [
+              {
+                "basic_info": {
+                  "name": "Fixture Artist"
+                },
+                "ex_info": {
+                  "desc": "Fixture biography"
+                }
+              }
+            ]
+          }
+        },
+        "req_1": {
+          "code": 0,
+          "data": {
+            "totalNum": 2,
             "songList": [
               {
                 "songInfo": {
@@ -630,33 +2343,31 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media1",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
-              }
-            ],
-            "totalNum": 2
-          }
-        },
-        "req_1": {
-          "code": 0,
-          "data": {
-            "singer_list": [
-              {
-                "basic_info": {
-                  "name": "Fixture Artist"
-                },
-                "pic": {
-                  "pic": ""
-                },
-                "ex_info": {}
               }
             ]
           }
@@ -664,6 +2375,12 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musichallSinger.SingerInfoInter",
+          "method": "GetSingerDetail",
+          "param": {}
+        },
+        "req_1": {
+          "module": "musichall.song_list_server",
           "method": "GetSingerSongList",
           "param": {
             "begin": 0
@@ -680,7 +2397,13 @@
           "code": 0,
           "data": {
             "dirinfo": {
-              "title": "Fixture Playlist"
+              "dissid": 1,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
             },
             "songlist": [
               {
@@ -696,14 +2419,29 @@
                   }
                 ],
                 "album": {
+                  "id": 123,
                   "mid": "album1",
-                  "name": "Fixture Album"
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
                 },
                 "file": {
                   "media_mid": "media1",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
                 }
               }
             ],
@@ -714,8 +2452,157 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
           "method": "CgiGetDiss",
           "param": {
+            "disstid": 1,
+            "song_begin": 0
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "dirinfo": {
+              "dissid": 2,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
+            },
+            "songlist": [
+              {
+                "id": 1,
+                "mid": "mid1",
+                "title": "Fixture Song 1",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media1",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
+              }
+            ],
+            "total_song_num": 2,
+            "hasmore": 1
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
+          "method": "CgiGetDiss",
+          "param": {
+            "disstid": 2,
+            "song_begin": 0
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "dirinfo": {
+              "dissid": 1,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
+            },
+            "songlist": [
+              {
+                "id": 1,
+                "mid": "mid1",
+                "title": "Fixture Song 1",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media1",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
+              }
+            ],
+            "total_song_num": 2,
+            "hasmore": 1
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
+          "method": "CgiGetDiss",
+          "param": {
+            "disstid": 0,
+            "dirid": 201,
             "song_begin": 0
           }
         }
@@ -730,6 +2617,7 @@
           "code": 0,
           "data": {
             "data": {
+              "topId": 1,
               "title": "Fixture Top",
               "totalNum": 2
             },
@@ -747,14 +2635,29 @@
                   }
                 ],
                 "album": {
+                  "id": 123,
                   "mid": "album1",
-                  "name": "Fixture Album"
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
                 },
                 "file": {
                   "media_mid": "media1",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
                 }
               }
             ]
@@ -763,6 +2666,7 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musicToplist.Toplist",
           "method": "GetDetail",
           "param": {
             "offset": 0
@@ -778,6 +2682,26 @@
         "req_0": {
           "code": 0,
           "data": {
+            "basicInfo": {
+              "id": 123,
+              "mid": "album1",
+              "name": "Fixture Album",
+              "publishDate": "2026-01-01"
+            },
+            "singer": {
+              "singerList": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ]
+            }
+          }
+        },
+        "req_1": {
+          "code": 0,
+          "data": {
+            "totalNum": 2,
             "songList": [
               {
                 "songInfo": {
@@ -793,35 +2717,44 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media2",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
               }
-            ],
-            "totalNum": 2,
-            "albumMid": "album1"
-          }
-        },
-        "req_1": {
-          "code": 0,
-          "data": {
-            "basicInfo": {
-              "name": "Fixture Album",
-              "mid": "album1",
-              "publishDate": "2001-01-01"
-            }
+            ]
           }
         }
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musichallAlbum.AlbumInfoServer",
+          "method": "GetAlbumDetail",
+          "param": {}
+        },
+        "req_1": {
+          "module": "music.musichallAlbum.AlbumSongList",
           "method": "GetAlbumSongList",
           "param": {
             "begin": 1
@@ -837,6 +2770,22 @@
         "req_0": {
           "code": 0,
           "data": {
+            "singer_list": [
+              {
+                "basic_info": {
+                  "name": "Fixture Artist"
+                },
+                "ex_info": {
+                  "desc": "Fixture biography"
+                }
+              }
+            ]
+          }
+        },
+        "req_1": {
+          "code": 0,
+          "data": {
+            "totalNum": 2,
             "songList": [
               {
                 "songInfo": {
@@ -852,33 +2801,31 @@
                     }
                   ],
                   "album": {
+                    "id": 123,
                     "mid": "album1",
-                    "name": "Fixture Album"
+                    "name": "Fixture Album",
+                    "publishDate": "2026-01-01"
                   },
                   "file": {
                     "media_mid": "media2",
-                    "size_128mp3": 123456,
-                    "size_320mp3": 234567,
-                    "size_flac": 345678
+                    "size_128mp3": 128,
+                    "size_320mp3": 320,
+                    "size_flac": 1000,
+                    "size_192ogg": 192,
+                    "size_96aac": 96,
+                    "size_new": [
+                      2000,
+                      0,
+                      0,
+                      321,
+                      0,
+                      640
+                    ],
+                    "size_192aac": 192,
+                    "size_96ogg": 96,
+                    "size_48aac": 48
                   }
                 }
-              }
-            ],
-            "totalNum": 2
-          }
-        },
-        "req_1": {
-          "code": 0,
-          "data": {
-            "singer_list": [
-              {
-                "basic_info": {
-                  "name": "Fixture Artist"
-                },
-                "pic": {
-                  "pic": ""
-                },
-                "ex_info": {}
               }
             ]
           }
@@ -886,6 +2833,12 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musichallSinger.SingerInfoInter",
+          "method": "GetSingerDetail",
+          "param": {}
+        },
+        "req_1": {
+          "module": "musichall.song_list_server",
           "method": "GetSingerSongList",
           "param": {
             "begin": 1
@@ -902,7 +2855,13 @@
           "code": 0,
           "data": {
             "dirinfo": {
-              "title": "Fixture Playlist"
+              "dissid": 1,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
             },
             "songlist": [
               {
@@ -918,14 +2877,29 @@
                   }
                 ],
                 "album": {
+                  "id": 123,
                   "mid": "album1",
-                  "name": "Fixture Album"
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
                 },
                 "file": {
                   "media_mid": "media2",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
                 }
               }
             ],
@@ -936,8 +2910,157 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
           "method": "CgiGetDiss",
           "param": {
+            "disstid": 1,
+            "song_begin": 1
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "dirinfo": {
+              "dissid": 2,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
+            },
+            "songlist": [
+              {
+                "id": 2,
+                "mid": "mid2",
+                "title": "Fixture Song 2",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media2",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
+              }
+            ],
+            "total_song_num": 2,
+            "hasmore": 0
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
+          "method": "CgiGetDiss",
+          "param": {
+            "disstid": 2,
+            "song_begin": 1
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "dirinfo": {
+              "dissid": 1,
+              "dissname": "Fixture Playlist",
+              "songnum": 2,
+              "creator": {
+                "nick": "Fixture User",
+                "encrypt_uin": "fake-euin"
+              }
+            },
+            "songlist": [
+              {
+                "id": 2,
+                "mid": "mid2",
+                "title": "Fixture Song 2",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media2",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
+              }
+            ],
+            "total_song_num": 2,
+            "hasmore": 0
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.srfDissInfo.DissInfo",
+          "method": "CgiGetDiss",
+          "param": {
+            "disstid": 0,
+            "dirid": 201,
             "song_begin": 1
           }
         }
@@ -952,6 +3075,7 @@
           "code": 0,
           "data": {
             "data": {
+              "topId": 1,
               "title": "Fixture Top",
               "totalNum": 2
             },
@@ -969,14 +3093,29 @@
                   }
                 ],
                 "album": {
+                  "id": 123,
                   "mid": "album1",
-                  "name": "Fixture Album"
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
                 },
                 "file": {
                   "media_mid": "media2",
-                  "size_128mp3": 123456,
-                  "size_320mp3": 234567,
-                  "size_flac": 345678
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
                 }
               }
             ]
@@ -985,6 +3124,7 @@
       },
       "requestJson": {
         "req_0": {
+          "module": "music.musicToplist.Toplist",
           "method": "GetDetail",
           "param": {
             "offset": 1
@@ -1015,7 +3155,9 @@
       },
       "requestJson": {
         "req_0": {
-          "method": "GetAll"
+          "module": "music.musicToplist.Toplist",
+          "method": "GetAll",
+          "param": {}
         }
       }
     },
@@ -1030,17 +3172,52 @@
             "v_playlist": [
               {
                 "tid": 1,
-                "dirId": 201,
-                "dirName": "Liked",
-                "songNum": 2
+                "dirName": "Owned Playlist",
+                "picUrl": "https://fixture.invalid/owned.png",
+                "songNum": 2,
+                "dirId": 201
               }
-            ]
+            ],
+            "total": 1,
+            "bFinish": true
           }
         }
       },
       "requestJson": {
         "req_0": {
-          "method": "GetPlaylistByUin"
+          "module": "music.musicasset.PlaylistBaseRead",
+          "method": "GetPlaylistByUin",
+          "param": {}
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "v_list": [
+              {
+                "tid": 2,
+                "dirName": "Favorite Playlist",
+                "songNum": 2
+              }
+            ],
+            "total": 1,
+            "hasmore": 0
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.musicasset.PlaylistFavRead",
+          "method": "CgiGetPlaylistFavInfo",
+          "param": {
+            "offset": 0
+          }
         }
       }
     },
@@ -1064,13 +3241,87 @@
                         "id": 1,
                         "type": 200,
                         "jumptype": 10046,
-                        "title": "Song"
+                        "title": "Song",
+                        "card_extra_info": {
+                          "Tracks": [
+                            {
+                              "id": 1,
+                              "mid": "mid1",
+                              "title": "Fixture Song 1",
+                              "interval": 180,
+                              "type": 0,
+                              "singer": [
+                                {
+                                  "mid": "singer1",
+                                  "name": "Fixture Artist"
+                                }
+                              ],
+                              "album": {
+                                "id": 123,
+                                "mid": "album1",
+                                "name": "Fixture Album",
+                                "publishDate": "2026-01-01"
+                              },
+                              "file": {
+                                "media_mid": "media1",
+                                "size_128mp3": 128,
+                                "size_320mp3": 320,
+                                "size_flac": 1000,
+                                "size_192ogg": 192,
+                                "size_96aac": 96,
+                                "size_new": [
+                                  2000,
+                                  0,
+                                  0,
+                                  321,
+                                  0,
+                                  640
+                                ],
+                                "size_192aac": 192,
+                                "size_96ogg": 96,
+                                "size_48aac": 48
+                              }
+                            }
+                          ],
+                          "SongList": [
+                            {
+                              "ID": 1,
+                              "MID": "mid1",
+                              "Name": "Song",
+                              "SingerName": "Fixture Artist",
+                              "Cover": "https://fixture.invalid/song.png"
+                            }
+                          ]
+                        }
                       },
                       {
                         "id": 1,
                         "type": 500,
                         "subtype": 510,
-                        "title": "Fixture Entry"
+                        "title": "Daily"
+                      },
+                      {
+                        "id": 1,
+                        "type": 500,
+                        "jumptype": 10014,
+                        "title": "Playlist"
+                      },
+                      {
+                        "id": "album1",
+                        "type": 400,
+                        "jumptype": 10002,
+                        "title": "Album"
+                      },
+                      {
+                        "id": 1,
+                        "type": 1000,
+                        "title": "Top"
+                      },
+                      {
+                        "id": 99,
+                        "type": 900,
+                        "jumptype": 20001,
+                        "title": "Radio"
                       }
                     ]
                   }
@@ -1082,7 +3333,11 @@
       },
       "requestJson": {
         "req_0": {
-          "method": "get_recommend_feed"
+          "module": "music.recommend.RecommendFeed",
+          "method": "get_recommend_feed",
+          "param": {
+            "page": 1
+          }
         }
       }
     },
@@ -1094,77 +3349,118 @@
         "req_0": {
           "code": 0,
           "data": {
-            "albums": [
+            "retcode": 0,
+            "v_shelf": []
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.recommend.RecommendFeed",
+          "method": "get_recommend_feed",
+          "param": {
+            "page": 2
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "tracks": [
               {
-                "id": 123,
-                "name": "Fixture Album",
-                "singers": []
+                "id": 1,
+                "mid": "mid1",
+                "title": "Fixture Song 1",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media1",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
+              },
+              {
+                "id": 2,
+                "mid": "mid2",
+                "title": "Fixture Song 2",
+                "interval": 180,
+                "type": 0,
+                "singer": [
+                  {
+                    "mid": "singer1",
+                    "name": "Fixture Artist"
+                  }
+                ],
+                "album": {
+                  "id": 123,
+                  "mid": "album1",
+                  "name": "Fixture Album",
+                  "publishDate": "2026-01-01"
+                },
+                "file": {
+                  "media_mid": "media2",
+                  "size_128mp3": 128,
+                  "size_320mp3": 320,
+                  "size_flac": 1000,
+                  "size_192ogg": 192,
+                  "size_96aac": 96,
+                  "size_new": [
+                    2000,
+                    0,
+                    0,
+                    321,
+                    0,
+                    640
+                  ],
+                  "size_192aac": 192,
+                  "size_96ogg": 96,
+                  "size_48aac": 48
+                }
               }
-            ],
-            "total": 1
+            ]
           }
         }
       },
       "requestJson": {
         "req_0": {
-          "method": "get_new_album_info"
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {
-            "musicid": 12345,
-            "musickey": "fake-renewed-key",
-            "nick": "Fixture User",
-            "refresh_key": "fake-refresh"
+          "module": "music.radioProxy.MbTrackRadioSvr",
+          "method": "get_radio_track",
+          "param": {
+            "id": 99,
+            "num": 5
           }
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "Login"
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {}
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "SendPhoneAuthCode"
-        }
-      }
-    },
-    {
-      "path": "/cgi-bin/musicu.fcg",
-      "method": "POST",
-      "body": {
-        "code": 0,
-        "req_0": {
-          "code": 0,
-          "data": {
-            "musicid": 12345,
-            "musickey": "fake-qr-key",
-            "nick": "Fixture User"
-          }
-        }
-      },
-      "requestJson": {
-        "req_0": {
-          "method": "QQLogin"
         }
       }
     },
@@ -1194,14 +3490,36 @@
       "body": {
         "code": 0,
         "data": {
-          "sum": 1,
+          "sum": 2,
           "list": [
             {
               "dissid": 1,
-              "dissname": "Fixture Playlist"
+              "dissname": "Playlist 1"
             }
           ]
         }
+      },
+      "query": {
+        "sin": "0"
+      }
+    },
+    {
+      "path": "/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg",
+      "method": "GET",
+      "body": {
+        "code": 0,
+        "data": {
+          "sum": 2,
+          "list": [
+            {
+              "dissid": 2,
+              "dissname": "Playlist 2"
+            }
+          ]
+        }
+      },
+      "query": {
+        "sin": "1"
       }
     },
     {
@@ -1215,6 +3533,38 @@
     {
       "path": "/ptqrlogin",
       "method": "GET",
+      "body": "ptuiCB('65','0','','0','Fixture');",
+      "query": {
+        "ptqrtoken": "2127249969"
+      }
+    },
+    {
+      "path": "/ptqrlogin",
+      "method": "GET",
+      "body": "ptuiCB('66','0','','0','Fixture');",
+      "query": {
+        "ptqrtoken": "843323603"
+      }
+    },
+    {
+      "path": "/ptqrlogin",
+      "method": "GET",
+      "body": "ptuiCB('67','0','','0','Fixture');",
+      "query": {
+        "ptqrtoken": "40991964"
+      }
+    },
+    {
+      "path": "/ptqrlogin",
+      "method": "GET",
+      "body": "ptuiCB('68','0','','0','Fixture');",
+      "query": {
+        "ptqrtoken": "981465038"
+      }
+    },
+    {
+      "path": "/ptqrlogin",
+      "method": "GET",
       "body": "ptuiCB('0','0','https://fixture.invalid/?uin=12345&service=x&ptsigx=fake-sig&s_url=x','0','Fixture');"
     },
     {
@@ -1223,7 +3573,8 @@
       "body": "",
       "status": 302,
       "headers": {
-        "Set-Cookie": "p_skey=fake-p-skey; Path=/"
+        "Set-Cookie": "p_skey=fake-p-skey; Path=/",
+        "Location": "https://fixture.invalid/must-not-follow"
       }
     },
     {
@@ -1232,7 +3583,7 @@
       "body": "",
       "status": 302,
       "headers": {
-        "Location": "https://fixture.invalid/?code=fake-code"
+        "Location": "https://fixture.invalid/?code=fake-oauth-code&state=state"
       }
     },
     {
@@ -1248,7 +3599,127 @@
     {
       "path": "/connect/l/qrconnect",
       "method": "GET",
+      "body": "window.wx_errcode=402;window.wx_code=''",
+      "query": {
+        "uuid": "expired"
+      }
+    },
+    {
+      "path": "/connect/l/qrconnect",
+      "method": "GET",
+      "body": "window.wx_errcode=408;window.wx_code=''",
+      "query": {
+        "uuid": "waiting"
+      }
+    },
+    {
+      "path": "/connect/l/qrconnect",
+      "method": "GET",
+      "body": "window.wx_errcode=404;window.wx_code=''",
+      "query": {
+        "uuid": "scanned"
+      }
+    },
+    {
+      "path": "/connect/l/qrconnect",
+      "method": "GET",
+      "body": "window.wx_errcode=403;window.wx_code=''",
+      "query": {
+        "uuid": "refused"
+      }
+    },
+    {
+      "path": "/connect/l/qrconnect",
+      "method": "GET",
       "body": "window.wx_errcode=405;window.wx_code='fake-wx-code'"
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "requestJson": {
+        "req_0": {
+          "method": "get_song_detail_yqq",
+          "param": {
+            "song_mid": "atmos"
+          }
+        }
+      },
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "track_info": {
+              "id": 7,
+              "mid": "atmos",
+              "title": "Fixture Song 1",
+              "interval": 180,
+              "type": 0,
+              "singer": [
+                {
+                  "mid": "singer1",
+                  "name": "Fixture Artist"
+                }
+              ],
+              "album": {
+                "id": 123,
+                "mid": "album1",
+                "name": "Fixture Album",
+                "publishDate": "2026-01-01"
+              },
+              "file": {
+                "media_mid": "media7",
+                "size_128mp3": 128,
+                "size_320mp3": 320,
+                "size_flac": 1000,
+                "size_192ogg": 192,
+                "size_96aac": 96,
+                "size_new": [
+                  0,
+                  2000,
+                  0,
+                  321,
+                  0,
+                  640
+                ],
+                "size_192aac": 192,
+                "size_96ogg": 96,
+                "size_48aac": 48
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "requestJson": {
+        "req_0": {
+          "method": "UrlGetVkey",
+          "param": {
+            "songmid": [
+              "atmos"
+            ]
+          }
+        }
+      },
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "expiration": 600,
+            "midurlinfo": [
+              {
+                "filename": "Q000media7.flac",
+                "result": 0,
+                "purl": "Q000fixture.flac?vkey=fake"
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "cases": [
@@ -1298,12 +3769,20 @@
       "args": [
         "mid1"
       ],
-      "context": {
-        "quality": "lossless"
+      "expectedJson": {
+        "id": "mid1",
+        "album": {
+          "id": "album1"
+        },
+        "artists": [
+          {
+            "id": "singer1"
+          }
+        ]
       }
     },
     {
-      "name": "track.streams",
+      "name": "streams quality fallback",
       "path": "track.streams",
       "args": [
         "mid1"
@@ -1314,30 +3793,95 @@
       "expectedJson": [
         {
           "quality": "lossless",
-          "format": "flac",
-          "size": 345678
+          "format": "flac"
+        },
+        {
+          "quality": "lossless",
+          "format": "ogg"
+        },
+        {
+          "quality": "high",
+          "format": "mp3"
         }
       ]
     },
     {
-      "name": "track.lyrics",
-      "path": "track.lyrics",
+      "name": "streams requested format within quality",
+      "path": "track.streams",
       "args": [
         "mid1"
       ],
       "context": {
-        "quality": "lossless"
+        "quality": "high",
+        "format": "ogg"
       },
+      "expectedJson": [
+        {
+          "quality": "high",
+          "format": "ogg"
+        },
+        {
+          "quality": "high",
+          "format": "ogg"
+        },
+        {
+          "quality": "high",
+          "format": "mp3"
+        }
+      ]
+    },
+    {
+      "name": "streams hires",
+      "path": "track.streams",
+      "args": [
+        "mid1"
+      ],
+      "context": {
+        "quality": "hires"
+      },
+      "expectedJson": [
+        {
+          "quality": "hires",
+          "format": "flac"
+        }
+      ]
+    },
+    {
+      "name": "encrypted QRC and translation",
+      "path": "track.lyrics",
+      "args": [
+        "mid1"
+      ],
       "expectedJson": {
         "format": "krc",
-        "text": "[1000,900]<0,400,0>你<400,500,0>好"
+        "text": "[1000,900]<0,400,0>你<400,500,0>好",
+        "translation": "[00:01.00]Hello"
       }
+    },
+    {
+      "name": "plain LRC fallback",
+      "path": "track.lyrics",
+      "args": [
+        "plain"
+      ],
+      "expectedJson": {
+        "format": "lrc",
+        "text": "[00:01.00]Plain lyric",
+        "translation": "[00:01.00]翻译"
+      }
+    },
+    {
+      "name": "no lyrics",
+      "path": "track.lyrics",
+      "args": [
+        "none"
+      ]
     },
     {
       "name": "album.get",
       "path": "album.get",
       "args": [
-        "123"
+        "album1"
       ],
       "context": {
         "limit": 1
@@ -1376,17 +3920,14 @@
     {
       "name": "toplist.list",
       "path": "toplist.list",
-      "args": [],
-      "context": {
-        "limit": 1
-      }
+      "args": []
     },
     {
-      "name": "home",
+      "name": "home mixed shelves",
       "path": "home",
       "args": [],
       "context": {
-        "limit": 1
+        "refresh": false
       },
       "expectedJson": {
         "shelves": [
@@ -1397,6 +3938,15 @@
                 "id": "mid1"
               }
             ]
+          },
+          {
+            "type": "playlists"
+          },
+          {
+            "type": "albums"
+          },
+          {
+            "type": "toplists"
           },
           {
             "type": "entries",
@@ -1412,20 +3962,82 @@
       }
     },
     {
-      "name": "categories.list",
-      "path": "categories.list",
-      "expectedJson": {"sorts":[{"id":"hot","title":"热门"}]},
+      "name": "home continuation",
+      "path": "home",
       "args": [],
       "context": {
-        "limit": 1
+        "refresh": false,
+        "cursor": "{\"page\": 2, \"s_num\": 1, \"v_cache\": [\"207\"]}"
+      },
+      "expectedJson": {
+        "shelves": []
       }
     },
     {
-      "name": "me.playlists",
+      "name": "categories.list",
+      "path": "categories.list",
+      "args": [],
+      "expectedJson": {
+        "sorts": [
+          {
+            "id": "hot",
+            "title": "热门"
+          }
+        ],
+        "groups": [
+          {
+            "items": [
+              {
+                "id": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "categories.playlists",
+      "path": "categories.playlists",
+      "args": [
+        "1"
+      ],
+      "context": {
+        "limit": 1,
+        "sort": "hot"
+      }
+    },
+    {
+      "name": "owned then favorite playlists",
       "path": "me.playlists",
       "args": [],
       "context": {
         "limit": 1
+      },
+      "expectedJson": {
+        "items": [
+          {
+            "id": "1",
+            "owned": true
+          }
+        ],
+        "next": "fav:0"
+      }
+    },
+    {
+      "name": "favorite playlists",
+      "path": "me.playlists",
+      "args": [],
+      "context": {
+        "limit": 1,
+        "cursor": "fav:0"
+      },
+      "expectedJson": {
+        "items": [
+          {
+            "id": "2",
+            "owned": false
+          }
+        ]
       }
     },
     {
@@ -1437,14 +4049,46 @@
       }
     },
     {
-      "name": "categories.playlists",
-      "path": "categories.playlists",
+      "name": "radio private FM",
+      "path": "radio.next",
+      "args": [],
+      "context": {
+        "history": [],
+        "count": 2
+      },
+      "expectedJson": [
+        {
+          "id": "mid1"
+        },
+        {
+          "id": "mid2"
+        }
+      ]
+    },
+    {
+      "name": "radio excludes history",
+      "path": "radio.next",
       "args": [
-        "1"
+        "99"
       ],
       "context": {
-        "limit": 1
-      }
+        "history": [
+          {
+            "id": "mid1",
+            "title": "Fixture",
+            "artists": [],
+            "extra": {
+              "songId": 1
+            }
+          }
+        ],
+        "count": 1
+      },
+      "expectedJson": [
+        {
+          "id": "mid2"
+        }
+      ]
     },
     {
       "name": "scrape.search",
@@ -1464,38 +4108,115 @@
       "args": [
         {
           "id": "mid1",
-          "title": "Fixture Song",
+          "title": "Fixture",
           "artists": []
         }
       ],
       "expectedJson": {
-        "format": "krc",
-        "text": "[1000,900]<0,400,0>你<400,500,0>好"
+        "format": "krc"
+      }
+    },
+    {
+      "name": "AuthExpired refresh and replay",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "refresh-once",
+          "limit": 1
+        }
+      ],
+      "expectedJson": {
+        "items": [
+          {
+            "id": "mid1"
+          }
+        ]
       }
     },
     {
       "name": "auth.user",
       "path": "auth.user",
-      "args": []
+      "args": [],
+      "expectedJson": {
+        "id": "12345",
+        "name": "Fixture User"
+      }
     },
     {
       "name": "auth.refresh",
       "path": "auth.refresh",
-      "args": []
+      "args": [],
+      "expectedJson": {
+        "musickey": "fake-renewed-key",
+        "refresh_key": "fake-refresh-key",
+        "refresh_token": "fake-refresh-token"
+      }
     },
     {
       "name": "auth.cookie.submit",
       "path": "auth.cookie.submit",
       "args": [
-        "uin=12345; qm_keyst=fake-cookie-key"
-      ]
+        "uin=12345; qm_keyst=fake-cookie-key; refresh_key=fake-refresh-key"
+      ],
+      "expectedJson": {
+        "credential": {
+          "musicid": 12345,
+          "refresh_key": "fake-refresh-key",
+          "encrypt_uin": "fake-euin"
+        }
+      }
     },
     {
       "name": "qq QR start",
       "path": "auth.qrcode.start",
       "args": [
         "qq"
-      ]
+      ],
+      "expectedJson": {
+        "state": {
+          "variant": "qq"
+        },
+        "expiresIn": 180
+      }
+    },
+    {
+      "name": "qq QR waiting",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "qq",
+          "identifier": "waiting"
+        }
+      ],
+      "expectedJson": {
+        "status": "waiting"
+      }
+    },
+    {
+      "name": "qq QR scanned",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "qq",
+          "identifier": "scanned"
+        }
+      ],
+      "expectedJson": {
+        "status": "scanned"
+      }
+    },
+    {
+      "name": "qq QR expired",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "qq",
+          "identifier": "expired"
+        }
+      ],
+      "expectedJson": {
+        "status": "expired"
+      }
     },
     {
       "name": "qq QR finish",
@@ -1503,18 +4224,67 @@
       "args": [
         {
           "variant": "qq",
-          "jar": {
-            "qrsig": "fake-qrsig"
-          }
+          "identifier": "fake-qrsig"
         }
-      ]
+      ],
+      "expectedJson": {
+        "status": "done",
+        "credential": {
+          "refresh_key": "fake-refresh-key"
+        }
+      }
     },
     {
       "name": "wx QR start",
       "path": "auth.qrcode.start",
       "args": [
         "wx"
-      ]
+      ],
+      "expectedJson": {
+        "state": {
+          "variant": "wx"
+        },
+        "expiresIn": 180
+      }
+    },
+    {
+      "name": "wx QR waiting",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "wx",
+          "identifier": "waiting"
+        }
+      ],
+      "expectedJson": {
+        "status": "waiting"
+      }
+    },
+    {
+      "name": "wx QR scanned",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "wx",
+          "identifier": "scanned"
+        }
+      ],
+      "expectedJson": {
+        "status": "scanned"
+      }
+    },
+    {
+      "name": "wx QR expired",
+      "path": "auth.qrcode.poll",
+      "args": [
+        {
+          "variant": "wx",
+          "identifier": "expired"
+        }
+      ],
+      "expectedJson": {
+        "status": "expired"
+      }
     },
     {
       "name": "wx QR finish",
@@ -1522,29 +4292,86 @@
       "args": [
         {
           "variant": "wx",
-          "uuid": "fake-uuid"
+          "identifier": "fake-uuid"
         }
-      ]
+      ],
+      "expectedJson": {
+        "status": "done",
+        "credential": {
+          "refresh_key": "fake-refresh-key"
+        }
+      }
     },
     {
-      "name": "auth.sms.send",
+      "name": "SMS send cooldown",
       "path": "auth.sms.send",
       "args": [
-        "fixture-phone"
-      ]
+        "10000000000"
+      ],
+      "expectedJson": {
+        "state": {
+          "phone": "10000000000",
+          "field": "phoneNo"
+        },
+        "cooldown": 60
+      }
     },
     {
-      "name": "auth.sms.verify",
+      "name": "SMS verify",
       "path": "auth.sms.verify",
       "args": [
         {
-          "phone": "fixture-phone"
+          "phone": "10000000000",
+          "field": "phoneNo"
         },
         "123456"
-      ]
+      ],
+      "expectedJson": {
+        "credential": {
+          "musicid": 12345
+        }
+      }
     },
     {
-      "name": "CGI upstream error",
+      "name": "SMS upstream frequency",
+      "path": "auth.sms.send",
+      "args": [
+        "10000000001"
+      ],
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "SMS captcha requires QR",
+      "path": "auth.sms.send",
+      "args": [
+        "10000000002"
+      ],
+      "expectedCode": "CAPABILITY_UNSUPPORTED"
+    },
+    {
+      "name": "VIP track",
+      "path": "track.streams",
+      "args": [
+        "vip"
+      ],
+      "context": {
+        "quality": "high"
+      },
+      "expectedCode": "VIP_REQUIRED"
+    },
+    {
+      "name": "expired stream URL",
+      "path": "track.streams",
+      "args": [
+        "expired"
+      ],
+      "context": {
+        "quality": "standard"
+      },
+      "expectedCode": "PLAYBACK_EXPIRED"
+    },
+    {
+      "name": "upstream error",
       "path": "search.track",
       "args": [
         {
@@ -1555,7 +4382,18 @@
       "expectedCode": "UPSTREAM_ERROR"
     },
     {
-      "name": "Invalid cookie",
+      "name": "rate limited",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "limited",
+          "limit": 1
+        }
+      ],
+      "expectedCode": "RATE_LIMITED"
+    },
+    {
+      "name": "invalid cookie",
       "path": "auth.cookie.submit",
       "args": [
         "broken"
@@ -1563,21 +4401,108 @@
       "expectedCode": "PARSE_ERROR"
     },
     {
-      "name": "Invalid cursor",
+      "name": "invalid search cursor",
       "path": "search.track",
       "args": [
         {
           "keyword": "Fixture",
-          "cursor": "not-a-page",
-          "limit": 1
+          "limit": 1,
+          "cursor": "broken"
         }
       ],
+      "expectedCode": "PARSE_ERROR"
+    },
+    {
+      "name": "invalid detail cursor",
+      "path": "album.get",
+      "args": [
+        "album1"
+      ],
+      "context": {
+        "cursor": "-1",
+        "limit": 1
+      },
       "expectedCode": "PARSE_ERROR"
     },
     {
       "name": "auth.logout",
       "path": "auth.logout",
       "args": []
+    },
+    {
+      "name": "zzc signed retry",
+      "path": "search.track",
+      "args": [
+        {
+          "keyword": "sign-required",
+          "limit": 1
+        }
+      ],
+      "expectedJson": {
+        "items": [
+          {
+            "id": "mid1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hires Atmos fallback without master",
+      "path": "track.streams",
+      "args": [
+        "atmos"
+      ],
+      "context": {
+        "quality": "hires"
+      },
+      "expectedJson": [
+        {
+          "quality": "hires",
+          "format": "flac",
+          "size": 2000
+        }
+      ]
+    },
+    {
+      "name": "high AAC format preference",
+      "path": "track.streams",
+      "args": [
+        "mid1"
+      ],
+      "context": {
+        "quality": "high",
+        "format": "m4a"
+      },
+      "expectedJson": [
+        {
+          "quality": "high",
+          "format": "m4a",
+          "bitrate": 192000
+        }
+      ]
+    },
+    {
+      "name": "standard AAC fallback",
+      "path": "track.streams",
+      "args": [
+        "mid1"
+      ],
+      "context": {
+        "quality": "standard",
+        "format": "m4a"
+      },
+      "expectedJson": [
+        {
+          "quality": "standard",
+          "format": "m4a",
+          "bitrate": 96000
+        },
+        {
+          "quality": "standard",
+          "format": "m4a",
+          "bitrate": 48000
+        }
+      ]
     }
   ]
 }

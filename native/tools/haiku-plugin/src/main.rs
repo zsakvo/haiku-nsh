@@ -68,7 +68,7 @@ fn scaffold(name: &str, template: &str) -> Result<()> {
     std::fs::write(
         path.join("tsconfig.json"),
         serde_json::to_string_pretty(&json!({
-            "compilerOptions":{"strict":true,"noEmit":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM","DOM.Iterable"]},
+            "compilerOptions":{"strict":true,"noEmit":true,"allowImportingTsExtensions":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM","DOM.Iterable"]},
             "files":[sdk,"plugin.ts"]
         }))?,
     )?;
@@ -94,7 +94,7 @@ async fn check(path: &Path) -> Result<()> {
     std::fs::write(
         &config,
         serde_json::to_vec_pretty(&json!({
-            "compilerOptions":{"strict":true,"noEmit":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM","DOM.Iterable"]},
+            "compilerOptions":{"strict":true,"noEmit":true,"allowImportingTsExtensions":true,"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","DOM","DOM.Iterable"]},
             "files":[sdk()?,path.join("plugin.ts")]
         }))?,
     )?;
