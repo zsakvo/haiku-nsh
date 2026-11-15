@@ -50,16 +50,15 @@ export function CardShelf(props:{items:any[];open:(item:any)=>void;listening?:bo
 /** Cover navigation and playback are sibling controls with separate keyboard stops. */
 export type RecommendationPreview={titles:string[];loading:boolean;error?:string};
 export function RecommendationCard(props:{
-  title:string;cover?:string;busy?:boolean;disabled?:boolean;open:()=>void;play:()=>void;
+  title:string;cover?:string;busy?:boolean;disabled?:boolean;open?:()=>void;play:()=>void;
   preview?:RecommendationPreview;loadPreview:()=>void;
 }) {
   const hovered=signal(false);
   const fade="transition-opacity duration-300 motion-reduce:transition-none";
   const visibility=()=>hovered()?"opacity-100":"opacity-0";
-  return <View class="group relative w-(--recommendation-cover-width) h-(--recommendation-cover-height) shrink-0"
+  return <View accessibilityLabel={`推荐：${props.title}`} class="group relative w-(--recommendation-cover-width) h-(--recommendation-cover-height) shrink-0"
     onMouseEnter={()=>{hovered.set(true);props.loadPreview();}} onMouseLeave={()=>hovered.set(false)}>
-    <BaseButton accessibilityLabel={props.title} onPress={props.open}
-      class={`absolute inset-0 rounded-(--radius-inset) overflow-hidden bg-cover-placeholder active:opacity-85 ${focus}`}>
+    <View class="absolute inset-0 rounded-(--radius-inset) overflow-hidden bg-cover-placeholder">
       <If when={!!props.cover}><Image src={props.cover} class="absolute inset-0" style={{objectFit:"cover"}} /></If>
       <If when={!props.cover}><View class="absolute inset-0 items-center justify-center"><Icon name="music" color="cover-foreground" /></View></If>
       <View class="absolute inset-x-0 top-0 h-24 pointer-events-none"
@@ -82,9 +81,12 @@ export function RecommendationCard(props:{
           </Each>
         </View>
       </View>
-    </BaseButton>
+    </View>
+    <If when={!!props.open}><BaseButton accessibilityLabel={props.title} onPress={()=>props.open?.()}
+      class={`absolute inset-0 rounded-(--radius-inset) active:bg-cover-shade ${focus}`} /></If>
     <BaseButton accessibilityLabel={`播放${props.title}`} onPress={props.play} disabled={props.disabled}
       tooltip={<Tooltip label={props.busy?"正在加载播放列表…":`播放${props.title}`} />}
+      focusVisibleStyle={{opacity:1,pointerEvents:"auto"}}
       style={{pointerEvents:hovered()?"auto":"none"}}
       class={`absolute bottom-1.5 right-1.5 size-(--recommendation-play-size) rounded-full items-center justify-center bg-cover-play-background hover:bg-cover-play-hover active:bg-cover-play-active disabled:opacity-40 focus-visible:opacity-100 ${fade} ${visibility()} ${focus}`}>
       <Icon name={props.busy?"sync":"play"} color="cover-foreground" />

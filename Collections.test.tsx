@@ -19,6 +19,7 @@ test("native Dock likes, playlist submenu create/add, edit/delete, Stop and Core
   await app.press("text:测试歌单");
   await app.waitFor("id:page-playlist");
   await app.waitFor("label:Song Alpha");
+  await app.press("更多歌单操作");
   await app.press("编辑歌单…");
   await app.clear("label:歌单名称");
   await app.type("label:歌单名称", "改名后的歌单");
@@ -31,10 +32,12 @@ test("native Dock likes, playlist submenu create/add, edit/delete, Stop and Core
   await app.press("修改本地元数据");
   await app.waitFor("label:Song Alpha Edited");
   await app.waitUntil(() => app.texts().some((t) => t.startsWith("first-artwork:") && t !== originalArtwork));
+  await app.press("更多歌单操作");
   await app.press("删除歌单…");
   await app.waitFor("text:删除歌单？");
   await app.press("取消");
   expect(app.shows("text:改名后的歌单")).toBe(true);
+  await app.press("更多歌单操作");
   await app.press("删除歌单…");
   await app.press("确认删除歌单");
   await app.waitFor("id:page-playlists");

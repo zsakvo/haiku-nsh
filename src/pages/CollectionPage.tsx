@@ -3,8 +3,7 @@ import { CollectionsService, Core, TrackList } from "haiku/native";
 import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
 import { Button } from "../ui/Button";
-import { CollectionArtwork } from "../ui/CollectionArtwork";
-import { EmptyState } from "../ui/EmptyState";
+import { DetailHeader, DetailAction } from "../ui/DetailHeader";
 import { Menu, MenuItem, Dialog } from "../ui/Surfaces";
 import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
@@ -17,6 +16,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const service = props.core.collections;
   const mirror = mirrorCollections(props.core);
   const player = mirrorCore(props.core).player;
+  const managing = signal(false);
   const search = signal("");
   const filter = signal("");
   const sort = signal(props.id === "__liked__" ? "newest" : "manual");
@@ -84,34 +84,30 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       }
     });
   }
-  return <View testID={liked ? "page-favorites" : "page-playlist"}
-    class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-4 gap-4">
-      <View class="flex-row gap-5 items-start">
-        <If when={!liked}><CollectionArtwork covers={covers()} /></If>
-        <View class="flex-1 min-w-0 gap-2">
-          <Text role="header" class="text-xl font-semibold text-foreground">{collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}</Text>
-          <If when={!!collection()?.description}><Text class="text-sm text-muted-foreground">{collection()?.description}</Text></If>
-          <Text class="text-xs text-muted-foreground">{collection()?.trackCount ?? 0} 首歌曲</Text>
-          <View class="flex-row flex-wrap gap-2">
-            <Button label="播放全部" variant="primary" size="sm" disabled={!collection()?.trackCount}
-              onPress={() => void act(() => service.playSource(source()!, ""))} />
-            <Button label="下载全部" size="sm" disabled={!collection()?.trackCount}
-              onPress={() => void act(() => props.core.downloads.enqueue(service.tracks(props.id)))} />
-            <If when={collection()?.kind === "user"}>
-              <Button label="编辑歌单…" size="sm" onPress={() => editor.set("edit")} />
-              <Button label="删除歌单…" size="sm" onPress={() => deleting.set(true)} />
-            </If>
-            <If when={collection()?.kind === "plugin"}>
-              <Button label="取消收藏歌单…" size="sm" onPress={() => deleting.set(true)} />
-            </If>
-          </View>
-        </View>
-      </View>
+  const header = () => <View class="gap-3 pb-2">
+      <DetailHeader title={collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}
+        cover={collection()?.cover || covers().find((cover):cover is string=>!!cover)}
+        description={collection()?.description} metadata={`${collection()?.trackCount ?? 0} 首`}>
+        <DetailAction label="播放全部" icon="play" primary disabled={!collection()?.trackCount || !source()}
+          onPress={() => void act(() => service.playSource(source()!, ""))} />
+        <DetailAction label="下载全部" icon="download" disabled={!collection()?.trackCount}
+          onPress={() => void act(() => props.core.downloads.enqueue(service.tracks(props.id)))} />
+        <Menu trigger={<Button label="…" accessibilityLabel="更多歌单操作" variant="ghost" size="sm" onPress={()=>{}} />}>
+          <MenuItem onSelect={()=>managing.set(!managing())}><Text>{managing()?"收起歌单管理":"管理歌单"}</Text></MenuItem>
+          <If when={collection()?.kind === "user"}>
+            <MenuItem onSelect={()=>editor.set("edit")}><Text>编辑歌单…</Text></MenuItem>
+            <MenuItem onSelect={()=>deleting.set(true)}><Text>删除歌单…</Text></MenuItem>
+          </If>
+          <If when={collection()?.kind === "plugin"}>
+            <MenuItem onSelect={()=>deleting.set(true)}><Text>取消收藏歌单…</Text></MenuItem>
+          </If>
+        </Menu>
+      </DetailHeader>
+      <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
+      <If when={managing()}>
       <If when={!liked && !!collection()}>
         <AutoDownloadControls core={props.core} id={props.id} />
       </If>
-      <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
       <SettingSelect label="曲目排序" value={sort()} onChange={sort.set} items={[
         { value: "manual", title: "歌单顺序" }, { value: "newest", title: "最新加入" },
         { value: "oldest", title: "最早加入" }, { value: "title", title: "按曲名" },
@@ -126,6 +122,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
           </Each>
         </Menu>
       </View>
+      </If>
       <If when={!!selected().length}>
         <View class="flex-row flex-wrap gap-2 items-center">
           <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
@@ -145,13 +142,15 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       <If when={!!error() || !!source.error()}><Text class="text-sm text-destructive">{error() || String(source.error())}</Text>
         <Button label="重试" size="sm" onPress={() => { error.set(""); source.refetch(); }} />
       </If>
-    </View>
-    <If when={!collection()?.trackCount}>
-      <EmptyState title={liked ? "收藏值得重听的音乐" : "从一首歌开始"}
-        description={liked ? "点击底栏的喜欢按钮，或在曲目菜单中选择喜欢。" : "在曲目菜单中选择“加入歌单”，把音乐放在这里。"} />
-    </If>
-    <If when={!!collection()?.trackCount && !!source()}>
-      <TrackList bottomInset={token("dock-scroll-clearance")} source={source()!} active={props.active && !editor() && !deleting() && !trackEditor()}
+    </View>;
+  return <View testID={liked ? "page-favorites" : "page-playlist"}
+    class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
+    <If when={!!source()} else={<View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-2">
+      <Text class="text-sm text-muted-foreground">{source.error()?String(source.error()):"正在加载歌单…"}</Text>
+      <If when={!!source.error()}><Button label="重试" size="sm" onPress={()=>source.refetch()} /></If>
+    </View>}>
+      <TrackList detail header={header()} bottomInset={token("dock-scroll-clearance")} source={source()!}
+        active={props.active && !editor() && !deleting() && !trackEditor()}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onPlay={(event) => void act(() => service.playSource(event.source, event.id))}
         onAction={(event) => void command(event.command, event.ids)}

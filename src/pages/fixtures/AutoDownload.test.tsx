@@ -4,6 +4,9 @@ const options = { platform: "macos" as const, width: 1200, height: 800, network:
 
 test("playlist automatic download adds existing tracks to the real download queue", async () => {
   const app = await open("../../../AutoDownloadPreview.tsx", options);
+  await app.waitFor("label:更多歌单操作");
+  await app.press("更多歌单操作");
+  await app.press("管理歌单");
   await app.waitFor("label:自动下载");
   await app.press("label:自动下载");
   await app.waitFor("label:跟随移除");

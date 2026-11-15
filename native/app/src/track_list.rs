@@ -24,6 +24,13 @@ pub struct TrackListProps {
     /// Scrollable trailing space beneath the last row, for overlapping player controls.
     #[prop(default)]
     pub bottom_inset: Prop<f32>,
+    /// Playlist detail layout with artwork, inline likes and a scrolling heading.
+    #[prop(default)]
+    pub detail: Prop<bool>,
+    /// Page content above the table, scrolling with the songs.
+    pub header: Prop<Option<Slot>>,
+    /// Pagination and status below the songs.
+    pub footer: Prop<Option<Slot>>,
 }
 /// Commands and selection requests from the list; the consumer owns playback/editor actions.
 #[derive(Clone, Debug, PartialEq, Event)]
@@ -295,6 +302,9 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
         }
     });
     let initial = source(props).map(|s| s.scroll.get_untracked()).unwrap_or(0);
+    if props.detail.get_untracked() {
+        return detail_list(props, cx, list, initial).into_element();
+    }
     view()
         .flex_1()
         .min_h_0()
@@ -577,4 +587,134 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
             .flex_1()
             .min_h_0(),
         )
+        .into_element()
+}
+
+fn detail_heading() -> impl IntoElement {
+    view().test_id("detail-song-heading")
+        .app_class("flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border mb-2.5")
+        .child(text("#").app_class("w-10 shrink-0 text-xs text-muted-foreground"))
+        .child(text("标题").flex_1().flex_grow(1.6).min_w_0().app_class("pr-6 text-xs text-muted-foreground"))
+        .child(text("专辑").flex_1().min_w_0().app_class("pr-6 text-xs text-muted-foreground"))
+        .child(text("喜欢").app_class("w-14 shrink-0 text-xs text-muted-foreground"))
+        .child(text("时长").app_class("w-(--detail-duration-width) shrink-0 text-xs text-muted-foreground"))
+        .child(view().w_8())
+}
+
+fn detail_list(
+    props: TrackListProps,
+    cx: Scope<TrackListEvent>,
+    list: ElementRef,
+    initial: usize,
+) -> impl IntoElement {
+    let bridge = crate::presentation::get().map(|p| p.bridge.clone());
+    virtual_list(
+        move || source(props).map(|s| s.ids.with(Vec::len)).unwrap_or(0),
+        move |at| {
+            let track = computed(move || {
+                let s = source(props)?;
+                s.revision.get();
+                s.provider.track(&id_at(props, at)?)
+            });
+            let playing = move || id_at(props, at).is_some_and(|id|
+                props.current_id.get().is_some_and(|current| current.as_str() == id));
+            let like_bridge = bridge.clone();
+            let liked = computed(move || {
+                like_bridge.as_ref().is_some_and(|b| {
+                    b.collections_revision.get();
+                    track.with(|t| t.as_ref().is_some_and(|t| b.collections.is_liked(&t.entity_ref())))
+                })
+            });
+            let write = bridge.clone();
+            let cover = computed(move || track.with(|t| t.as_ref().and_then(|t| {
+                let url = t.cover.as_ref()?;
+                Some(crate::presentation::get().map(|p|
+                    crate::sources::cover_url(&p.bridge.source_host, &t.source, url, 36)
+                ).unwrap_or_else(|| url.clone()))
+            })).unwrap_or_default());
+            let row = view()
+                .role(nsh_core::AccessibilityRole::Row).focusable(true)
+                .label(move || track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default()))
+                .app_class("flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")
+                .bg(move || {
+                    let selected = source(props).is_some_and(|s| id_at(props, at)
+                        .is_some_and(|id| s.selected.with(|set| set.contains(&id))));
+                    if selected { theme().color("selection").unwrap_or(theme().accent) } else { theme().background }
+                })
+                .accessibility_state(move || nsh_core::AccessibilityState {
+                    selected: source(props).is_some_and(|s| id_at(props, at)
+                        .is_some_and(|id| s.selected.with(|set| set.contains(&id)))),
+                    ..Default::default()
+                })
+                .on_press(move |event: &PressEvent| {
+                    if let Some(s) = source(props) {
+                        s.select(at.index(), event.modifiers.cmd, event.modifiers.shift);
+                        selection(props, cx);
+                        if event.clicks == 2 && let Some(id) = id_at(props, at) {
+                            play(props, cx, id);
+                        }
+                    }
+                })
+                .child(text(move || format!("{:02}", at.index() + 1))
+                    .app_class("w-10 shrink-0 text-xs text-muted-foreground"))
+                .child(nsh_base::button()
+                    .accessibility_label(move || Some(format!("播放{}", track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default())).into()))
+                    .flex_1().flex_grow(1.6).min_w_0()
+                    .app_class("flex-row items-center gap-2.5 pr-6 rounded-(--radius) focus-visible:outline-2 focus-visible:outline-ring")
+                    .on_press(move || { if let Some(id) = id_at(props, at) { play(props, cx, id); } })
+                    .child(view().app_class("size-9 shrink-0 rounded-(--radius-inset) overflow-hidden bg-muted items-center justify-center")
+                        .child(when(move || !cover.get().is_empty(), move || image(move || cover.get()).size_full().object_fit(nsh_core::ResizeMode::Cover)))
+                        .child(when(move || cover.get().is_empty(), || crate::player_controls::icon("music", false))))
+                    .child(view().flex_1().min_w_0().gap(px(1.))
+                        .child(text(move || track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default()))
+                            .text_xs().app_class("font-medium").truncate()
+                            .text_color(move || if playing() { theme().primary } else { theme().foreground }))
+                        .child(text(move || track.with(|t| t.as_ref().map(artist_names).filter(|a| !a.is_empty())
+                            .map(|a| a.join(" / ")).unwrap_or_else(|| "未知艺术家".into())))
+                            .app_class("text-(--detail-artist-size)").truncate()
+                            .text_color(move || if playing() { theme().primary } else { theme().muted_foreground }))))
+                .child(text(move || track.with(|t| t.as_ref().and_then(|t| t.album.as_ref())
+                    .map(|a| a.title.clone()).unwrap_or_else(|| "—".into())))
+                    .flex_1().min_w_0().app_class("pr-6 text-xs").truncate()
+                    .text_color(move || if playing() { theme().primary } else { theme().muted_foreground }))
+                .child(view().w_14().flex_shrink_0().child(nsh_base::button()
+                    .accessibility_label(move || Some(if liked.get() { "取消喜欢".into() } else { "喜欢".into() }))
+                    .disabled(write.is_none())
+                    .app_class("w-6 h-7 items-center justify-center rounded-(--radius) hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring")
+                    .on_press(move || {
+                        if let Some(b) = &write
+                            && let Some(t) = track.get_untracked()
+                            && let Err(e) = b.collections.set_liked(&t, Some(!liked.get_untracked())) {
+                            log::error!("Like: {e}");
+                        }
+                    })
+                    .child(image(move || nsh_core::element::ImageSrc::svg_markup(if liked.get() {
+                        include_str!("../../../assets/icons/heart-filled.svg")
+                    } else { include_str!("../../../assets/icons/heart.svg") }))
+                        .size(px(18.)).tint_color(move || if liked.get() { theme().destructive } else { theme().muted_foreground }))))
+                .child(text(move || track.with(|t| t.as_ref().and_then(|t| t.duration).filter(|s| *s > 0.)
+                    .map(|s| format!("{:02}:{:02}", s as u64 / 60, s as u64 % 60)).unwrap_or_else(|| "—".into())))
+                    .app_class("w-(--detail-duration-width) shrink-0 text-xs text-muted-foreground"))
+                .child(menu().popup_class(POPUP).trigger(nsh_base::button()
+                    .accessibility_label("更多曲目操作").app_class("size-8 rounded-(--radius) hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring")
+                    .child(text("…").text_color(move || theme().muted_foreground)))
+                    .child(commands(props, at, cx)));
+            view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(context_menu().popup_class(POPUP)
+                .on_open_change(move |event: &nsh_base::MenuEvent| {
+                    if matches!(event, nsh_base::MenuEvent::OpenChange(true, _))
+                        && let Some(s) = source(props)
+                        && !id_at(props, at).is_some_and(|id| s.selected.with_untracked(|set| set.contains(&id))) {
+                        s.select(at.index(), false, false); selection(props, cx);
+                    }
+                }).trigger(row).child(commands(props, at, cx)))
+        },
+    )
+    .test_id("detail-track-list").element_ref(&list).flex_1().min_h_0()
+    .header(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.header.place(|s| s)).child(detail_heading()))
+    .footer(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.footer.place(|s| s)))
+    .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())
+    .initial_scroll_index(initial)
+    .content_padding_bottom(move || px(props.bottom_inset.get()))
+    .estimated_item_size(move || px(theme().tokens().number("detail-row-height").unwrap_or(58.)))
+    .empty(text("没有符合条件的歌曲").app_class("p-4 text-sm text-muted-foreground"))
 }

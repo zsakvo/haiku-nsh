@@ -95,7 +95,7 @@ export default definePlugin({
   playlist: {
     async get(id, ctx) {
       if (playlistOffline) throw new Upstream("歌单来源离线");
-      if(id==="playlist/百万")return {info:playlist(ctx),tracks:{items:Array.from({length:7},(_,i)=>({...track(`favorites/${i}`,ctx),title:`收藏曲目 ${i+1}`}))}};
+      if(id==="playlist/百万")return {info:{...playlist(ctx),trackCount:70},tracks:{items:Array.from({length:70},(_,i)=>({...track(`favorites/${i}`,ctx),title:`收藏曲目 ${i+1}`}))}};
       return { info: playlist(ctx), tracks: tracks(ctx) };
     },
   },

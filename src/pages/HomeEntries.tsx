@@ -9,7 +9,7 @@ export type HomeEntry = {
 };
 const playable = (entry:HomeEntry) => ["playlist","radio","album","toplist","program"].includes(entry.to.reference.kind);
 
-/** Entry playback stays on Home; navigation still opens the source's original destination. */
+/** Radio entries only start a station; collections also expose detail navigation. */
 export function HomeEntries(props:{
   core:Core;entries:HomeEntry[];active:boolean;fallbackCover?:string;open:(entry:HomeEntry)=>void;
 }) {
@@ -101,7 +101,7 @@ export function HomeEntries(props:{
           <RecommendationCard title={e().title} cover={e().cover||props.fallbackCover}
             preview={previews()[JSON.stringify(e().to.reference)]} loadPreview={()=>void preview(e())}
             busy={pending()===JSON.stringify(e().to.reference)} disabled={!!pending()}
-            open={()=>props.open(e())} play={()=>void play(e())} />}
+            open={e().to.reference.kind==="radio"?undefined:()=>props.open(e())} play={()=>void play(e())} />}
         </Each>
       </Scroll>
     </If>

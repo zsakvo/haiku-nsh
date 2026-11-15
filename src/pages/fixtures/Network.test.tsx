@@ -26,11 +26,16 @@ test("library source → paged album → playback, artist albums, favorite sideb
   await app.waitFor("role:button[夜航精选]");
   await app.press("role:button[夜航精选]");
   await app.waitFor("text:已加载 1 首");
+  await app.press("更多歌单操作");
   await app.press("收藏歌单");
-  await app.waitFor("role:button[取消收藏歌单]");
+  await app.press("更多歌单操作");
+  await app.waitFor("role:menuitem[取消收藏歌单]");
+  await app.keyboard.press("escape");
   expect(app.texts().filter((t) => t === "夜航精选").length >= 2).toBe(true);
   await app.press("id:nav-history");
   await app.press("歌单历史");
   await app.press("id:history-playlist-list >> role:button[夜航精选]");
-  await app.waitFor("role:button[取消收藏歌单]");
+  await app.press("更多歌单操作");
+  await app.waitFor("role:menuitem[取消收藏歌单]");
+  await app.keyboard.press("escape");
 });

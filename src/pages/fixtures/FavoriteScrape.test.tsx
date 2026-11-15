@@ -6,11 +6,13 @@ test("favorite opens complete refreshed mirror and unfavorite requires confirmat
   const app = await open("../../../FavoriteRefreshPreview.tsx", options);
   await app.waitFor("label:潮汐之间");
   await app.waitFor("label:远方回声");
-  await app.waitFor("text:2 首歌曲");
+  await app.waitFor("text:2 首");
+  await app.press("更多歌单操作");
   await app.press("取消收藏歌单…");
   await app.waitFor("role:button[确认取消收藏]");
   await app.press("role:button[取消]");
   expect(app.shows("label:潮汐之间")).toBe(true);
+  await app.press("更多歌单操作");
   await app.press("取消收藏歌单…");
   await app.press("确认取消收藏");
   await app.waitUntil(() => !app.shows("role:button[取消收藏歌单…]"));
