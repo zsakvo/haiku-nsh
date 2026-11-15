@@ -16,8 +16,10 @@ const pageSize = 6;
 const rowsPerColumn = 3;
 
 /** Each virtual page contains two columns of three songs; the shelf owns paging and actions. */
-export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boolean }) {
-  const width = signal(0), page = signal(0), hovered = signal(false);
+export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boolean; width?: number }) {
+  // The page width the parent already knows: at 0 every page is 1 pt wide until the first layout,
+  // and the list binds all of them at once.
+  const width = signal(props.width ?? 0), page = signal(0), hovered = signal(false);
   const error = signal(""), pending = signal(""), creating = signal<HomeTrack[] | null>(null);
   const liked = signal(new Set(props.core.collections.likedKeys() as string[]));
   const playlists = signal(props.core.collections.list() as Collection[]);

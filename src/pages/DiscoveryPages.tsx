@@ -105,6 +105,11 @@ export function HomePage(props:Props) {
     });
     rows=next;return out;
   });
+  // The shelves above the first feed row (song pages, recommendation covers, card rows) are
+  // heavy, and a recycled cell rebuilds them whole when a fast scroll returns to the top, drawing
+  // blank rows meanwhile. They live in the list's header, built once; feed rows stay recycled.
+  const lead=computed(()=>{const all=merged(),first=all.findIndex(row=>!!row.feed);return first>0?all.slice(0,first):[];});
+  const rest=computed(()=>{const skip=lead().length;return skip?merged().slice(skip):merged();});
   const openFeed=(e:FeedItem)=>e.kind==="entries"?link(e.item.to):props.navigate(entityRoute(e.item));
   // Append the next page when the scroll nears the bottom; shelves with repeated ids are skipped.
   // QQ continuation pages are small (one shelf) and take 0.5–4 s each, so one page is always
@@ -158,8 +163,18 @@ export function HomePage(props:Props) {
     if(ref.kind==="radio") {props.navigate({kind:"radio",source:ref.source});return;}
     props.navigate(entityRoute(link));
   }
+  function section(s:()=>Section){
+    return <View class="pb-6"><Shelf id={`shelf-${s().id}`} title={s().continued?"":s().title} tight={s().continued} more={s().more?()=>link(s().more):undefined}>
+      <If when={!!s().feed}><FeedRow core={props.core} items={s().feed!} columns={columns()} open={openFeed} /></If>
+      <If when={!s().feed&&s().kind==="tracks"}><HomeTracks core={props.core} tracks={s().items} active={props.active} width={feedWidth()} /></If>
+      <If when={!s().feed&&s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
+        fallbackCover={current()?.fallbackCover} open={e=>link(e.to)} /></If>
+      <If when={!s().feed&&s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
+        listening hideTitle={s().kind==="toplists"} open={e=>props.navigate(entityRoute(e))} /></If>
+    </Shelf></View>;
+  }
   return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <List testID="home-scroll" class="flex-1" each={merged()} keyExtractor={s=>s.id}
+    <List testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id}
       onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
       estimatedItemSize={rowEstimate()} loadMoreThreshold={2} onLoadMore={()=>wantMore.set(true)}
       contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"
@@ -171,6 +186,7 @@ export function HomePage(props:Props) {
         <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
         <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
         <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
+        <Each of={lead()} key={s=>s.id}>{section}</Each>
       </View>}
       footer={<View>
         <If when={loadingMore()}><Spinner label="正在加载更多推荐" /></If>
@@ -179,14 +195,7 @@ export function HomePage(props:Props) {
           <Button label="加载更多推荐" size="sm" variant="ghost" onPress={()=>void more()} />
         </If>
       </View>}>
-        {s=><View class="pb-6"><Shelf id={`shelf-${s().id}`} title={s().continued?"":s().title} tight={s().continued} more={s().more?()=>link(s().more):undefined}>
-          <If when={!!s().feed}><FeedRow core={props.core} items={s().feed!} columns={columns()} open={openFeed} /></If>
-          <If when={!s().feed&&s().kind==="tracks"}><HomeTracks core={props.core} tracks={s().items} active={props.active} /></If>
-          <If when={!s().feed&&s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
-            fallbackCover={current()?.fallbackCover} open={e=>link(e.to)} /></If>
-          <If when={!s().feed&&s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
-            listening hideTitle={s().kind==="toplists"} open={e=>props.navigate(entityRoute(e))} /></If>
-        </Shelf></View>}
+        {section}
     </List>
   </View>;
 }
