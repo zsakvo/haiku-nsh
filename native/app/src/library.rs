@@ -293,11 +293,11 @@ impl LibraryService {
             blocking(move || library.groups(&kind, &query, offset as usize, limit as usize))
                 .await
                 .map_err(|e| error(e.to_string()))?;
-        Ok(serde_json::json!({"total":total,"items":items}))
+        Ok(this.with(|s| crate::sources::project_covers(&s.bridge.player.source_host, "local", serde_json::json!({"total":total,"items":items}), 192)))
     }
     /// Read one effective track for an editor. List rows read this directly in Rust.
     pub fn track(&self, id: String) -> JsonValue {
-        value(&self.bridge.library.track(&id))
+        crate::sources::project_covers(&self.bridge.player.source_host, "local", value(&self.bridge.library.track(&id)), 256)
     }
     /// Describe one opaque local group for its detail header, without serializing its tracks.
     pub async fn describe_group(this: Instance<Self>, key: String) -> Result<JsonValue, JsError> {

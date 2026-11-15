@@ -3,12 +3,12 @@ const options = { platform: "macos" as const, width: 1200, height: 800, network:
 
 test("Escape closes now playing and the dock can reopen it", async () => {
   const app = await open("../../../RemoteLyricsPreview.tsx", options);
-  await app.waitFor("label:显示歌词");
-  await app.press("label:显示歌词");
+  await app.waitFor("label:打开正在播放");
+  await app.press("label:打开正在播放");
   await app.waitFor("id:now-playing");
   await app.keyboard.press("escape");
   await app.waitUntil(() => !app.shows("id:now-playing"));
-  await app.press("label:显示歌词");
+  await app.press("label:打开正在播放");
   await app.waitFor("id:now-playing");
   await app.press("label:收起正在播放");
   await app.waitUntil(() => !app.shows("id:now-playing"));
@@ -17,7 +17,7 @@ test("Escape closes now playing and the dock can reopen it", async () => {
 test("manual lyrics dialog previews, adopts, restores automatic and reports source errors", async () => {
   const app = await open("../../../RemoteLyricsPreview.tsx", options);
   await app.waitFor("text:潮汐之间");
-  await app.press("label:显示歌词");
+  await app.press("label:打开正在播放");
   await app.waitFor("id:now-playing");
   await app.press("role:button[查找歌词…]");
   await app.waitFor("id:lyrics-preview >> text:潮汐之间");
@@ -25,13 +25,13 @@ test("manual lyrics dialog previews, adopts, restores automatic and reports sour
   await app.waitUntil(() => app.texts().some(t => t.includes("分") && t.includes("逐字")));
   await app.press("采用歌词");
   await app.waitUntil(() => !app.shows("text:查找歌词"));
-  await app.press("label:显示歌词");
+  await app.press("label:打开正在播放");
   await app.waitFor("id:now-playing");
   await app.press("role:button[查找歌词…]");
   await app.waitFor("id:lyrics-preview >> text:潮汐之间");
   await app.press("恢复自动");
   await app.waitUntil(() => !app.shows("text:查找歌词"));
-  await app.press("label:显示歌词");
+  await app.press("label:打开正在播放");
   await app.waitFor("id:now-playing");
 });
 

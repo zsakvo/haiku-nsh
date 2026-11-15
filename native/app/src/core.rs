@@ -18,10 +18,12 @@ pub(crate) fn js_error(error: Error) -> JsError {
         .with("sourceId", serde_json::json!(error.source_id))
         .with("detail", serde_json::json!(error.detail))
 }
-fn json(state: &PlayerState) -> JsonValue {
-    serde_json::to_value(state).expect("finite core state")
+fn json(state: &PlayerState, host: &haiku_plugins::Host) -> JsonValue {
+    crate::sources::project_covers(host, "", serde_json::to_value(state).expect("finite core state"), 104)
 }
 pub(crate) fn decode<T: serde::de::DeserializeOwned>(value: JsonValue) -> Result<T, JsError> {
+    let mut value = value;
+    crate::sources::restore_covers(&mut value);
     serde_json::from_value(value)
         .map_err(|e| js_error(Error::new(ErrorCode::InvalidArgument, e.to_string())))
 }
@@ -103,12 +105,13 @@ impl CoreBridge {
             let state = signal(controller.state());
             let mut states = controller.subscribe();
             let core = controller.clone();
+            let projection_host = source_host.clone();
             // One pump owns both event delivery and the display-frame clock.
             spawn(async move {
                 loop {
                     let snapshot = states.borrow_and_update().clone();
                     state.set(snapshot.clone());
-                    let value = json(&snapshot);
+                    let value = json(&snapshot, &projection_host);
                     let callbacks: Vec<_> = listeners.0.borrow().values().cloned().collect();
                     for listener in callbacks {
                         listener.post(value.clone());
@@ -778,7 +781,7 @@ impl PlayerService {
     }
     /// Current low-frequency snapshot; contains no position/buffer fraction.
     pub fn snapshot(&self) -> JsonValue {
-        json(&self.bridge.controller.state())
+        json(&self.bridge.controller.state(), &self.bridge.source_host)
     }
     /// Hear the initial snapshot and subsequent low-frequency changes. Stop unregisters once.
     pub fn on_state(&mut self, #[args(state)] listener: Callback<JsonValue>) -> Stop {
@@ -786,7 +789,7 @@ impl PlayerService {
         let id = self.next_listener;
         self.listeners.0.borrow_mut().insert(id, listener);
         let listeners = self.listeners.clone();
-        let initial = json(&self.bridge.controller.state());
+        let initial = json(&self.bridge.controller.state(), &self.bridge.source_host);
         let listeners_for_initial = listeners.clone();
         // A deferred callback itself schedules JS for its next turn; post is safe here.
         if let Some(listener) = listeners_for_initial.0.borrow().get(&id) {
@@ -931,6 +934,70 @@ mod plugin_host_tests {
     use super::*;
     use nsh_engine::{EngineConfig, Root};
     use nsh_testing::Headless;
+
+    #[component]
+    fn ConcurrentOpenFixture() -> impl IntoElement {
+        let ready = signal(false);
+        spawn(async move {
+            let dir = Arc::new(tempfile::tempdir().unwrap());
+            global::<Option<DataRoot>>().set(Some(DataRoot {
+                path: dir.path().to_path_buf(),
+                credentials: Arc::new(haiku_services::account::MemoryCredentials::default()),
+                sync_secrets: Arc::new(haiku_services::sync::MemorySecrets::default()),
+                _temporary: Some(dir),
+            }));
+            // Match the shell, settings and plugin stores opening a cold Core together.
+            let cores = futures::future::try_join_all((0..4).map(|_| Core::open()))
+                .await
+                .unwrap();
+            let identity = cores[0].with(|core| core as *const Core as usize);
+            for core in &cores[1..] {
+                assert_eq!(core.with(|core| core as *const Core as usize), identity);
+            }
+            let settings = cores[1].with(|core| core.plugins.clone());
+            crate::plugins::PluginService::import_package(
+                settings.clone(),
+                format!("{}/tests/fixtures/auth-plugin", env!("CARGO_MANIFEST_DIR")),
+            )
+            .await
+            .unwrap();
+            let login = crate::plugins::PluginService::begin_login(
+                settings.clone(),
+                "auth.fixture".into(),
+            )
+            .await
+            .unwrap();
+            crate::plugins::PluginService::login_step(
+                settings,
+                login,
+                "cookie".into(),
+                serde_json::json!("fake-cookie"),
+            )
+            .await
+            .unwrap();
+            let shell = cores[0].with(|core| core.plugins.clone());
+            let snapshot = crate::plugins::PluginService::list(shell).await.unwrap();
+            assert!(snapshot["sources"].as_array().unwrap().iter().any(|source| {
+                source["sourceId"] == "auth.fixture" && source["enabled"] == true
+            }));
+            ready.set(true);
+        });
+        text(move || {
+            if ready.get() {
+                "Shared signed-in source"
+            } else {
+                "Opening"
+            }
+        })
+    }
+
+    #[test]
+    fn concurrent_core_open_shares_the_signed_in_source_with_the_shell() {
+        let mut app =
+            Headless::start(EngineConfig::new(Root::of::<ConcurrentOpenFixture>())).unwrap();
+        app.wait_for("Shared signed-in source").unwrap();
+    }
+
     #[component]
     fn Fixture() -> impl IntoElement {
         let installed = signal(false);

@@ -1,0 +1,15 @@
+[package]
+name = "haiku-karaoke-preview"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# This fixture wraps the production registry without changing its registration.
+[workspace]
+
+[dependencies]
+nsh-app-haiku = { path = "../../../native/app" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+haiku-macos = { path = "../../../native/crates/haiku-macos" }
+nsh-platform-macos = "=0.4.0"

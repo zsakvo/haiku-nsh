@@ -41,7 +41,7 @@
 | 名称 | 实现 | 回退 |
 |---|---|---|
 | `GlassSurface` | NSVisualEffectView 作为 PlayerDock 的背景；无染色的 clear glass，细圆角轮廓，上缘高光 | NSH 绘制的半透明表面（M1 起就有） |
-| `KaraokeLayer`（可选） | CoreText + Core Animation 逐字填充 | Rust 组件 `KaraokeLine`。只有在实测 CPU 占用不可接受时才启用此项。**暂不实现，保留为优化点**（用户 2026-11-11 决定；M6-04 实测 debug 构建 Now Playing + 桌面歌词同开 CPU 平均 14.3%，8.6–17.4%，`.artifacts/m6-04/cpu.log`）。若 release 构建实测偏高或用户反馈耗电，再实现 |
+| `KaraokeLayer` | CoreText + Core Animation 逐字填充，只用于正在播放的当前行；时钟只在播放/暂停/seek/切行时同步 | Rust 组件 `KaraokeLine`（非 macOS 或注册不可用时）。2026-11-15 用户决定实现（M7-03），此前曾暂缓（M6-04 实测 debug CPU 平均 14.3%）。M7-03 同条件 A/B：原生 21.65% / 回退 22.23%，主线程 92% 空闲，剩余占用在其他线程，归入 G21 |
 
 ## 6. 网页登录（D14）
 

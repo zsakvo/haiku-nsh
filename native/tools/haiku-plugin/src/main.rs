@@ -1,5 +1,5 @@
 use haiku_plugins::{
-    contract::{ContractMode, run_contract},
+    contract::{ContractMode, run_contract_selected},
     describe_package,
 };
 use serde_json::json;
@@ -127,21 +127,23 @@ async fn run() -> Result<()> {
         Some("new") if args.len() == 4 && args[2] == "--template" => scaffold(&args[1], &args[3]),
         Some("check") if args.len() == 2 => check(Path::new(&args[1])).await,
         Some("test") if args.len() >= 2 => {
-            let flags = &args[2..];
-            if flags.iter().any(|s| s != "--live" && s != "--record") || flags.len() > 1 {
-                return Err("Use at most one of --live or --record".into());
+            let mut mode = ContractMode::Replay;
+            let mut only = Vec::new();
+            let mut flags = args[2..].iter();
+            while let Some(flag) = flags.next() {
+                match flag.as_str() {
+                    "--live" if mode == ContractMode::Replay => mode = ContractMode::Live,
+                    "--record" if mode == ContractMode::Replay => mode = ContractMode::Record,
+                    "--only" => only = flags.next().ok_or("--only requires comma-separated capability paths")?.split(',').map(str::to_owned).collect(),
+                    _ => return Err("Use --live or --record, optionally --only path,path".into()),
+                }
             }
-            let mode = match flags.first().map(String::as_str) {
-                Some("--live") => ContractMode::Live,
-                Some("--record") => ContractMode::Record,
-                _ => ContractMode::Replay,
-            };
-            let report = run_contract(Path::new(&args[1]), mode).await?;
+            let report = run_contract_selected(Path::new(&args[1]), mode, &only).await?;
             println!("{}", serde_json::to_string_pretty(&report)?);
             eprintln!("{}", report.summary());
             if report.passed { Ok(()) } else { Err("Contract tests failed".into()) }
         }
-        _ => Err("Usage: haiku-plugin new <name> --template provider|library|scraper\n       haiku-plugin check <dir>\n       haiku-plugin test <dir> [--live|--record]".into()),
+        _ => Err("Usage: haiku-plugin new <name> --template provider|library|scraper\n       haiku-plugin check <dir>\n       haiku-plugin test <dir> [--live|--record] [--only path,path]".into()),
     }
 }
 #[tokio::main]

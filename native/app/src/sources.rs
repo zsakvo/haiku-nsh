@@ -39,18 +39,33 @@ impl TrackResolver for SourceResolver {
         })
     }
 }
-pub struct SourceRadio { pub host: Arc<Host>, pub source: String, pub channel: Option<String> }
+pub struct SourceRadio {
+    pub host: Arc<Host>,
+    pub source: String,
+    pub channel: Option<String>,
+}
 impl std::fmt::Debug for SourceRadio {
-    fn fmt(&self, f:&mut std::fmt::Formatter<'_>)->std::fmt::Result { f.debug_struct("SourceRadio").field("source",&self.source).field("channel",&self.channel).finish() }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceRadio")
+            .field("source", &self.source)
+            .field("channel", &self.channel)
+            .finish()
+    }
 }
 impl haiku_playback::RadioProvider for SourceRadio {
-    fn next(&self, history: Vec<Track>, count:u32)->BoxFuture<'_,Result<Vec<Track>,Error>> {
+    fn next(&self, history: Vec<Track>, count: u32) -> BoxFuture<'_, Result<Vec<Track>, Error>> {
         Box::pin(async move {
             struct Cancel(haiku_plugins::Cancellation);
-            impl Drop for Cancel {fn drop(&mut self){self.0.cancel();}}
-            let cancel=Cancel(Default::default());
+            impl Drop for Cancel {
+                fn drop(&mut self) {
+                    self.0.cancel();
+                }
+            }
+            let cancel = Cancel(Default::default());
             SourceApi::new(self.host.source(&self.source).map_err(playback_error)?)
-                .radio_next(self.channel.as_deref(),&history,count,Some(&cancel.0)).await.map_err(playback_error)
+                .radio_next(self.channel.as_deref(), &history, count, Some(&cancel.0))
+                .await
+                .map_err(playback_error)
         })
     }
 }
@@ -107,6 +122,125 @@ impl Drop for RemoteSources {
         // their handles; the engine-local registry itself is freed with its engine.
         self.owner.dispose();
     }
+}
+
+// TSX passes coverTemplate back unchanged so mutation inputs retain the source image.
+pub(crate) fn project_covers(
+    host: &Host,
+    source: &str,
+    mut value: serde_json::Value,
+    target: u32,
+) -> serde_json::Value {
+    fn visit(host: &Host, source: &str, value: &mut serde_json::Value, target: u32) {
+        match value {
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    visit(host, source, item, target);
+                }
+            }
+            serde_json::Value::Object(object) => {
+                let source = object
+                    .get("source")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| object.get("reference").and_then(|v| v["source"].as_str()))
+                    .or_else(|| object.get("sourceId").and_then(|v| v.as_str()))
+                    .unwrap_or(source)
+                    .to_owned();
+                let target = match object.get("kind").and_then(|v| v.as_str()) {
+                    Some("tracks") => 104,
+                    Some("entries") => 380,
+                    Some("albums" | "programs") => 300,
+                    Some("playlists" | "toplists") => 224,
+                    _ => target,
+                };
+                if let Some(template) = object
+                    .get("cover")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
+                {
+                    let url = cover_url(host, &source, &template, target);
+                    if template.contains("{size}") {
+                        object.insert("coverTemplate".into(), serde_json::json!(template));
+                    }
+                    object.insert("cover".into(), serde_json::json!(url));
+                }
+                for (key, child) in object.iter_mut() {
+                    if key == "extra" {
+                        continue;
+                    }
+                    let size = match key.as_str() {
+                        "info" => 256,
+                        "tracks" => 104,
+                        "albums" => 192,
+                        "entries" => 380,
+                        _ => target,
+                    };
+                    visit(host, &source, child, size);
+                }
+            }
+            _ => {}
+        }
+    }
+    visit(host, source, &mut value, target);
+    value
+}
+pub(crate) fn restore_covers(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items {
+                restore_covers(item);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            if let Some(serde_json::Value::String(template)) = object.remove("coverTemplate") {
+                object.insert("cover".into(), serde_json::json!(template));
+            }
+            for (key, child) in object.iter_mut() {
+                if key != "extra" {
+                    restore_covers(child);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+pub(crate) fn cover_url(host: &Host, source: &str, template: &str, target: u32) -> String {
+    let descriptor = host.source(source).ok().map(|s| s.descriptor());
+    haiku_plugins::resolve_cover(
+        template,
+        target,
+        descriptor
+            .as_ref()
+            .and_then(|d| d.covers.as_ref())
+            .map(|c| c.sizes.as_slice()),
+    )
+}
+
+/// Resolve the current/next artwork before looking up the shared URL cache.
+pub(crate) async fn playback_cover(host: &Host, track: &Track) -> Option<String> {
+    let mut image = None;
+    if track.source != "local" {
+        if let Ok(source) = host.source(&track.source) {
+            if source
+                .descriptor()
+                .capabilities
+                .iter()
+                .any(|c| c == "track.cover")
+            {
+                match SourceApi::new(source)
+                    .track_cover(&track.id, 1600, None)
+                    .await
+                {
+                    Ok(value) => image = value,
+                    Err(error) => log::warn!("track.cover {}: {error}", track.source),
+                }
+            }
+        }
+    }
+    image
+        .or_else(|| track.cover.clone())
+        .map(|image| cover_url(host, &track.source, &image, 1600))
 }
 
 /// Bounded source artwork cache shared by native presentation and the media center.

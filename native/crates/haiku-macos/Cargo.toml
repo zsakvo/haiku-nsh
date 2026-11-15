@@ -18,6 +18,10 @@ block.workspace = true
 nsh-platform-macos = "=0.4.0"
 block2 = "=0.6.2"
 objc2-foundation = { version = "=0.3.2", features = ["NSHTTPCookie"] }
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFAttributedString", "CFCGTypes"] }
+objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGContext", "CGColorSpace", "CGImage", "CGPath"] }
+objc2-core-text = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-graphics", "CTFrame", "CTFramesetter", "CTLine", "CTStringAttributes"] }
+objc2-quartz-core = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "objc2-core-graphics", "CAAnimation", "CALayer", "CAMediaTiming", "CAMediaTimingFunction", "CATransaction"] }
 # haiku-store uses loro 1.13.6. Its permissive internal range otherwise selects
 # incompatible 1.17.x in NSH's separate generated workspace (which has its own lock).
 loro-internal = "=1.13.6"

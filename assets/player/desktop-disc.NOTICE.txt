@@ -1,0 +1,5 @@
+`desktop-disc.png` is the unmodified `webfiles/public/assets/img/vinyl/desktopDisc.png`
+extracted, at the user's request, from the locally installed
+`/Applications/NeteaseMusic.app/Contents/Resources/resources.pack`.
+It retains its original 251 × 251 dimensions and transparency. This is a third-party
+NetEase Cloud Music asset; the repository's own license does not grant rights to it.

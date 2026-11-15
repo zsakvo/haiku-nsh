@@ -21,13 +21,13 @@
 |---|---|---|---|---|
 | F01 桌面外壳与导航 | 部分实现 | `src/shell/AppShell.tsx`、`src/shell/navigation.ts`、`src/pages/`、`native/app/src/{player_dock,now_playing,platform/*}.rs` | M1–M5 已审阅；本机 M5-05 完整 nsh test 64/64，导航/页面保留/根 Dock 有断言；详见 AUDIT E1–E6 | 第三方“我的”入口、部分播放/队列入口未接；最终系统交互及缺失的 M6 原始证据见 AUDIT G01/G08/G14 |
 | F02 插件包与来源生命周期 | 已验证 | `native/crates/haiku-plugins/src/{host,descriptor,contract}.rs`、`native/app/src/{plugins,plugin_tools}.rs`、`src/shell/PluginSettings.tsx`、`sdk/GUIDE.md` | v2 导入/校验/事务回滚/独立实例/启停排序与四内置契约；本机 M5-05 workspace 291 通过/1 忽略，QQ 新版 CLI 59/59；AUDIT F02/E1/E3/E7 | 按 D9 不运行 v1；500ms 哈希监听、record/live 基础实现；系统选择器与真实热重载待人工 |
-| F03 来源认证与用户内容 | 部分实现 | `haiku-plugins/src/{source,api}.rs`、`dev-plugins/qq-music/{plugin,api,auth,types,crypto}.ts`、`src/shell/PluginSettings.tsx` | M6-07 已审阅提交 ba58330；QQ 新结构 check、59/59 replay、全插件 tsc、haiku-plugins 22/22；其他认证 E1/E3 | D14 原生 web 回退未接，用户歌单/owned分组无 app 页面，动态封面鉴权不完整；G14/G18；真实认证待人工；QQ公开live8/9有限制 |
+| F03 来源认证与用户内容 | 部分实现 | `haiku-plugins/src/{source,api}.rs`、`dev-plugins/qq-music/{plugin,api,auth,types,crypto}.ts`、`src/shell/PluginSettings.tsx` | M6-07 已审阅提交 ba58330；QQ 新结构 check、59/59 replay、全插件 tsc、haiku-plugins 22/22；M7-01：QQ 3.1.0 尺寸声明/track.cover，CLI 60/60、插件 24/24；其他认证 E1/E3 | D14 原生 web 回退未接，用户歌单/owned分组无 app 页面，动态封面真实鉴权未覆盖（本轮 live AUTH_EXPIRED）；G14/G18；真实认证待人工；QQ公开live8/9有限制 |
 | F04 推荐、发现与分类 | 部分实现 | `native/app/src/discovery.rs`、`haiku-playback/src/controller.rs`、`src/pages/DiscoveryPages.tsx` | 单源推荐缓存/刷新、分类排序分页与连续电台已审阅；本机 M4-03 29/29、M4-04 33/33、M5-05 回归；AUDIT E1/E5 | home 丢弃 next，缺首屏2页/空货架补齐；单源与参考聚合要求有文档冲突；混合FM未接；G15 |
 | F05 搜索 | 部分实现 | `native/app/src/{sources,plugins,command_keyboard}.rs`、`src/pages/SearchPage.tsx`、`src/shell/CommandPalette.tsx` | 五实体单源页、280ms多源预览/完整第一页起播、历史/迟到隔离/分页已审阅；本机 E1/E5 | 搜索页无全部来源聚合；在线曲目详情/编辑无入口；G16/G19；真实搜索与键盘待人工 |
 | F06 队列与播放控制 | 部分实现 | `haiku-playback/src/{queue,controller,backend,network}.rs`、`native/app/src/{core,player_dock,seek_bar}.rs` | 核心模式/代次/重试/预载/会话/睡眠受控断言，本机 E1/E2；历史网络实播记录见 HANDOFF | 下载优先未接、albumProgress仅存储、睡眠/停止/静音/队列部分入口及行为设置缺失；全栏seek欠缺；G08/G09/G12/G17/G21 |
 | F07 音效与响度 | 已实现（M6-06b 待审阅） | `haiku-store/src/settings.rs`、`haiku-audio/src/{effects,loudness}.rs`、`haiku-playback/src/{backend,loudness_cache}.rs`、`src/shell/PlaybackSettings.tsx` | DSP/clamp/峰值/缓存/切歌保持已有 E1/E2；G02 已补，全参数重置/DSP一致、自定义覆盖/删除确认 Headless 通过，浅色截图见 m6-06b | 固定软削波与8ms保护已批准；真实听感待人工 |
-| F08 歌词与正在播放 | 部分实现 | `haiku-lyrics/src/{formats,providers,service,cursor}.rs`、`native/app/src/{presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 来源链/超时/编码/解析/手工选择/切歌取消、Rust独立时钟/虚拟歌词断言，E1/E2/E5 | 普通歌词显示设置、上游策略、远端有效元数据、高清/鉴权封面欠缺；G10/G18/G19；KaraokeLayer与静态动画按用户决定延期；G22 |
-| F09 桌面集成 | 部分实现 | `haiku-macos/src/{glass,shortcuts,lifecycle,system,menubar,desktop_lyrics}.rs`、`native/app/src/platform/`、`packaging/` | M6-01～05 历史已审阅；基础 E1/E2；M6-06b 补 G04/G07，歌词关闭无字段/行边界及恢复注册/冲突回滚 Rust 回归通过，应用快捷键恢复 Headless 通过 | G01 历史原始证据缺失、全栏seek/最终性能未齐（G21）；真实媒体中心与全局按键待人工；实机清单见AUDIT |
+| F08 歌词与正在播放 | 部分实现 | `haiku-lyrics/src/{formats,providers,service,cursor}.rs`、`native/app/src/{presentation,lyrics_view,now_playing}.rs`、`src/shell/Lyrics{Search,Settings}.tsx` | 来源链/超时/编码/解析/手工选择/切歌取消、Rust独立时钟/虚拟歌词断言，E1/E2/E5；M7-01 本地 Headless 验证 1600 请求→800 档高清图、共用最终 URL 缓存；M7-02 转场回归与真实入场两图通过；M7-03 clock/seek/暂停回归及真实原生行截图通过，review2 串行 app45/nsh92通过 | 普通歌词显示设置、上游策略、远端有效元数据、高清封面已接，真实鉴权/旧 QQ 缩略图未覆盖；G10/G18/G19；M7-03 同条件30秒 CPU 原生21.65%/回退22.23%，单组差异不足以证明稳定收益，采样与人工项见小节；M7-02 转场及 initialNowPlaying 振荡已处理，见 G22 |
+| F09 桌面集成 | 部分实现 | `haiku-macos/src/{glass,karaoke,shortcuts,lifecycle,system,menubar,desktop_lyrics}.rs`、`native/app/src/platform/`、`packaging/` | M6-01～05 历史已审阅；基础 E1/E2；M6-06b 补 G04/G07，歌词关闭无字段/行边界及恢复注册/冲突回滚 Rust 回归通过，应用快捷键恢复 Headless 通过；M7-03 片段时间/漂移纯函数、原生尺寸回报与实窗截图通过，review2 同条件 A/B及10秒 sample完成 | G01 历史原始证据缺失、全栏seek/最终性能未齐（G21）；M7-03 同条件 A/B未证明稳定性能改善，未采到原生重建热点；真实媒体中心与全局按键待人工；实机清单见AUDIT |
 | F10 本地曲库与刮削 | 部分实现 | `haiku-library/src/{local_scan,service}.rs`、`native/app/src/scrape{,_service}.rs`、`haiku-plugins/src/scraper.rs`、`src/pages/{LibraryPage,ScrapeReview,TrackEditor}.tsx` | 扫描/稀疏覆盖/4并发8秒/阈值/审阅撤销与持久化已审阅；本机 E1/E2/E5 | 高级查询/文件名回退、歌词刮削选项、完整编辑字段/刮削字段、封面缓存、备份根映射/停稳欠缺；G13/G19/G20 |
 | F11 喜欢、歌单与远端收藏 | 部分实现 | `haiku-store/src/{collections,playlist_core}.rs`、`native/app/src/{collections,favorite_refresh}.rs`、`src/pages/{CollectionPage,CollectionsBrowser,SourceDetailPage}.tsx` | CRDT/跨源身份、完整分页原子镜像/离线/单飞取消/只读/确认有 E1/E4/E5；M6-06b 补 G03，网格/列表持久化重开、四种显示排序且保留 CRDT 原序回归通过 | 有效元数据/保护封面恢复未齐（G18/G19）；真实来源与favorite媒体命令待人工 |
 | F12 历史与听歌统计 | 部分实现 | `haiku-store/src/{history,stats}.rs`、`haiku-services/src/stats_upload.rs`、`native/app/src/activity.rs`、`src/pages/{HistoryPage,StatsPage}.tsx` | 500/100历史、5秒/5000统计、排行热图/小时/里程碑、SHA1上传/去重/退避/账号隔离已审阅；E1/E4/E6 | 缺历史时间过滤、专辑排行/月分布展示（G11）；新记录鉴权封面/统一元数据有G18/G19；长期/真实服务待人工 |
@@ -1152,3 +1152,106 @@ RustCrypto 相关重复版本仍有：block-buffer 0.10.4/0.12.1、const-oid 0.9
 - 已知 block 0.1.6 future-incompat 与开发 host __eh_frame 提示；另如实记录工具链忽略 target-dir、Lofty 为最小 FLAC 夹具补 PADDING 提示，以及自动下载在歌单变化/备份恢复屏障期间的日志。
 - 待人工：真实系统媒体中心歌词显隐及全局按键恢复/冲突体验、主观音效听感；未扩展至其他缺口、其他平台或 live。
 - 在主仓库工作，未 /new、未提交 git、未改 Rex 会话/窗格、参考版、NSH 或依赖源码；无新增架构决定。
+
+## 2026-11-15 M7-01：封面尺寸声明与高清封面（review1 三项通过，待审阅）
+
+- SDK 新增 covers.sizes 与 track.cover；PLUGIN_SDK 单点定义选档规则；descriptor 验证正整数严格升序并推断能力。
+- 实体映射保留模板；resolve_cover 位于 haiku-plugins/src/api.rs；宿主其余位置不再直接替换 {size}。
+- sources::cover_url 统一调用解析器；project_covers 覆盖插件页面、播放器快照、曲库、收藏、历史与下载的 Rust→TSX 投影。
+- review1：删除线程内封面回传索引及 clear_cover_templates；仅含 {size} 的对象附带不透明 coverTemplate，TSX 原样回传；队列/收藏/下载入口恢复 cover 并移除此字段。
+- 消费点：plugins 的 home/categories/category_playlists/radio_channels/search/search_preview/detail/artist_albums/browse；core、library、activity、collections、downloads 的投影与收藏 artwork。
+- 高清消费：presentation::prepared_cover → sources::playback_cover；当前/下一首请求 track.cover(size=1600)，错误/null 回退原图，只记日志。
+- decoded cache 键含来源和最终 URL（本地文件保留元数据指纹）；sources::artwork 磁盘缓存也含最终 URL；媒体中心继续共用 artwork_path。
+- 缩略图目标：home 曲目 52×2=104；专辑/节目卡 150×2=300；普通货架卡 112×2=224；来源实体网格 96×2=192；详情头 128×2=256。
+- 推荐入口 150×190 取最长边×2=380；共享歌曲兜底图单独投影到 380；收藏拼图单格 64×2=128、列表小拼图单格 24×2=48。
+- 原生 TrackList、历史/下载行没有封面控件，未增加布局；这些曲目传回 TSX 时使用 104 投影。下载仍为 hd=1000/普通=500，再按声明选档。
+- QQ 3.1.0 声明 [150,300,500,800]；cover 复用 song() 请求，由专辑 mid 生成 800 图，无专辑 mid 回退歌手 T001；补充离线契约。
+- CLI 新增 --only，定向 live 每个所选能力只执行首个用例一次、不遍历分页；成功取得 cover 时检查最终图片 HTTP 状态。
+- cargo test -p haiku-plugins：review1 单次通过 24/24；cargo-test-haiku-plugins-review1.log；保留此前修复日志。
+- cargo run -p haiku-plugin -- check dev-plugins/qq-music：通过；test：60/60；tsc --noEmit -p sdk/tsconfig.json：通过。
+- 对应日志：haiku-plugin-check.log、haiku-plugin-test.log、tsc-sdk.log；均位于 .artifacts/m7-01/。
+- cargo test --workspace：311 通过、2 失败、1 忽略；cargo-test-workspace.log；两失败均为 Core 启动 5s 超时。
+- 超时名称为 core_open_installs_readable_builtin_descriptor、engines_own_independent_temporary_data_roots；与 STATUS M6 历史审阅确认的满载偶发一致，不追加 workspace 重跑。
+- nsh check：review1 单次通过；nsh-check-review1.log；保留此前编译和类型修复日志。
+- RUST_TEST_THREADS=1 nsh test：review1 单次通过 86/86，Rust 40/40（含底栏高清 Headless）、TSX 46/46（含 Activity）；nsh-test-review1.log。
+- 保留历史 nsh-test-repair1.log 的 85/86 结果；本轮两个 Core 启动测试及旧“更多”入口失败均已通过。
+- review1：Activity 测试改选“视图 → 通知中心…”；夹具将实际注册的应用菜单通过测试快捷键弹出，适配 Headless 仅支持 popup 菜单的限制；应用 UI 无改动。
+- 收尾推荐页角色投影改动后定向 Discovery.test.tsx 5/5；nsh-test-discovery-final.log；最终类型检查见上。
+- live 仅尝试一次 --only search.track,track.cover：临时副本只把 fixture 换为真实曲目/搜索参数，插件源码不变，临时副本已删除。
+- haiku-plugin-live.log：fixture Cookie 登录先返回 AUTH_EXPIRED，未执行两个能力，未取得 800 URL 的 HTTP 200；按任务允许失败记录，不重试。
+- 不迁移旧 R512x512：旧 QQ 喜欢/歌单/收藏拼图和旧缓存首页仍可能缺图；队列/曲库/历史等旧条目被复用于缩略图时也仍无图；新查询/刷新得到模板后恢复。
+- QQ 当前播放/下一首可通过 track.cover 恢复旧封面，前提来源请求正常；真实 QQ 认证、媒体中心实机、旧数据重查均未覆盖。
+- 警告：review1 check 无警告输出；test runner 汇总 1 条构建警告（非 -v 未展开）；此前已记录 block 0.1.6、__eh_frame 和 Lofty 最小 FLAC 补 PADDING。
+- 待审阅：接受任务约定内的 workspace 偶发；有效 QQ 登录后的 live 证据尚缺；本轮不重跑 workspace、插件 CLI/SDK 或 live。
+- 在主仓库当前工作区继续，保留既有改动，未提交 git；未开真实窗口/截图，未修改 NSH、依赖或参考项目。
+
+## 2026-11-15 M7-02：正在播放转场（已处理，review2 验收通过）
+
+- 原因定位：当前真实 macOS host 未复现历史 animated_value 停滞；无 Core 与 Core 播放中同一 250ms 位移均在约 100ms 采样 y=102.33041，完成回调 true，500ms 时 y=0；不能归因 CoreBridge，也未证明旧问题原始原因。
+- 诊断证据：nsh-run-probe-no-core-verbose.log、nsh-run-probe-playback.log；首轮非 verbose 日志为 nsh-run-probe-no-core.log，未展示 Rust 采样。临时探针/注册已删除，未改 NSH 或 CoreBridge。
+- 采用任务回退方案：now_playing.rs 增加共用转场容器与挂载阶段，背景/内容一起移动；入场 320ms ease-out，离场 240ms ease-in；同一原生 View 反向，generation 拒绝旧完成回调。
+- 生命周期使用请求时的绝对截止时间，离场后补最后一帧再卸载；收起根 View 设置 PointerEvents::None；位置信号不参与挂载或转场样式。
+- NSH 原生样式过渡在 reduce_motion 下被禁用，因此该模式使用显式 AnimatedValue 的 150ms opacity timing，translate-y 恒为 0；正常模式仅 transform 过渡。
+- Headless 回归：反向测试把实际 MountBatch 样式交给 NSH 共享 transition::Live 采样，验证从中间值反向、同一 View 保留及旧退出不卸载；该项、reduced-motion 项与原几何测试在 review2 通过。
+- review1 仅修改测试契约：observe 记录覆盖层根 ViewProps.pointer_events，收起中断言为 PointerEvents::None，随后完成卸载断言；不再用直接派发 Press 的 Headless.press 验证原生命中屏蔽，未因此修改产品代码。
+- review1 app 43/43、nsh check、nsh test 89/89 通过，但真实预览反复开关、10 秒内无入场完成；首图不能证明有效中途帧。原始 *review1* 日志/图片保留，未以自动测试通过替代真实验收。
+- review2 原因由审阅定位并经本轮回归/预览确认修复：PlayerDock effect 回报共享 presentation.open，NowPlaying 又由 props.open 写回同一 signal；initialNowPlaying=true 与底栏初始 false 相互触发，review1 日志翻转 15015 次；属于应用状态所有权反馈环。
+- review2 产品改动：删除 PlayerDock 的 OpenChange 镜像 effect；封面只 emit OpenChange(true)；NowPlaying 的 Esc/关闭按钮只 emit OpenChange(false)，保留 props→presentation.open 单向同步。AppShell 处理器已检查，仍由 nowPlaying.set 接收请求、打开时 closeOverlay，无需改动。
+- review2 新增回归通过：Rust 夹具组合生产 Dock/NowPlaying，并以 cfg(test) 计数，500ms 时 starts=1/phase=Open/owner=true/shared=true；NowPlayingInitialFixture.tsx + App.test.tsx 验证实际 AppShell initialNowPlaying 保持打开、Esc 关闭与底栏样式恢复。
+- 新增测试初稿曾误用完整事件枚举监听器，报 E0631；已按 #[args(open)] 修为 &bool。原始编译错误归档 cargo-test-app-compile-review2.log，不计行为验证失败。
+- review2 RUST_TEST_THREADS=1 cargo test --manifest-path native/Cargo.toml -p nsh-app-haiku：44/44，通过；cargo-test-app-review2.log。
+- review2 ./scripts/nsh.sh check：通过；nsh-check-review2.log。
+- review2 RUST_TEST_THREADS=1 ./scripts/nsh.sh test：91/91，通过（Rust 44、TSX 47）；nsh-test-review2.log。编译错误修正后上述验证各跑一次，沿用同一 rustup 工具链。
+- review2 真实预览仅运行一次：./scripts/nsh.sh run NowPlayingTransitionPreview.tsx --port 8795 --window-size 1200x800 -v；隔离 Core、静音本地播放，5 秒后自动打开生产 AppShell；nsh-run-transition-review2.log。
+- 真实日志仅一次 open=true 开始与一次完成，无 open=false 翻转；定时 screencapture 各取一图，无 GUI 自动操作。中途图请求在开始日志后约 45ms、返回 233ms；完成日志约 343ms，完成图请求 502ms、返回 668ms；capture-transition-review2.log。
+- 两图已查看：now-playing-entering-review2.png 中覆盖层位于窗口下半部、原页面仍可见；now-playing-open-review2.png 中覆盖层完整到位，封面/元数据/歌词与 Dock 可见。
+- 全部证据位于 .artifacts/m7-02/；历史 cargo-test-app*.log 保留；review2 Cargo/host 有已知 block 0.1.6 与 __eh_frame 提示，NSH test 汇总 1 条未展开构建警告，音频夹具有既有 PADDING 提示。
+- 待人工确认：真实收起、快速反向与降低动态效果的连续观感；本轮真实截图覆盖入场，不替代这些主观检查；历史 animated_value 停滞的原始原因仍未证明。
+- F08 与 AUDIT G22 已更新为已处理，并注明 initialNowPlaying 振荡已修。截图临时辅助程序已删除，无额外探针/JSON/hash 清单残留。
+- 在主仓库当前工作区继续，保留既有改动；未提交 git，未改布局、控制栏、歌词渲染、NSH、参考项目或依赖源码。
+
+## 2026-11-15 M7-03：原生逐字歌词层（review2 验证通过，性能结论待审阅）
+
+- 高度方案已获接受：NSH 0.4.0 ComponentContext::set_size，CoreText 按实际宽度排版；宽度/内容/屏幕倍率变化时重建，仅高度改变才回报 NSH。
+- haiku-macos/src/karaoke.rs、karaoke/native.rs：CoreText 整行栅格化、主题暗/亮图、UTF-16 视觉行拆片/按宽度分摊时间、CALayer 动画；漂移超过0.35秒或状态/epoch改变时同步。
+- 原生视图 hitTest=nil、静态无障碍文本，seek 由 NSH 外层按钮处理；Cargo.toml 复用 objc2 绑定，无新增 .m；两级 lib.rs 导出/注册。
+- lyrics_view.rs 仅当前逐字行原生，其余整行 NSH text；普通 LRC 不走原生，非 macOS/未注册时保留 karaoke_line。
+- 已接受的时钟去重：generation/timeline_revision/playing（含 buffering）/当前行变化后非跟踪读取 position；seek/切曲增加 epoch，普通逐帧位置不发属性。
+- review2：rebuild 的构建键明确只含 words/font/size/weight/color/dim，另比较宽度/倍率；clock 只 sync。核对旧 set_prop 已对 clock 分支处理且未存入 props，不能把旧 CPU 归因为 clock 重栅格化。
+- 本轮新增 fixtures/karaoke-layer/{App.tsx,nsh.json,native/Cargo.toml,native/src/lib.rs}；包装同一个 KaraokeLayerPreview，HAIKU_KARAOKE_PREVIEW_NATIVE=1/0 仅在夹具控制是否注册 haiku.KaraokeLayer，关闭走生产回退；无产品调试开关。
+- 同条件：同一 debug 二进制/依赖锁、1200×800、隔离 Core、静音60秒本地 FLAC/增强 LRC、repeatOne、Now Playing 打开、无桌面歌词；入场完成后预热5秒，各 ps 每秒一次共30样本。
+- 命令：HAIKU_KARAOKE_PREVIEW_NATIVE=1（再=0） ./scripts/nsh.sh run fixtures/karaoke-layer --port 8798 --window-size 1200x800 -v；nsh-run-native-{on,off}-review2.log，均确认注册状态。
+- 原生开启：30.017秒，均值21.650%，区间17.5%～26.5%；cpu-native-on-review2.log。
+- 原生未注册/回退：30.017秒，均值22.226667%，区间17.6%～28.3%；cpu-native-off-review2.log。
+- 原生低0.576667个百分点（相对2.5945%），单次顺序 A/B且区间大量重叠，不能证明稳定性能收益；ab-review2.log。
+- 开启侧 CPU 采样后执行 /usr/bin/sample 92647 10 1 -file .artifacts/m7-03/sample-native-on-review2.log；10秒、请求1ms间隔，未把 profiler 开销混入 A/B；sample-command-review2.log。
+- 主线程3759样本，3474（92.4182%）在 RunLoop→mach_msg2_trap 等待，不计 CPU 工作；以下为非等待叶节点 self 样本前五，不重复累计祖先。
+- 五栈共用 Surface::drain→Mounter::revisit→Sights::shows/sight 前缀，末尾均为 objc2 debug msg_send_check→class_getInstanceMethod→getMethodNoSuper_nolock：
+- ① Views::parent→parent_view→from_ns→downcast_ref<ViewObj>→is_kind_of_class：10样本，主线程0.2660%。
+- ② Views::frame→NSView::frame：9样本，0.2394%。
+- ③ Views::parent→parent_view→downcast_ref<Container>→is_kind_of_class：9样本，0.2394%。
+- ④ Views::parent→parent_view→NSView::superview：8样本，0.2128%。
+- ⑤ Views::hidden→NSView::isHidden：7样本，0.1862%；完整栈和原始行号见 sample-analysis-review2.log。
+- 同次 engine 采样含 CoreBridge::refresh_progress→SeekBar 宽度绑定，以及 Core::layout_main→compute_layout_with_measure（含子栈17样本）。结合源码，逐帧位置驱动进度/时间绑定和 NSH 样式/布局/平台视图遍历；未单独量出时间格式化成本。
+- 未采到 KaraokeView::rebuild/layout_native 或 State::sync，仅有1个 KaraokeView 析构样本；不证明零调用，但未确立原生层/歌词视图热点，因此未追加性能修改或复测。
+- RUST_TEST_THREADS=1 cargo test --manifest-path native/Cargo.toml -p nsh-app-haiku：45/45，doc-tests 0；cargo-test-app-review2.log。
+- RUST_TEST_THREADS=1 ./scripts/nsh.sh test：92/92（Rust45、TSX47）；nsh-test-review2.log。两项各一次通过；clock/seek/暂停和回退回归均通过。
+- 沿用 haiku-macos 11项及 web_cookies S3（cargo-test-macos.log）、nsh check（nsh-check-review1.log）；本轮未重跑。
+- review1 实窗1200×800当前行部分填亮、正常切行/循环：karaoke-layer-review1.png、nsh-run-review1.log及 capture/window/screenshot-review1.log；review1 夹具 seek/pause 加文字后断言通过。
+- 历史60秒23.008%（18.6%～27.4%）在 cpu-review1.log；M6-04约14.3%为30秒且同时打开桌面歌词，条件不同，不作为本轮 A/B结论依据。
+- 预构建锁版本偏离在窗口启动/测量前停止并对齐主仓库 native/Cargo.lock，日志 ab-prebuild-review2.log、nsh-run-native-on-prebuild-review2.log 保留；测量未重复。
+- 警告：已知 block 0.1.6、__eh_frame；NSH runner 汇总1条未展开构建警告，既有最小 FLAC 有 Lofty 补 PADDING 提示。
+- 待人工：逐字填充连续平滑度、长行换行、字体回退；其他平台未编译。桌面/菜单栏歌词未改；没有证据支持本轮继续优化其他控件/NSH。
+- 证据均在 .artifacts/m7-03/，日志后缀 -review2；两侧预览进程组已停止，临时测量程序/缓存链接已清理，无额外 JSON/hash 清单或 GUI 自动操作。
+- 更新 F08/F09，保留既有工作区改动、未提交 git；未改 MACOS.md §5、AUDIT、NSH、依赖源码或参考项目。
+
+## 2026-11-15 M7-04：正在播放专属控制区（待用户验收）
+
+- 新增 now_playing_controls.rs：封面下信息/歌曲菜单、较粗进度与剩余时间、大播放按钮、模式/队列/内联音量及辅助入口；复用现有 token，歌词可隐藏，窄窗居中，补齐键盘与导航衔接。
+- 覆盖层占满窗口，根部同一底栏按 M7-02 时长/缓动滑出淡出并支持 reduce motion；最终一次 ./scripts/nsh.sh check 通过，日志 .artifacts/m7-04/nsh-check-final.log；未提交 git。
+- 按用户后续要求移除本轮新增测试/截图夹具，不再测试、截图或测 CPU；调整前的 app 测试失败日志保留（夹具时钟/主题/选择器），现有测试旧契约与真实视觉/交互留待用户验收。
+
+## 2026-11-15 M7-05：正在播放对齐参考版（待用户验收）
+- 按 haiku-gpuix 对齐双栏、封面/唱片400ms过渡、三键控制和无时间进度；删除 M7-04 多余入口，编辑/匹配连接现有流程，保留快捷键和入退场。
+- 歌词24pt/500、翻译19pt、按行距衰减，读取 playerFont；背景封面色混黑50%及独立遮罩，500ms smoothstep 换色支持打断/reduce motion。
+- ./scripts/nsh.sh check 通过：.artifacts/m7-05/nsh-check.log；自写括号编译错误修正后通过，库/测试目标各报同一 like_button 未使用警告。未新增测试、截图、CPU或实窗验收，未提交 git。

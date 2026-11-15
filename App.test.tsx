@@ -2,6 +2,17 @@ import { expect, open, test } from "nsh/test";
 import { destinations } from "./src/shell/navigation";
 
 const options = { platform: "macos" as const, width: 1200, height: 800 };
+test("initialNowPlaying stays open after 500ms and Escape closes the controlled surface", async () => {
+  const app = await open("./NowPlayingInitialFixture.tsx", { ...options, clock: {} });
+  await app.waitFor("id:now-playing");
+  await app.wait(500);
+  expect(app.count("id:now-playing-overlay")).toBe(1);
+  expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#f9f7f4ff");
+  await app.keyboard.press("escape");
+  await app.waitUntil(() => !app.shows("id:now-playing-overlay"));
+  expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#272522ff");
+});
+
 test("sidebar reaches every destination", async () => {
   const app = await open("./AppFixture.tsx", options);
   await app.waitFor("id:nav-home");

@@ -34,22 +34,12 @@ pub(crate) fn get() -> Option<Rc<Presentation>> {
 }
 pub(crate) fn reapply_theme() {
     if let Some(p) = get() {
-        let palette = p
-            .palette
-            .borrow()
-            .clone()
-            .unwrap_or_else(crate::player_theme::accent_palette);
+        let palette = p.palette.borrow().clone().unwrap_or_default();
         crate::player_theme::apply(&palette);
     }
 }
-fn cover_path(track: &Track) -> Option<String> {
-    track
-        .cover
-        .as_ref()
-        .map(|p| p.strip_prefix("file://").unwrap_or(p).to_owned())
-}
 fn cover_key(path: &str) -> String {
-    let meta = std::fs::metadata(path).ok();
+    let meta = std::fs::metadata(path.strip_prefix("file://").unwrap_or(path)).ok();
     format!(
         "{path}:{:?}:{:?}",
         meta.as_ref().and_then(|m| m.modified().ok()),
@@ -159,56 +149,25 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             let selected = track.get();
             let Some(p) = weak.upgrade() else { return };
             let version = p.request.borrow_mut().advance();
-            let art = selected.as_ref().and_then(cover_path);
-            let key = art.as_deref().map(cover_key);
-            let cached = key.as_ref().and_then(|key| {
-                p.cache
-                    .borrow()
-                    .iter()
-                    .find(|(k, _)| k == key)
-                    .map(|(_, v)| v.clone())
-            });
-            let cold = cached.is_none();
-            p.artwork
-                .set(cached.as_ref().map(|c| c.uri.clone()).unwrap_or_default());
-            p.artwork_path.set(cached.as_ref().map(|c| c.path.clone()));
-            let palette = cached.map(|c| c.palette);
-            *p.palette.borrow_mut() = palette.clone();
-            crate::player_theme::apply(
-                &palette.unwrap_or_else(crate::player_theme::accent_palette),
-            );
-            let host = p.bridge.source_host.clone();
-            let root = p.bridge.artwork_root.clone();
+            p.artwork.set(String::new());
+            p.artwork_path.set(None);
+            *p.palette.borrow_mut() = None;
+            crate::player_theme::apply(&[]);
             let weak = Rc::downgrade(&p);
             spawn(async move {
-                let disk_art = if cold {
-                    if let Some(track) = selected {
-                        background(crate::sources::artwork(host, root, track))
-                            .await
-                            .ok()
-                            .flatten()
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+                let Some(track) = selected else { return };
+                let Some((key, cover)) = prepared_cover(weak.clone(), track).await else {
+                    return;
                 };
-                let result = blocking(move || disk_art.and_then(load_cover)).await;
                 let Some(p) = weak.upgrade() else { return };
                 if !p.request.borrow().accepts(version) {
                     return;
                 }
-                if let Ok(cover) = result {
-                    if let Some(cover) = cover {
-                        if let Some(key) = key {
-                            p.remember(key, cover.clone());
-                        }
-                        p.artwork.set(cover.uri);
-                        p.artwork_path.set(Some(cover.path));
-                        *p.palette.borrow_mut() = Some(cover.palette.clone());
-                        crate::player_theme::apply(&cover.palette);
-                    }
-                }
+                p.remember(key, cover.clone());
+                p.artwork.set(cover.uri);
+                p.artwork_path.set(Some(cover.path));
+                *p.palette.borrow_mut() = Some(cover.palette.clone());
+                crate::player_theme::apply(&cover.palette);
             });
         });
         // Cursor publishes line changes only. Word fills read the same Rust clock directly.
@@ -241,28 +200,10 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             revision.get();
             let next = state.with(|s| s.next_index.and_then(|i| s.tracks.get(i as usize).cloned()));
             let next = next.map(|t| library.track(&t.id).unwrap_or(t));
-            let Some(path) = next.as_ref().and_then(cover_path) else {
-                return;
-            };
-            let key = cover_key(&path);
-            let Some(p) = weak.upgrade() else { return };
-            if p.cache.borrow().iter().any(|(k, _)| *k == key) {
-                return;
-            }
-            let weak = Rc::downgrade(&p);
-            let host = p.bridge.source_host.clone();
-            let root = p.bridge.artwork_root.clone();
+            let Some(track) = next else { return };
+            let weak = weak.clone();
             spawn(async move {
-                let path = if let Some(track) = next {
-                    background(crate::sources::artwork(host, root, track))
-                        .await
-                        .ok()
-                        .flatten()
-                } else {
-                    None
-                };
-                let Some(path) = path else { return };
-                if let Ok(Some(cover)) = blocking(move || load_cover(path)).await {
+                if let Some((key, cover)) = prepared_cover(weak.clone(), track).await {
                     if let Some(p) = weak.upgrade() {
                         p.remember(key, cover);
                     }
@@ -271,6 +212,39 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
         });
     });
 }
+// Current and next share the same bounded decoded cache, keyed by source + final URL.
+async fn prepared_cover(
+    weak: std::rc::Weak<Presentation>,
+    mut track: Track,
+) -> Option<(String, Cover)> {
+    let p = weak.upgrade()?;
+    let host = p.bridge.source_host.clone();
+    let root = p.bridge.artwork_root.clone();
+    drop(p);
+    let lookup = host.clone();
+    let input = track.clone();
+    let url = background(async move { crate::sources::playback_cover(&lookup, &input).await })
+        .await
+        .ok()??;
+    let key = format!("{}:{}", track.source, cover_key(&url));
+    let cached = weak
+        .upgrade()?
+        .cache
+        .borrow()
+        .iter()
+        .find(|(k, _)| k == &key)
+        .map(|(_, c)| c.clone());
+    if let Some(cover) = cached {
+        return Some((key, cover));
+    }
+    track.cover = Some(url);
+    let path = background(crate::sources::artwork(host, root, track))
+        .await
+        .ok()??;
+    let cover = blocking(move || load_cover(path)).await.ok()??;
+    Some((key, cover))
+}
+
 impl Presentation {
     fn remember(&self, key: String, cover: Cover) {
         let mut cache = self.cache.borrow_mut();

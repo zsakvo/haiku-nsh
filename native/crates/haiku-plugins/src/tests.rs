@@ -275,7 +275,7 @@ async fn auth_single_flight_refresh_replay_and_validation() {
         .await
         .unwrap();
     assert_eq!(page.items.len(), 1);
-    assert_eq!(page.items[0].cover.as_deref(), Some("https://cover/512"));
+    assert_eq!(page.items[0].cover.as_deref(), Some("https://cover/{size}"));
     assert_eq!(api.take_warnings().len(), 1);
     install(&host,"expired.test","track:{streams:async(id,ctx)=>{if(!ctx.storage.get('once')){ctx.storage.set('once',true);throw new Expired();}return [{url:'fresh'}];}},auth:{password:{submit:async()=>({credential:{ok:true}})},user:async()=>null}").await;
     let mut draft = host.begin_login("expired.test").await.unwrap();
@@ -481,7 +481,7 @@ async fn subsonic_fixture_verify_search_details_streams_paging_errors_cancel() {
         haiku_model::EntityRef::decode(&encoded).unwrap(),
         page.items[0].reference.clone().unwrap()
     );
-    assert!(page.items[0].cover.as_ref().unwrap().contains("size=512"));
+    assert!(page.items[0].cover.as_ref().unwrap().contains("size={size}"));
     for kind in [SearchKind::Album, SearchKind::Artist] {
         assert_eq!(
             api.search(
@@ -724,7 +724,7 @@ async fn sdk_models_home_links_and_complete_lists() {
     assert_eq!(home.shelves[5].entries[0].to.reference.kind, "radio");
     assert_eq!(
         home.shelves[5].entries[0].cover.as_deref(),
-        Some("cover/512")
+        Some("cover/{size}")
     );
     assert!(home.shelves[5].more.is_none());
     assert_eq!(api.take_warnings().len(), 5);
@@ -1239,4 +1239,30 @@ async fn discovery_contract_sorts_and_private_fm_undefined() {
         assert!(contract::validate_schema("categories",&value).is_err());
     }
     assert!(contract::validate_schema("categories",&json!({"groups":[]})).is_ok());
+}
+
+#[test]
+fn cover_size_selection_hit_ceiling_maximum_and_undeclared() {
+    let sizes = Some([150, 300, 500, 800].as_slice());
+    assert_eq!(resolve_cover("R{size}x{size}", 300, sizes), "R300x300");
+    assert_eq!(resolve_cover("R{size}", 301, sizes), "R500");
+    assert_eq!(resolve_cover("R{size}", 1600, sizes), "R800");
+    assert_eq!(resolve_cover("R{size}", 1600, None), "R1600");
+    assert_eq!(resolve_cover("fixed", 1600, sizes), "fixed");
+}
+
+#[tokio::test]
+async fn cover_templates_survive_mapping_and_cover_is_a_capability() {
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    let descriptor = install(&host, "cover.fixture", r#"auth:{password:{submit:async()=>({credential:{token:'fixture'}})}},covers:{sizes:[150,300,500,800]},track:{get:async(id)=>({id,title:'Cover',artists:[],cover:'https://cover/{size}'}),cover:async(id,ctx)=>'https://hd/'+ctx.size,streams:async()=>[]},search:{track:async()=>({items:[{id:'a',title:'Cover',artists:[],cover:'https://cover/{size}'}]})}"#).await;
+    assert!(descriptor.capabilities.contains(&"track.cover".into()));
+    assert_eq!(descriptor.covers.unwrap().sizes, vec![150,300,500,800]);
+    let mut login = host.begin_login("cover.fixture").await.unwrap();
+    login.password(BTreeMap::new(), None).await.unwrap();
+    let api = SourceApi::new(login.commit().await.unwrap());
+    assert_eq!(api.track("a", None).await.unwrap().cover.as_deref(), Some("https://cover/{size}"));
+    let page = api.search(SearchKind::Track,"",PageArgs {cursor:None,limit:1},None).await.unwrap();
+    assert_eq!(page.items[0].cover.as_deref(), Some("https://cover/{size}"));
+    assert_eq!(api.track_cover("a",1600,None).await.unwrap().as_deref(), Some("https://hd/1600"));
 }

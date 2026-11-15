@@ -1929,7 +1929,11 @@ dependencies = [
  "loro-internal",
  "nsh-platform-macos",
  "objc",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-core-text",
  "objc2-foundation",
+ "objc2-quartz-core",
  "serde",
  "serde_json",
 ]

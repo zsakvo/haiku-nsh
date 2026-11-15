@@ -18,6 +18,7 @@ mod library;
 mod lyrics_view;
 mod lyrics;
 mod now_playing;
+mod now_playing_controls;
 mod platform;
 mod player_controls;
 mod player_dock;
@@ -46,6 +47,7 @@ pub use track_list::TrackList;
 #[native_components(macos)]
 fn native_views(components: &nsh_platform_macos::Components) {
     haiku_macos::glass::register(components);
+    haiku_macos::karaoke::register(components);
 }
 
 /// The native API imported by the TSX entry.
@@ -87,6 +89,8 @@ fn native(registry: &mut Registry) {
         };
     }
     registry.assets(&[
+        ui_asset!("player/desktop-disc.png"),
+        ui_asset!("player/desktop-disc.NOTICE.txt"),
         ui_asset!("icons/home-simple.svg"),
         ui_asset!("icons/view-grid.svg"),
         ui_asset!("icons/antenna.svg"),

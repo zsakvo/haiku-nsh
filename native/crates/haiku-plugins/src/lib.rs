@@ -8,7 +8,7 @@ pub mod scraper;
 mod sdk;
 mod source;
 pub use api::*;
-pub use descriptor::{Descriptor, describe_package, normalize_source_url, source_id};
+pub use descriptor::{Covers, Descriptor, describe_package, normalize_source_url, source_id};
 pub use host::{Host, Package, SourceRecord};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

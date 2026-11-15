@@ -4041,6 +4041,17 @@
   ],
   "cases": [
     {
+      "name": "track.cover 800 album",
+      "path": "track.cover",
+      "args": [
+        "mid1"
+      ],
+      "context": {
+        "size": 1600
+      },
+      "expectedJson": "https://y.gtimg.cn/music/photo_new/T002R800x800M000album1.jpg"
+    },
+    {
       "name": "search.track",
       "path": "search.track",
       "args": [

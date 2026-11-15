@@ -92,11 +92,11 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
     await props.core.player.setMode(shuffle ? "shuffle" : "sequential");
     await props.core.player.play(tracks(), 0);
   }
-  return <View testID="page-source-detail" class="flex-1 min-h-0 pb-28"
+  return <View testID="page-source-detail" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <Scroll class="flex-1" contentClass="flex-col">
+    <Scroll class="flex-1" contentClass="flex-col pb-(--dock-scroll-clearance)">
     <If when={first.loading() && !info()}>
-      <View accessibilityLabel="正在加载详情" class="px-(--content-inset) gap-4">
+      <View accessibilityLabel="正在加载详情" class="pl-(--content-inset-left) pr-(--content-inset-right) gap-4">
         <View class="flex-row gap-5"><View class="size-32 rounded-(--radius-panel) bg-muted" />
           <View class="flex-1 gap-3"><View class="h-6 w-64 bg-muted rounded-(--radius)" /><View class="h-4 w-48 bg-muted rounded-(--radius)" /></View>
         </View>
@@ -104,13 +104,13 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
       </View>
     </If>
     <If when={!!first.error() || !!error()}>
-      <View class="px-(--content-inset) gap-2">
+      <View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-2">
         <Text class="text-sm text-destructive">{error() || String(first.error())}</Text>
         <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />
       </View>
     </If>
     <If when={!!info()}>
-      <View class="px-(--content-inset) pb-4 gap-3">
+      <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-4 gap-3">
         <View class="flex-row gap-5 items-start">
           <View class="size-32 shrink-0 bg-muted rounded-(--radius-panel) overflow-hidden items-center justify-center">
             <If when={!!info().cover}><Image src={info().cover} class="size-32" /></If>
@@ -148,7 +148,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
         </If>
       </View>
       <SourceTracks core={props.core} tracks={tracks()} active={props.active} fit />
-      <View class="px-(--content-inset) py-2 flex-row gap-3 items-center">
+      <View class="pl-(--content-inset-left) pr-(--content-inset-right) py-2 flex-row gap-3 items-center">
         <Text class="text-xs text-muted-foreground">{`已加载 ${tracks().length} 首`}</Text>
         <If when={!!next()}><Button label="加载更多曲目" size="sm" loading={busy()} onPress={() => void act(() => more("tracks"))} /></If>
       </View>

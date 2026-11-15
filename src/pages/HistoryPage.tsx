@@ -1,4 +1,4 @@
-import { cleanup, effect, List, resource, signal, Text, View } from "nsh";
+import { cleanup, effect, List, resource, signal, Text, token, View } from "nsh";
 import type { Core } from "haiku/native";
 import { CollectionsService, PluginService, TrackList } from "haiku/native";
 import { PlaylistEditor } from "./PlaylistEditor";
@@ -44,9 +44,9 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       if (command === "reveal") for (const track of tracks) await props.core.library.reveal(track.id);
     } catch (e) { error.set(String(e)); }
   }
-  return <View testID="page-history" class="flex-1 min-h-0 pb-28"
+  return <View testID="page-history" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="px-(--content-inset) gap-3 pb-4">
+    <View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-3 pb-4">
       <Text role="header" class="text-xl font-semibold text-foreground">历史</Text>
       <View class="flex-row gap-2">
         <Button label="曲目历史" size="sm" variant={tab() === "tracks" ? "primary" : "secondary"} onPress={() => tab.set("tracks")} />
@@ -69,7 +69,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     </View>
     <If when={tab() === "tracks" && !!handle() && state().tracks.length > 0}>
-      <TrackList source={handle()!} active={props.active && tab() === "tracks" && !confirming() && !playlistEditor() && !trackEditor()}
+      <TrackList bottomInset={token("dock-scroll-clearance")} source={handle()!} active={props.active && tab() === "tracks" && !confirming() && !playlistEditor() && !trackEditor()}
         onPlay={(e) => void play(e.id)} onSelectionChange={(e) => selected.set(e.ids)}
         onAction={(e) => void action(e.command, e.ids)} />
     </If>
@@ -79,9 +79,9 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       <EmptyState title="留下听过的旋律" description="播放音乐后，你可以在这里找到它。" />
     </If>
     <If when={tab() === "playlists"}>
-      <List testID="history-playlist-list" each={playlists()} keyExtractor={(p: any) => JSON.stringify([p.kind, p.sourceId, p.id])}
+      <List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} testID="history-playlist-list" each={playlists()} keyExtractor={(p: any) => JSON.stringify([p.kind, p.sourceId, p.id])}
         class="flex-1 min-h-0" estimatedItemSize={64}>
-        {(p: () => any) => <View class="flex-row items-center gap-3 px-(--content-inset) py-3">
+        {(p: () => any) => <View class="flex-row items-center gap-3 pl-(--content-inset-left) pr-(--content-inset-right) py-3">
           <View class="flex-1 gap-1">
             <Button label={p().title} variant="ghost" onPress={() => {
               if (p().kind === "local") props.navigate({ kind: "playlist", ref: props.core.collections.key(p().id) as any });

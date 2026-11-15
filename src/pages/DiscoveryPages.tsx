@@ -153,7 +153,7 @@ export function HomePage(props:Props) {
           <If when={!!s().feed}><FeedRow core={props.core} items={s().feed!} columns={columns()} open={openFeed} /></If>
           <If when={!s().feed&&s().kind==="tracks"}><HomeTracks core={props.core} tracks={s().items} active={props.active} /></If>
           <If when={!s().feed&&s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
-            fallbackCover={current()?.shelves.filter(s=>s.kind==="tracks").flatMap(s=>s.items).find(e=>e.cover)?.cover} open={e=>link(e.to)} /></If>
+            fallbackCover={current()?.fallbackCover} open={e=>link(e.to)} /></If>
           <If when={!s().feed&&s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
             listening hideTitle={s().kind==="toplists"} open={e=>props.navigate(entityRoute(e))} /></If>
         </Shelf></View>}

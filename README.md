@@ -9,6 +9,13 @@ Run `nsh check`, `nsh build`, `nsh test`, and `nsh run` from this directory.
 Package with `nsh package --target macos`. Run Rust workspace checks with
 `cargo test --manifest-path native/Cargo.toml --workspace`.
 
+If using `huacnlee/cargo`, invoke NSH through `./scripts/nsh.sh`, for example
+`./scripts/nsh.sh run --target macos` or `./scripts/nsh.sh check`. This Cargo fork
+ignores NSH's explicit target directory and writes new hosts to `.nsh/rust/target`,
+while NSH launches from `target`; an old host there can keep running after a
+successful build. The script uses Cargo from the active Rust toolchain for NSH
+commands and sets the build-time strip overrides below.
+
 On this machine (macOS 27), disable stripping for build-time dependencies before
 running Cargo or NSH commands:
 

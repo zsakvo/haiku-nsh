@@ -133,7 +133,7 @@ impl ActivityService {
     }
     /// Reference-compatible playback, playlist and search histories.
     pub fn list(&self) -> JsonValue {
-        serde_json::to_value(self.bridge.core.history.snapshot()).unwrap()
+        crate::sources::project_covers(&self.bridge.core.source_host, "", serde_json::to_value(self.bridge.core.history.snapshot()).unwrap(), 104)
     }
     /// Filter source identities without copying tracks into TSX.
     pub fn sources(&self) -> Vec<String> {

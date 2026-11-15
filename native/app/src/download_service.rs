@@ -73,7 +73,7 @@ pub struct DirectoryProgress {
 }
 pub struct Service {
     root: PathBuf,
-    host: Arc<Host>,
+    pub(crate) host: Arc<Host>,
     settings: Arc<SettingsStore>,
     state: Mutex<State>,
     events: watch::Sender<Vec<Item>>,
@@ -530,11 +530,10 @@ impl Service {
         self.save(&state)
     }
     async fn cover(&self, track: &Track, hd: bool) -> Result<Option<PathBuf>> {
-        let Some(mut url) = track.cover.clone() else {
+        let Some(template) = track.cover.clone() else {
             return Ok(None);
         };
-        // SDK image templates accept the same size token as SourceApi.
-        url = url.replace("{size}", if hd { "1000" } else { "500" });
+        let url = crate::sources::cover_url(&self.host, &track.source, &template, if hd { 1000 } else { 500 });
         if !url.starts_with("http://") && !url.starts_with("https://") {
             return Ok(Some(PathBuf::from(
                 url.strip_prefix("file://").unwrap_or(&url),

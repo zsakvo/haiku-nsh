@@ -12,7 +12,7 @@
 | 每个函数各算 `page/pageSize/hasMore/total` | 统一游标分页 `{ items, next? }` |
 | 手动拼接和解析 `qq:playlist:xxx`，一个 `getPlaylist` 分派多种实体 | 插件只处理原生 id；宿主负责命名空间；每种实体单独一个处理函数 |
 | manifest 中的 `capabilities`/`searchTypes`/`idSchemes` 与导出函数重复 | 能力由插件定义推断，不需要声明 |
-| `getCoverArt` 需要一次额外调用 | 封面 URL 支持 `{size}` 模板，宿主自行替换 |
+| 封面尺寸与高清封面 | `covers.sizes` 声明模板支持的边长；`track.cover` 按需提供高清封面 |
 | 运行时缺 AES，插件手写分组密码 | haiku-jsrt 提供 `crypto.createCipheriv` 等（§8） |
 | 调用无法取消 | 每次调用都带 `ctx.signal`，SDK 的 `http` 自动接入 |
 
@@ -429,3 +429,11 @@ haiku-plugin test  ./my-source [--live]          # 契约测试
 | `qq-scraper`、`kugou-scraper` | 刮削 | 独立保留，见 Q3 |
 
 > 已确认 Q3：保留独立的轻量 `qq-scraper` 内置插件；qq-music 同时也实现 `scrape`。
+
+## 封面尺寸与高清封面
+
+`definePlugin` 可声明 `covers?: { sizes: number[] }`，值为非空、正整数、严格升序的像素边长；未声明表示支持任意尺寸。`Image` 仍为 URL 字符串，可含 `{size}`；实体映射和持久化保留模板。
+
+唯一选档规则：取声明中不小于目标尺寸的最小值；没有就取最大值。未声明则使用目标尺寸。宿主在消费时解析：缩略图目标为显示边长 × 2；底栏、正在播放、媒体中心、当前曲和下一首预热目标为 1600；下载沿用高清设置。
+
+可选 `track.cover?(id: string, ctx: Context & { size: number }): Promise<Image | null>` 返回不小于请求尺寸的最佳封面（受来源最大尺寸限制，可含模板）。仅用于列表只有固定缩略图、模板不能满足高清需求的来源。宿主只为当前曲与下一首调用，失败或 null 回退到 `Track.cover`，只记日志；列表不调用。描述符能力推断包含 `track.cover`。

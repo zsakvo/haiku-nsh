@@ -495,6 +495,7 @@ export default definePlugin({
   id: 'qq.music',
   name: 'QQ 音乐',
   version: '3.2.0',
+  covers: { sizes: [150, 300, 500, 800] },
   author: 'Haiku',
   logo: 'logo.png',
   http: { headers: { Referer: 'https://y.qq.com/' } },
@@ -505,7 +506,18 @@ export default definePlugin({
     artist: (args, ctx) => search(1, 'singer', artist, args, ctx),
     playlist: (args, ctx) => search(3, 'item_songlist', playlist, args, ctx),
   },
-  track: { get: async (id, ctx) => track(await song(ctx, id)), streams, lyrics },
+  track: {
+    get: async (id, ctx) => track(await song(ctx, id)),
+    async cover(id, ctx) {
+      const s = await song(ctx, id);
+      const a = s.album;
+      const mid = a?.mid || a?.albumMid || a?.albummid;
+      const singer = s.singer?.[0];
+      const url = mid ? cover(mid) : cover(singer?.mid || singer?.singerMID, 'T001');
+      return url?.replaceAll('{size}', '800') || null;
+    },
+    streams, lyrics,
+  },
   album: {
     async get(id, ctx) {
       const numeric = /^\d+$/.test(id);

@@ -51,7 +51,7 @@ export function CollectionsBrowser(props: { core: Core; active: boolean; navigat
     const items = playlists(); const width = mode() === "grid" ? 3 : 1;
     return Array.from({ length: Math.ceil(items.length / width) }, (_, index) => items.slice(index * width, index * width + width));
   };
-  const covers = (id: string) => { mirror.revision(); return props.core.collections.artwork(id) as (string | null)[]; };
+  const covers = (id: string) => { mirror.revision(); return props.core.collections.artwork(id, mode() === "list") as (string | null)[]; };
   function move(id: string, delta: number) {
     try {
       const ids = playlists().map((p) => p.id); const from = ids.indexOf(id); const to = from + delta;
@@ -60,8 +60,8 @@ export function CollectionsBrowser(props: { core: Core; active: boolean; navigat
       props.core.collections.reorder(ids);
     } catch (e) { error.set(String(e)); }
   }
-  return <View testID="page-playlists" class="flex-1 min-h-0 pb-28" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="px-(--content-inset) pb-4 gap-3">
+  return <View testID="page-playlists" class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
+    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-4 gap-3">
       <View class="flex-row items-center gap-2">
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">歌单</Text>
         <Button label="新建歌单…" size="sm" onPress={() => creating.set(true)} />
@@ -72,10 +72,10 @@ export function CollectionsBrowser(props: { core: Core; active: boolean; navigat
         items={[{ id: "list", label: "列表" }, { id: "grid", label: "网格" }]} />
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     </View>
-    <List each={rows()} keyExtractor={(row) => `${mode()}:${row.map((p) => p.id).join(",")}`}
+    <List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} each={rows()} keyExtractor={(row) => `${mode()}:${row.map((p) => p.id).join(",")}`}
       estimatedItemSize={mode() === "grid" ? 244 : 72} class="flex-1 min-h-0"
       empty={<Text class="p-5 text-sm text-muted-foreground">创建歌单，把不同来源的音乐放在一起。</Text>}>
-      {(row) => <View class="flex-row gap-4 px-(--content-inset) pb-3">
+      {(row) => <View class="flex-row gap-4 pl-(--content-inset-left) pr-(--content-inset-right) pb-3">
         <Each of={row()} key={(p) => p.id}>{(p) => <View class="flex-1 min-w-0 gap-2">
           <View class={mode() === "grid" ? "gap-2" : "flex-row items-center gap-3"}>
             <CollectionArtwork small={mode() === "list"} covers={covers(p().id)} />

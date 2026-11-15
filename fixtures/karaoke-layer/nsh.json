@@ -1,0 +1,22 @@
+{
+  "name": "Haiku",
+  "id": "dev.haiku.nsh",
+  "version": "1.0.0",
+  "build": 1,
+  "rust": "native",
+  "theme": "../../src/ui/theme/haiku.json",
+  "icon": "../../assets/app-icon.png",
+  "capabilities": {
+    "network": { "hosts": ["*"] },
+    "webview": { "hosts": ["*"] },
+    "statusBar": true,
+    "clipboard": true,
+    "picker": true,
+    "speech": true,
+    "openUrl": true,
+    "fs": {
+      "read": ["/tmp/haiku-m1-03-fixtures"],
+      "write": ["/tmp/haiku-m1-03-fixtures"]
+    }
+  }
+}

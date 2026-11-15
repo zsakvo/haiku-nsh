@@ -19,6 +19,12 @@ pub struct SeekBarProps {
     /// Use the cover-derived progress roles.
     #[prop(default)]
     pub now_playing: Prop<bool>,
+    /// Place elapsed and duration labels beside the track instead of below it.
+    #[prop(default)]
+    pub inline_times: Prop<bool>,
+    /// Reference immersive progress geometry without time labels.
+    #[prop(default)]
+    pub immersive: Prop<bool>,
 }
 /// User intent; emitted once at the end of an activated primary drag.
 #[derive(Clone, Debug, PartialEq, Event)]
@@ -35,7 +41,7 @@ struct Drag {
     duration: f64,
     active: bool,
 }
-fn time(seconds: f64) -> String {
+pub(crate) fn time(seconds: f64) -> String {
     let seconds = if seconds.is_finite() {
         seconds.max(0.) as u64
     } else {
@@ -51,6 +57,13 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
     let preview = signal(None::<f64>);
     let focused = signal(false);
     let valid = move || props.duration.get().is_finite() && props.duration.get() > 0.;
+    let muted = move || {
+        if props.now_playing.get() {
+            theme().color("dock-on-dark-muted").unwrap()
+        } else {
+            theme().muted_foreground
+        }
+    };
     effect(move || {
         if !focused.get() || !valid() {
             return;
@@ -68,153 +81,193 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
         .gap_1()
         .child(
             view()
-                .test_id("seek-track")
-                .h_6()
-                .justify_center()
-                .focusable(true)
-                .role(AccessibilityRole::Adjustable)
-                .label("播放进度")
-                .accessibility_value(move || {
-                    Some(AccessibilityValue {
-                        min: Some(0.),
-                        max: Some(props.duration.get() as f32),
-                        now: Some(preview.get().unwrap_or(props.position.get()) as f32),
-                        text: Some(time(preview.get().unwrap_or(props.position.get())).into()),
-                    })
-                })
-                .on_focus(move || focused.set(true))
-                .on_blur(move || focused.set(false))
-                .app_class("focus-visible:outline-2 focus-visible:outline-ring")
-                .opacity(move || if valid() { 1_f32 } else { 0.4_f32 })
-                .on_layout(move |b: &Bounds<Points>| {
-                    width.replace(b.size.width.0);
-                })
-                .on_touch(move |event: &TouchEvent| {
-                    let Some(point) = event.points.iter().find(|p| p.changed) else {
-                        return;
-                    };
-                    match event.phase {
-                        TouchPhase::Start => {
-                            if valid() && width.get() > 0. {
-                                drag.replace(Some(Drag {
-                                    down: point.page.x.0,
-                                    left: point.page.x.0 - point.location.x.0,
-                                    width: width.get(),
-                                    duration: props.duration.get_untracked(),
-                                    active: false,
-                                }));
-                            }
-                        }
-                        TouchPhase::Move => {
-                            drag.with(|held| {
-                                if let Some(d) = held {
-                                    d.active |= (point.page.x.0 - d.down).abs() >= 1.;
-                                    if d.active {
-                                        preview.set(Some(
-                                            ((point.page.x.0 - d.left) / d.width).clamp(0., 1.)
-                                                as f64
-                                                * d.duration,
-                                        ));
-                                    }
-                                }
-                            });
-                        }
-                        TouchPhase::End => {
-                            if let Some(d) = drag.replace(None) {
-                                if d.active {
-                                    let seconds =
-                                        ((point.page.x.0 - d.left) / d.width).clamp(0., 1.) as f64
-                                            * d.duration;
-                                    cx.emit(SeekBarEvent::Seek(seconds));
-                                }
-                            }
-                            preview.set(None);
-                        }
-                        TouchPhase::Cancel => {
-                            drag.replace(None);
-                            preview.set(None);
-                        }
-                    }
-                })
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(when(
+                    move || props.inline_times.get() && !props.immersive.get(),
+                    move || {
+                        text(move || time(preview.get().unwrap_or(props.position.get())))
+                            .test_id("seek-time")
+                            .w_9()
+                            .flex_shrink_0()
+                            .text_xs()
+                            .text_color(muted)
+                    },
+                ))
                 .child(
                     view()
-                        .h_1()
-                        .rounded_full()
-                        .overflow_hidden()
-                        .bg(move || theme().muted)
-                        .pointer_events(PointerEvents::None)
+                        .test_id("seek-track")
+                        .flex_1()
+                        .min_w_0()
+                        .h(move || px(if props.immersive.get() { 20. } else { 24. }))
+                        .justify_center()
+                        .focusable(true)
+                        .role(AccessibilityRole::Adjustable)
+                        .label("播放进度")
+                        .accessibility_value(move || {
+                            Some(AccessibilityValue {
+                                min: Some(0.),
+                                max: Some(props.duration.get() as f32),
+                                now: Some(preview.get().unwrap_or(props.position.get()) as f32),
+                                text: Some(
+                                    time(preview.get().unwrap_or(props.position.get())).into(),
+                                ),
+                            })
+                        })
+                        .on_focus(move || focused.set(true))
+                        .on_blur(move || focused.set(false))
+                        .app_class("focus-visible:outline-2 focus-visible:outline-ring")
+                        .opacity(move || if valid() { 1_f32 } else { 0.4_f32 })
+                        .on_layout(move |b: &Bounds<Points>| {
+                            width.replace(b.size.width.0);
+                        })
+                        .on_touch(move |event: &TouchEvent| {
+                            let Some(point) = event.points.iter().find(|p| p.changed) else {
+                                return;
+                            };
+                            match event.phase {
+                                TouchPhase::Start => {
+                                    if valid() && width.get() > 0. {
+                                        drag.replace(Some(Drag {
+                                            down: point.page.x.0,
+                                            left: point.page.x.0 - point.location.x.0,
+                                            width: width.get(),
+                                            duration: props.duration.get_untracked(),
+                                            active: false,
+                                        }));
+                                    }
+                                }
+                                TouchPhase::Move => {
+                                    drag.with(|held| {
+                                        if let Some(d) = held {
+                                            d.active |= (point.page.x.0 - d.down).abs() >= 1.;
+                                            if d.active {
+                                                preview.set(Some(
+                                                    ((point.page.x.0 - d.left) / d.width)
+                                                        .clamp(0., 1.)
+                                                        as f64
+                                                        * d.duration,
+                                                ));
+                                            }
+                                        }
+                                    });
+                                }
+                                TouchPhase::End => {
+                                    if let Some(d) = drag.replace(None) {
+                                        if d.active {
+                                            let seconds = ((point.page.x.0 - d.left) / d.width)
+                                                .clamp(0., 1.)
+                                                as f64
+                                                * d.duration;
+                                            cx.emit(SeekBarEvent::Seek(seconds));
+                                        }
+                                    }
+                                    preview.set(None);
+                                }
+                                TouchPhase::Cancel => {
+                                    drag.replace(None);
+                                    preview.set(None);
+                                }
+                            }
+                        })
                         .child(
                             view()
-                                .absolute()
-                                .top_0()
-                                .bottom_0()
-                                .left_0()
-                                .w(move || percentage(props.buffered.get().clamp(0., 1.) as f32))
+                                .h(px(4.))
+                                .rounded_full()
+                                .overflow_hidden()
                                 .bg(move || {
-                                    theme()
-                                        .color(if props.now_playing.get() {
-                                            "progress-now-playing-buffered"
-                                        } else {
-                                            "progress-buffered"
-                                        })
-                                        .unwrap_or(theme().muted)
-                                }),
-                        )
-                        .child(
-                            view()
-                                .absolute()
-                                .top_0()
-                                .bottom_0()
-                                .left_0()
-                                .w(move || {
-                                    percentage(if valid() {
-                                        (preview.get().unwrap_or(props.position.get())
-                                            / props.duration.get())
-                                        .clamp(0., 1.)
-                                            as f32
+                                    if props.immersive.get() {
+                                        theme().color("now-playing-progress-track").unwrap()
+                                    } else if props.now_playing.get() {
+                                        theme().color("now-playing-surface").unwrap()
                                     } else {
-                                        0.
-                                    })
+                                        theme().muted
+                                    }
                                 })
-                                .bg(move || {
-                                    theme()
-                                        .color(if props.now_playing.get() {
-                                            "progress-now-playing-played"
-                                        } else {
-                                            "progress-played"
+                                .pointer_events(PointerEvents::None)
+                                .child(
+                                    view()
+                                        .absolute()
+                                        .top_0()
+                                        .bottom_0()
+                                        .left_0()
+                                        .w(move || {
+                                            percentage(props.buffered.get().clamp(0., 1.) as f32)
                                         })
-                                        .unwrap_or(theme().primary)
-                                }),
+                                        .bg(move || {
+                                            theme()
+                                                .color(if props.immersive.get() {
+                                                    "now-playing-progress-buffered"
+                                                } else if props.now_playing.get() {
+                                                    "progress-now-playing-buffered"
+                                                } else {
+                                                    "progress-buffered"
+                                                })
+                                                .unwrap_or(theme().muted)
+                                        }),
+                                )
+                                .child(
+                                    view()
+                                        .absolute()
+                                        .top_0()
+                                        .bottom_0()
+                                        .left_0()
+                                        .w(move || {
+                                            percentage(if valid() {
+                                                (preview.get().unwrap_or(props.position.get())
+                                                    / props.duration.get())
+                                                .clamp(0., 1.)
+                                                    as f32
+                                            } else {
+                                                0.
+                                            })
+                                        })
+                                        .bg(move || {
+                                            theme()
+                                                .color(if props.immersive.get() {
+                                                    "now-playing-foreground"
+                                                } else if props.now_playing.get() {
+                                                    "progress-now-playing-played"
+                                                } else {
+                                                    "progress-played"
+                                                })
+                                                .unwrap_or(theme().primary)
+                                        }),
+                                ),
                         ),
-                ),
-        )
-        .child(
-            view()
-                .flex_row()
-                .justify_between()
-                .child(
-                    text(move || time(preview.get().unwrap_or(props.position.get())))
-                        .test_id("seek-time")
-                        .text_xs()
-                        .text_color(move || {
-                            if props.now_playing.get() {
-                                theme().color("dock-on-dark-muted").unwrap()
-                            } else {
-                                theme().muted_foreground
-                            }
-                        }),
                 )
-                .child(
-                    text(move || time(props.duration.get()))
-                        .test_id("seek-duration")
-                        .text_xs()
-                        .text_color(move || {
-                            if props.now_playing.get() {
-                                theme().color("dock-on-dark-muted").unwrap()
-                            } else {
-                                theme().muted_foreground
-                            }
-                        }),
-                ),
+                .child(when(
+                    move || props.inline_times.get() && !props.immersive.get(),
+                    move || {
+                        text(move || time(props.duration.get()))
+                            .test_id("seek-duration")
+                            .w_9()
+                            .flex_shrink_0()
+                            .text_xs()
+                            .text_right()
+                            .text_color(muted)
+                    },
+                )),
         )
+        .child(when(
+            move || !props.inline_times.get() && !props.immersive.get(),
+            move || {
+                view()
+                    .flex_row()
+                    .justify_between()
+                    .child(
+                        text(move || time(preview.get().unwrap_or(props.position.get())))
+                            .test_id("seek-time")
+                            .text_xs()
+                            .text_color(muted),
+                    )
+                    .child(
+                        text(move || time(props.duration.get()))
+                            .test_id("seek-duration")
+                            .text_xs()
+                            .text_color(muted),
+                    )
+            },
+        ))
 }

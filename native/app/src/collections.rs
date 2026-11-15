@@ -47,7 +47,8 @@ impl CollectionSource {
         } else {
             &query.sort
         };
-        let mut tracks: Vec<_> = self.store
+        let mut tracks: Vec<_> = self
+            .store
             .sorted_tracks(&query.id, sort)
             .into_iter()
             .map(|t| {
@@ -348,17 +349,36 @@ impl CollectionsService {
             .collect()
     }
     /// Cached first four covers. Background reads publish onChange(reason: artwork) when ready.
-    pub fn artwork(&self, id: String) -> Vec<Option<String>> {
+    pub fn artwork(&self, id: String, small: Option<bool>) -> Vec<Option<String>> {
+        let tracks = self.bridge.core.collections.tracks(&id);
         self.bridge
             .artwork
             .borrow()
             .get(&id)
             .cloned()
             .unwrap_or_default()
+            .into_iter()
+            .zip(tracks)
+            .map(|(image, track)| {
+                image.map(|image| {
+                    crate::sources::cover_url(
+                        &self.bridge.core.source_host,
+                        &track.source,
+                        &image,
+                        if small == Some(true) { 48 } else { 128 },
+                    )
+                })
+            })
+            .collect()
     }
     /// Summaries in display order, including the fixed __liked__ collection.
     pub fn list(&self) -> JsonValue {
-        serde_json::to_value(self.bridge.core.collections.list()).unwrap()
+        crate::sources::project_covers(
+            &self.bridge.core.source_host,
+            "",
+            serde_json::to_value(self.bridge.core.collections.list()).unwrap(),
+            128,
+        )
     }
     /// SDK tracks in playlist order (likes newest first); native lists use query handles instead.
     pub fn tracks(&self, id: String) -> JsonValue {
@@ -376,7 +396,12 @@ impl CollectionsService {
                 }
             })
             .collect();
-        serde_json::to_value(tracks).unwrap()
+        crate::sources::project_covers(
+            &self.bridge.core.source_host,
+            "",
+            serde_json::to_value(tracks).unwrap(),
+            104,
+        )
     }
     /// Create an editable playlist; an empty title is rejected.
     pub fn create(&self, title: String) -> Result<String, String> {
@@ -570,12 +595,18 @@ impl CollectionsService {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        serde_json::to_value(tracks).unwrap()
+        let value = serde_json::to_value(tracks).unwrap();
+        crate::presentation::get()
+            .map(|p| crate::sources::project_covers(&p.bridge.source_host, "", value.clone(), 104))
+            .unwrap_or(value)
     }
 }
-/// One native like control shared by Dock and now-playing; no JS mirror in the mutation path.
-pub(crate) fn like_button(dark: impl Into<Prop<bool>>) -> impl IntoElement {
-    let dark = dark.into();
+/// Native Dock like control; no JS mirror in the mutation path.
+pub(crate) fn compact_like_button(dark: impl Into<Prop<bool>>) -> impl IntoElement {
+    sized_like_button(dark.into(), true)
+}
+
+fn sized_like_button(dark: Prop<bool>, compact: bool) -> impl IntoElement {
     let p = crate::presentation::get().expect("Core.open");
     let track = p.track;
     let revision = p.bridge.collections_revision;
@@ -590,12 +621,12 @@ pub(crate) fn like_button(dark: impl Into<Prop<bool>>) -> impl IntoElement {
     });
     nsh_base::button().accessibility_label(move ||Some(if liked.get(){"取消喜欢"}else{"喜欢"}.into()))
         .selected(move ||liked.get()).disabled(move ||track.with(Option::is_none))
-        .size_8().rounded_full().items_center().justify_center()
+        .size(px(if compact {19.} else {32.})).flex_shrink_0().rounded_full().items_center().justify_center()
         .app_class("hover:opacity-80 active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .on_press(move || {if let Some(track)=track.get_untracked(){if let Err(e)=store.set_liked(&track,None){log::error!("Like: {e}");}}})
         .child(view().tooltip(crate::player_controls::hint("喜欢 / 取消喜欢"))
             .child(image(move || nsh_core::element::ImageSrc::svg_markup(if liked.get() {
                 include_str!("../../../assets/icons/heart-filled.svg")
-            } else { include_str!("../../../assets/icons/heart.svg") })).size_5()
+            } else { include_str!("../../../assets/icons/heart.svg") })).size(px(if compact {13.} else {20.}))
                 .tint_color(move ||if liked.get(){nsh_base::theme().primary}else if dark.get(){nsh_base::theme().color("now-playing-foreground").unwrap()}else{nsh_base::theme().foreground})))
 }

@@ -21,6 +21,11 @@ test("SeekBar primary threshold, independent preview, one release commit and cla
   await app.press("未知时长");
   await app.drag("id:seek-track", { x: -50 });
   expect(app.texts()).toContain("commits:2;last:100.000");
+  await app.press("行内时间");
+  await app.drag("id:seek-track", { x: -1000 });
+  expect(app.texts()).toContain("commits:3;last:0.000");
+  expect(app.count("id:seek-time")).toBe(1);
+  expect(app.count("id:seek-duration")).toBe(1);
 });
 
 test("persistent dock, commands through Core, retained navigation and local lyric switching", async () => {
@@ -31,6 +36,12 @@ test("persistent dock, commands through Core, retained navigation and local lyri
     expect(app.enabled("label:下一首")).toBe(false);
     await app.press("装载暂停队列");
     await app.waitFor("text:player:paused;track:Song Alpha");
+    expect(app.count("label:显示歌词")).toBe(0);
+    for (const mode of ["顺序播放", "列表循环", "单曲循环", "随机播放"]) {
+      await app.waitFor(`label:切换播放模式：${mode}`);
+      await app.press(`label:切换播放模式：${mode}`);
+    }
+    await app.waitFor("label:切换播放模式：顺序播放");
     expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#272522ff");
     expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#716b64ff");
     expect(app.spanStyle("id:seek-duration >> text:/^.+$/").color).toBe("#716b64ff");
@@ -42,7 +53,7 @@ test("persistent dock, commands through Core, retained navigation and local lyri
     await app.press("id:nav-search");
     await app.type("label:搜索词", "保留的播放页状态");
     await app.press("id:nav-library");
-    await app.press("label:显示歌词");
+    await app.press("label:打开正在播放");
     await app.waitFor("id:now-playing");
     // Now Playing is a dark surface even while the application is in light mode.
     expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#f9f7f4ff");

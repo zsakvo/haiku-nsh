@@ -136,5 +136,92 @@ fn pending_local_lyrics_survive_pause_and_download_settings_then_switch_tracks()
     app.wait_for("pending Beta").unwrap();
     app.press("Finish local read").unwrap();
     app.wait_for("Beta middle").unwrap();
-    assert!(!app.screen().texts().iter().any(|text| *text == "Alpha middle"));
+    assert!(
+        !app.screen()
+            .texts()
+            .iter()
+            .any(|text| *text == "Alpha middle")
+    );
+}
+
+#[component]
+fn HdCoverFixture() -> impl IntoElement {
+    set_tokens(
+        nsh_base::Theme::from_json(include_str!("../../../src/ui/theme/haiku.json")).unwrap(),
+    );
+    let ready = signal(false);
+    spawn(async move {
+        let core = crate::core::Core::open_isolated().await.unwrap();
+        let p = get().unwrap();
+        let root = core.with(|c| std::path::PathBuf::from(c.data_dir()));
+        let image_path = root.join("hd800.png");
+        let output = image_path.clone();
+        blocking(move || {
+            image::RgbImage::from_pixel(8, 8, image::Rgb([40, 110, 180]))
+                .save(output)
+                .unwrap();
+        })
+        .await
+        .unwrap();
+        let template = serde_json::to_string(&root.join("hd{size}.png").to_string_lossy()).unwrap();
+        let code = format!(
+            r#"import {{definePlugin}} from 'haiku';
+            export default definePlugin({{id:'hd.fixture',name:'HD',version:'1.0.0',auth:{{password:{{submit:async()=>({{credential:{{token:'fixture'}}}})}}}},covers:{{sizes:[150,800]}},
+            track:{{cover:async(id,ctx)=>{{if(ctx.size!==1600)throw Error('wrong target');return {template};}},streams:async()=>[]}}}});"#
+        );
+        let host = p.bridge.source_host.clone();
+        background(async move {
+            host.install_files(
+                std::collections::BTreeMap::from([("plugin.ts".into(), code.into_bytes())]),
+                false,
+            )
+            .await
+            .unwrap();
+            let mut login = host.begin_login("hd.fixture").await.unwrap();
+            login.password(Default::default(), None).await.unwrap();
+            login.commit().await.unwrap();
+        })
+        .await
+        .unwrap();
+        let track = Track {
+            source: "hd.fixture".into(),
+            cover: Some(root.join("R512x512.png").to_string_lossy().into_owned()),
+            ..Track::local("hd")
+        };
+        // Exercise the same signal consumed by PlayerDock, with no playback device/network.
+        p.bridge.state.update(|state| state.current = Some(track));
+        ready.set(true);
+    });
+    view().child(when(
+        move || ready.get(),
+        move || {
+            let p = get().unwrap();
+            view()
+                .child(
+                    <crate::player_dock::PlayerDock as nsh_core::element::Component>::element(
+                        Default::default(),
+                    ),
+                )
+                .child(text(move || {
+                    if p.artwork_path
+                        .get()
+                        .is_some_and(|path| path.ends_with("hd800.png"))
+                        && p.artwork.get().starts_with("data:image/png;base64,")
+                    {
+                        "dock uses track.cover at 800 from target 1600"
+                    } else {
+                        "pending HD artwork"
+                    }
+                }))
+        },
+    ))
+}
+
+#[test]
+fn dock_artwork_uses_declared_sizes_and_track_cover_with_local_image() {
+    use nsh_engine::{EngineConfig, Root};
+    use nsh_testing::Headless;
+    let mut app = Headless::start(EngineConfig::new(Root::of::<HdCoverFixture>())).unwrap();
+    app.wait_for("dock uses track.cover at 800 from target 1600")
+        .unwrap();
 }

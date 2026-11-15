@@ -3,6 +3,7 @@
 
 pub mod desktop_lyrics;
 pub mod desktop_lyrics_api;
+pub mod karaoke;
 #[cfg(target_os = "macos")]
 pub mod events;
 #[cfg(target_os = "macos")]

@@ -141,6 +141,7 @@ impl PluginService {
                 .into_iter()
                 .map(|p| {
                     let mut descriptor = serde_json::to_value(&p.descriptor).unwrap();
+                    descriptor.as_object_mut().unwrap().remove("covers");
                     descriptor["logo"] = json!(crate::plugin_tools::logo(
                         &p.path,
                         p.descriptor.logo.as_deref()
@@ -186,31 +187,143 @@ impl Drop for PluginService {
 #[class]
 impl PluginService {
     /// First-page home; refresh=false serves a fresh disk hit immediately. Refresh=true fetches and preserves radio entries.
-    pub async fn home(this: Instance<Self>, source: String, refresh: bool) -> Result<JsonValue, String> {
-        let host=Self::host(&this);let cache=this.with(|s|s.home.clone());
-        background(async move { cache.home(host,source,refresh).await }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    pub async fn home(
+        this: Instance<Self>,
+        source: String,
+        refresh: bool,
+    ) -> Result<JsonValue, String> {
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = 192;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            let cache = this.with(|s| s.home.clone());
+            background(async move { cache.home(host, source, refresh).await })
+                .await
+                .map_err(|e| e.to_string())?
+                .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|mut value| {
+            let fallback = value["shelves"].as_array().into_iter().flatten()
+                .filter(|s| s["kind"] == "tracks")
+                .flat_map(|s| s["items"].as_array().into_iter().flatten())
+                .find_map(|t| t["cover"].as_str())
+                .map(|image| crate::sources::cover_url(&projection_host, &projection_source, image, 380));
+            value["fallbackCover"] = json!(fallback);
+            crate::sources::project_covers(&projection_host, &projection_source, value, projection_size)
+        })
     }
     /// Continuation page of home shelves; never cached.
-    pub async fn home_page(this: Instance<Self>, source: String, cursor: String) -> Result<JsonValue, String> {
+    pub async fn home_page(
+        this: Instance<Self>,
+        source: String,
+        cursor: String,
+    ) -> Result<JsonValue, String> {
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
         let host = Self::host(&this);
         let cache = this.with(|s| s.home.clone());
-        background(async move { cache.page(host, source, cursor).await })
-            .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+        let value = background(async move { cache.page(host, source, cursor).await })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
+        Ok(crate::sources::project_covers(&projection_host, &projection_source, value, 192))
     }
     /// Category groups with optional provider-declared sorts.
-    pub async fn categories(this: Instance<Self>, source: String) -> Result<JsonValue,String> {
-        let host=Self::host(&this);
-        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).categories(None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    pub async fn categories(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = 224;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(async move {
+                Ok::<_, haiku_plugins::PluginError>(json!(
+                    haiku_plugins::SourceApi::new(host.source(&source)?)
+                        .categories(None)
+                        .await?
+                ))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
+        })
     }
     /// One opaque cursor page of playlists for a category and optional declared sort.
-    pub async fn category_playlists(this: Instance<Self>, source:String, id:String, sort:Option<String>, cursor:Option<String>) -> Result<JsonValue,String> {
-        let host=Self::host(&this);
-        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).category_playlists(&id,haiku_plugins::PageArgs{cursor,limit:40},sort.as_deref(),None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    pub async fn category_playlists(
+        this: Instance<Self>,
+        source: String,
+        id: String,
+        sort: Option<String>,
+        cursor: Option<String>,
+    ) -> Result<JsonValue, String> {
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = 224;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(async move {
+                Ok::<_, haiku_plugins::PluginError>(json!(
+                    haiku_plugins::SourceApi::new(host.source(&source)?)
+                        .category_playlists(
+                            &id,
+                            haiku_plugins::PageArgs { cursor, limit: 40 },
+                            sort.as_deref(),
+                            None
+                        )
+                        .await?
+                ))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
+        })
     }
     /// Ordinary nonempty radio channel IDs; private FM is selected separately.
-    pub async fn radio_channels(this: Instance<Self>, source:String) -> Result<JsonValue,String> {
-        let host=Self::host(&this);
-        background(async move { Ok::<_,haiku_plugins::PluginError>(json!(haiku_plugins::SourceApi::new(host.source(&source)?).radio_channels(None).await?)) }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
+    pub async fn radio_channels(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = 224;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(async move {
+                Ok::<_, haiku_plugins::PluginError>(json!(
+                    haiku_plugins::SourceApi::new(host.source(&source)?)
+                        .radio_channels(None)
+                        .await?
+                ))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
+        })
     }
     /// Search one enabled source and SDK kind; the cursor is opaque, tracks remain playable.
     pub async fn search(
@@ -220,21 +333,50 @@ impl PluginService {
         query: String,
         cursor: Option<String>,
     ) -> Result<JsonValue, String> {
-        let host = Self::host(&this);
-        background(async move { crate::sources::search(host, source, kind, query, cursor).await })
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = if kind == "track" { 104 } else { 192 };
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(
+                async move { crate::sources::search(host, source, kind, query, cursor).await },
+            )
             .await
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
+        })
     }
     /// Concurrent first-page track/playlist results per enabled source, with isolated errors.
     /// The UI previews three of each; tracks contains the entire first page for playback.
     pub async fn search_preview(this: Instance<Self>, query: String) -> Result<JsonValue, String> {
-        let host = Self::host(&this);
-        background(async move { crate::sources::search_preview(host, query).await })
-            .await
-            .map_err(|e| e.to_string())
+        let projection_host = Self::host(&this);
+        let projection_source = String::new();
+        let projection_size = 192;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(async move { crate::sources::search_preview(host, query).await })
+                .await
+                .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
+        })
     }
-
     /// Start two isolated search sources, including a track-only source, for offline acceptance.
     pub async fn start_search_fixture(this: Instance<Self>) -> Result<JsonValue, String> {
         let first = Self::start_network_fixture(this.clone()).await?;
@@ -312,16 +454,16 @@ impl PluginService {
         cursor: Option<String>,
     ) -> Result<JsonValue, String> {
         let host = Self::host(&this);
+        let projection_host = host.clone();
         let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
-        background(async move {
+        let projection_source = r.source.clone();
+        let value = background(async move {
             let source = host.source(&r.source)?;
             let capabilities = source.descriptor().capabilities;
             let api = haiku_plugins::SourceApi::new(source);
             let page = haiku_plugins::PageArgs { cursor: cursor.clone(), limit: 40 };
             let mut detail = api.detail(&r.kind, &r.id, page.clone(), None).await?;
-            if let Some(info) = &mut detail.info {
-                info.reference = Some(r.clone());
-            }
+            if let Some(info) = &mut detail.info { info.reference = Some(r.clone()); }
             let mut albums = None;
             if r.kind == "artist" {
                 if capabilities.iter().any(|p| p == "artist.tracks") {
@@ -333,7 +475,8 @@ impl PluginService {
             }
             Ok::<_, haiku_plugins::PluginError>(json!({"info":detail.info,"tracks":detail.tracks,
                 "albums":albums,"canFavorite":r.kind=="playlist" && capabilities.iter().any(|p| p=="playlist.get")}))
-        }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+        }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+        Ok(crate::sources::project_covers(&projection_host, &projection_source, value, 192))
     }
     /// Fetch another artist album page; cursors remain opaque plugin values.
     pub async fn artist_albums(
@@ -341,18 +484,34 @@ impl PluginService {
         reference: String,
         cursor: Option<String>,
     ) -> Result<JsonValue, String> {
-        let host = Self::host(&this);
-        let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
-        background(async move {
-            let api = haiku_plugins::SourceApi::new(host.source(&r.source)?);
-            Ok::<_, haiku_plugins::PluginError>(json!(
-                api.artist_albums(&r.id, haiku_plugins::PageArgs { cursor, limit: 40 }, None)
-                    .await?
-            ))
+        let projection_host = Self::host(&this);
+        let projection_source = haiku_model::EntityRef::decode(&reference)
+            .map_err(|e| e.to_string())?
+            .source;
+        let projection_size = 192;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            let r = haiku_model::EntityRef::decode(&reference).map_err(|e| e.to_string())?;
+            background(async move {
+                let api = haiku_plugins::SourceApi::new(host.source(&r.source)?);
+                Ok::<_, haiku_plugins::PluginError>(json!(
+                    api.artist_albums(&r.id, haiku_plugins::PageArgs { cursor, limit: 40 }, None)
+                        .await?
+                ))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
         })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())
     }
     /// Browse one declared library card (or all cards' first pages when card is null).
     pub async fn browse(
@@ -361,38 +520,52 @@ impl PluginService {
         card: Option<String>,
         cursor: Option<String>,
     ) -> Result<JsonValue, String> {
-        let host = Self::host(&this);
-        background(async move {
-            let source = host.source(&source)?;
-            if source.needs_login() {
-                return Err(haiku_plugins::PluginError::new(
-                    "AUTH_REQUIRED",
-                    "来源尚未登录，请前往设置连接",
-                ));
-            }
-            let api = haiku_plugins::SourceApi::new(source);
-            let mut groups = vec![];
-            for c in api
-                .library_cards()?
-                .into_iter()
-                .filter(|c| card.as_ref().is_none_or(|id| id == &c.id))
-            {
-                let page = haiku_plugins::PageArgs {
-                    cursor: cursor.clone(),
-                    limit: 40,
-                };
-                let result = if c.entity == "track" {
-                    json!(api.browse_tracks(&c.id, page, None).await?)
-                } else {
-                    json!(api.browse(&c.id, &c.entity, page, None, None).await?)
-                };
-                groups.push(json!({"card":c,"page":result}));
-            }
-            Ok::<_, haiku_plugins::PluginError>(json!({"groups":groups}))
+        let projection_host = Self::host(&this);
+        let projection_source = source.clone();
+        let projection_size = 192;
+        let result: Result<JsonValue, String> = async {
+            let host = Self::host(&this);
+            background(async move {
+                let source = host.source(&source)?;
+                if source.needs_login() {
+                    return Err(haiku_plugins::PluginError::new(
+                        "AUTH_REQUIRED",
+                        "来源尚未登录，请前往设置连接",
+                    ));
+                }
+                let api = haiku_plugins::SourceApi::new(source);
+                let mut groups = vec![];
+                for c in api
+                    .library_cards()?
+                    .into_iter()
+                    .filter(|c| card.as_ref().is_none_or(|id| id == &c.id))
+                {
+                    let page = haiku_plugins::PageArgs {
+                        cursor: cursor.clone(),
+                        limit: 40,
+                    };
+                    let result = if c.entity == "track" {
+                        json!(api.browse_tracks(&c.id, page, None).await?)
+                    } else {
+                        json!(api.browse(&c.id, &c.entity, page, None, None).await?)
+                    };
+                    groups.push(json!({"card":c,"page":result}));
+                }
+                Ok::<_, haiku_plugins::PluginError>(json!({"groups":groups}))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())
+        }
+        .await;
+        result.map(|value| {
+            crate::sources::project_covers(
+                &projection_host,
+                &projection_source,
+                value,
+                projection_size,
+            )
         })
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())
     }
     /// Reserve a shared refresh lease before awaiting; release it when the detail page leaves.
     pub fn begin_favorite_refresh(&self, reference: String) -> Result<String, String> {
@@ -483,7 +656,7 @@ impl PluginService {
         tracks: Vec<JsonValue>,
         handle: Option<u32>,
     ) -> Result<u32, String> {
-        let tracks = serde_json::from_value(json!(tracks)).map_err(|e| e.to_string())?;
+        let tracks = crate::core::decode(json!(tracks)).map_err(|e| format!("{e:?}"))?;
         let remote = this.with(|s| s.remote.clone());
         if let Some(handle) = handle {
             let sources = remote.tracks.borrow();

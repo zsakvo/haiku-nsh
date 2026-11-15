@@ -21,6 +21,9 @@ pub struct TrackListProps {
     /// Register keyboard commands only while this list is the active surface.
     #[prop(default = true)]
     pub active: Prop<bool>,
+    /// Scrollable trailing space beneath the last row, for overlapping player controls.
+    #[prop(default)]
+    pub bottom_inset: Prop<f32>,
 }
 /// Commands and selection requests from the list; the consumer owns playback/editor actions.
 #[derive(Clone, Debug, PartialEq, Event)]
@@ -206,7 +209,11 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
                 view()
                     .child(command(props, at, cx, "edit", "编辑信息…"))
                     .child(when(
-                        move || source(props).and_then(|s| s.provider.collection_id()).is_none(),
+                        move || {
+                            source(props)
+                                .and_then(|s| s.provider.collection_id())
+                                .is_none()
+                        },
                         move || command(props, at, cx, "scrape", "刮削…"),
                     ))
                     .child(command(props, at, cx, "reveal", "在 Finder 中显示"))
@@ -547,6 +554,7 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
             )
             .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())
             .initial_scroll_index(initial)
+            .content_padding_bottom(move || px(props.bottom_inset.get()))
             .estimated_item_size(move || {
                 px(theme().tokens().number("track-row-height").unwrap_or(48.0))
             })

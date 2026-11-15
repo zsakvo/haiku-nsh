@@ -29,9 +29,9 @@ export function SourceLibraryPage(props: { core: Core; source: string; title?: s
     run: () => { error.set(""); data.refetch(); },
     disabled: () => data.loading() || !!busy(),
   });
-  return <View testID="page-source-library" class="flex-1 min-h-0 pb-28"
+  return <View testID="page-source-library" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <Scroll testID="source-library-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-3 pb-4">
+    <Scroll testID="source-library-scroll" class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) gap-3 pb-(--dock-scroll-clearance)">
       <Text role="header" class="text-xl font-semibold text-foreground">{props.title || "来源音乐库"}</Text>
       <If when={data.loading() && !groups().length}><View class="h-40 bg-muted rounded-(--radius-panel)" accessibilityLabel="正在加载音乐库" /></If>
       <If when={!!data.error() || !!error()}>

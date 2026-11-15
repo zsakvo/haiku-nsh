@@ -1,4 +1,4 @@
-import { cleanup, effect, List, resource, Scroll, signal, Text, View } from "nsh";
+import { cleanup, effect, List, resource, Scroll, signal, Text, token, View } from "nsh";
 import { Core, LibraryService, TrackList } from "haiku/native";
 import type { EntityRef, Route } from "../shell/navigation";
 import { mirrorCore } from "../state/core";
@@ -105,7 +105,7 @@ export function LibraryPage(props: {
   }
   return <View testID="page-library" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="gap-3 px-(--content-inset) pb-4">
+    <View class="gap-3 pl-(--content-inset-left) pr-(--content-inset-right) pb-4">
       <View class="flex-row items-center gap-2">
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">
           {props.group ? (detail()?.title ?? (props.groupKind === "album" ? "本地专辑" : "本地艺术家")) : "本地曲库"}
@@ -194,7 +194,7 @@ export function LibraryPage(props: {
       <Text class="p-5 text-sm text-muted-foreground">正在加载曲库…</Text>
     </If>
     <If when={!!roots().length && !!source() && showTracks()}>
-      <TrackList source={source()!} active={props.active && !editor() && !rootsOpen() && !playlistTracks() && !reviewOpen() && !scrapeIds().length}
+      <TrackList bottomInset={token("dock-scroll-clearance")} source={source()!} active={props.active && !editor() && !rootsOpen() && !playlistTracks() && !reviewOpen() && !scrapeIds().length}
         currentId={mirrors.player()?.current?.id ?? null}
         onPlay={(event) => void act(() => library.playSource(event.source, event.id))}
         onAction={(event) => void action(event.command, event.ids)}
@@ -204,9 +204,9 @@ export function LibraryPage(props: {
       </If>
     </If>
     <If when={!!roots().length && !showTracks()}>
-      <List each={groups()?.items ?? []} keyExtractor={(group) => group.key} estimatedItemSize={64}
+      <List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} each={groups()?.items ?? []} keyExtractor={(group) => group.key} estimatedItemSize={64}
         class="flex-1 min-h-0" empty={<Text class="p-5 text-sm text-muted-foreground">{groups.loading() ? "正在加载分组…" : "没有符合条件的分组"}</Text>}>
-        {(group) => <View class="px-(--content-inset)">
+        {(group) => <View class="pl-(--content-inset-left) pr-(--content-inset-right)">
           <Button label={`${group().title} · ${group().subtitle} · ${group().count} 首`}
             variant="ghost" onPress={() => props.navigate({ kind: view() === "albums" ? "album" : "artist", ref: group().key })} />
         </View>}

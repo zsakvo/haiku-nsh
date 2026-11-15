@@ -54,7 +54,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
         <ShellToolbar testID="settings-heading">
           <IconButton icon="close" label="关闭设置" hint="关闭设置 · Esc" onPress={props.onClose} />
         </ShellToolbar>
-        <Scroll class="flex-1" contentClass="flex-col px-(--content-inset) py-4">
+        <Scroll class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) py-4">
           {/* Hidden checked Radio rings paint at the zero-size origin; mount only the active panel. */}
           <If when={selected() === "外观"}><View class="w-full max-w-2xl flex-col">
             <AppearanceOptions appearance={props.appearance} />

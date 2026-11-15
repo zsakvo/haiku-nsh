@@ -190,3 +190,11 @@ logo 支持包内相对路径或 HTTPS；本地文件受包边界和 512 KiB 大
 
 发布接口兼容的更新，尽量保持原始 ID、identity 字段和 KV 格式。复杂迁移要自行兼容旧值。
 真实账号、二维码手机确认、平台风控、VIP/地区限制、飞牛中继和系统选择器仍需人工验收。
+
+### 封面
+
+`cover` 可以返回包含 `{size}` 的 URL 模板。来源只接受固定边长时，在 `definePlugin` 声明例如 `covers: { sizes: [150, 300, 500, 800] }`（正整数严格升序）；省略表示任意尺寸。宿主的选档规则见 `specs/PLUGIN_SDK.md`「封面尺寸与高清封面」。
+
+列表仅有固定缩略图、无法用模板提供高清图时，可实现 `track.cover(id, ctx)`，按 `ctx.size` 返回最佳 `Image | null`，也可返回模板。宿主仅在当前曲/下一首预热时调用；列表不会调用，错误或 null 回退到曲目的 `cover`。
+
+定向验收可用 `haiku-plugin test <dir> --live --only search.track,track.cover`：每个所选能力只调用首个 fixture 用例一次、不遍历分页；`track.cover` 还会检查最终图片的 HTTP 状态。Live 仍使用 fixture 的登录资料，实测时需使用有效资料。

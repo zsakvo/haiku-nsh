@@ -1,4 +1,4 @@
-import { List, signal, Text, View } from "nsh";
+import { List, signal, Text, token, View } from "nsh";
 import type { Core } from "haiku/native";
 import { mirrorDownloads, type DownloadItem } from "../state/downloads";
 import { Button } from "../ui/Button";
@@ -26,9 +26,9 @@ export function DownloadsPage(props: { core: Core; active: boolean }) {
     busy.set(true); error.set("");
     try { await work(); } catch (e) { error.set(String(e)); } finally { busy.set(false); }
   }
-  return <View testID="page-downloads" class="flex-1 min-h-0 pb-28"
+  return <View testID="page-downloads" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="flex-col px-(--content-inset) pb-4 gap-3">
+    <View class="flex-col pl-(--content-inset-left) pr-(--content-inset-right) pb-4 gap-3">
       <View class="flex-row items-center gap-3">
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">下载</Text>
         <Text class="text-xs text-muted-foreground">{items().length} 项</Text>
@@ -53,9 +53,9 @@ export function DownloadsPage(props: { core: Core; active: boolean }) {
       <Text class="text-xs text-muted-foreground">清理已完成记录会保留磁盘文件。</Text>
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     </View>
-    <List each={visible()} keyExtractor={item => item.key} estimatedItemSize={104}
+    <List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} each={visible()} keyExtractor={item => item.key} estimatedItemSize={104}
       class="flex-1 min-h-0" testID="download-list">
-      {(item) => <View class="flex-col px-(--content-inset) py-3 gap-2 border-b border-border">
+      {(item) => <View class="flex-col pl-(--content-inset-left) pr-(--content-inset-right) py-3 gap-2 border-b border-border">
         <View class="flex-row items-center gap-3">
           <View class="flex-1 min-w-0 flex-col gap-1 items-start">
             <Text class="text-sm font-medium text-foreground">{item().track.title}</Text>

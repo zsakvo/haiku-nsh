@@ -25,8 +25,8 @@ test("real playback history, clear confirmation, stats ranges, diagnostic filter
   await app.waitFor("text:56 次");
   expect(app.shows("id:stats-calendar")).toBe(true);
   expect(app.shows("id:stats-hours")).toBe(true);
-  await app.press("更多");
-  await app.press("通知中心…");
+  await app.keyboard.press("ctrl+alt+shift+m");
+  await app.chooseMenuItem("视图 > 通知中心…");
   await app.waitFor("text:通知中心");
   await app.press("text:来源暂时离线");
   await app.waitFor("text:离线曲目仍可播放，稍后可以重试连接。");

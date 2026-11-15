@@ -24,7 +24,7 @@ export function WindowPanel(props: { children?: JSX.Element }) {
     style={{ margin: token("panel-gap") }}>{props.children}</View>;
 }
 export function ShellToolbar(props: { children?: JSX.Element; testID?: string }) {
-  return <View testID={props.testID} class="shrink-0 flex-row items-center justify-end gap-2 px-(--content-inset)"
+  return <View testID={props.testID} class="shrink-0 flex-row items-center justify-end gap-2 pl-(--content-inset-left) pr-(--content-inset-right)"
     style={{ height: chromeHeight() }} desktop={{ windowDrag: true }}>{props.children}</View>;
 }
 export function NavigationToolbar(props: { children?: JSX.Element }) {

@@ -32,6 +32,7 @@ import { CommandPalette } from "./CommandPalette";
 import { LyricsSearch } from "./LyricsSearch";
 import { createPageRefresh, PageRefreshContext } from "./pageRefresh";
 import { createPageSource, PageSourceContext } from "./pageSource";
+import { TrackEditor } from "../pages/TrackEditor";
 import { SourceChip } from "../ui/SourceChip";
 
 export function AppShell(props: {
@@ -57,6 +58,7 @@ export function AppShell(props: {
   const librarySources = () => plugins.value().sources.filter((s) => s.enabled
     && plugins.value().packages.some((p) => p.id === s.pluginId && p.enabled && p.capabilities.includes("library.browse")));
   const nowPlaying = signal(props.initialNowPlaying ?? false);
+  const editingTrack = signal<string[] | null>(null);
   const lyricsSearch = signal(props.initialLyricsSearch ?? false);
   const notifications = signal(props.initialNotifications ?? false);
   const about = signal(false);
@@ -167,7 +169,7 @@ export function AppShell(props: {
         </View>)}
         <If when={!!core()}><PlaylistSidebar core={core()!} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
-      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-(--dock-clearance)">
+      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-4">
         <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
           selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
         <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(binding("openSettings",shortcuts.settings))}`} onPress={showSettings} />
@@ -241,7 +243,12 @@ export function AppShell(props: {
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
-      <NowPlaying open={nowPlaying() && !lyricsSearch()}
+      <If when={!!editingTrack()}><TrackEditor core={core()!} ids={editingTrack()!} onClose={() => editingTrack.set(null)} /></If>
+      <NowPlaying open={nowPlaying() && !lyricsSearch() && !editingTrack()}
+        onAction={e => {
+          const track = e.value as { id?: string; source?: string };
+          if (e.action === "edit" && track?.source === "local" && track.id) editingTrack.set([track.id]);
+        }}
         onFindLyrics={() => lyricsSearch.set(true)}
         onOpenChange={(event) => nowPlaying.set(event.open)} />
       <LyricsSearch core={core()!} open={lyricsSearch()} onClose={() => lyricsSearch.set(false)} />

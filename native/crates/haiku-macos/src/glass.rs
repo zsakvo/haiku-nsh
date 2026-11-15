@@ -1,25 +1,31 @@
 //! The native background is a leaf; NSH overlays are later siblings.
 use nsh_platform_macos::{
-    objc2::{rc::Retained, MainThreadMarker},
+    Components, NativeComponent,
+    objc2::{MainThreadMarker, rc::Retained},
     objc2_app_kit::{
         NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
-        NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
-        NSVisualEffectState, NSVisualEffectView,
+        NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+        NSVisualEffectView,
     },
-    Components, NativeComponent,
 };
 use std::rc::Rc;
 
 struct GlassSurface(Retained<NSVisualEffectView>);
 impl NativeComponent for GlassSurface {
     fn view(&self) -> Retained<NSView> {
-        Retained::into_super(self.0.clone())
+        self.0.clone().into_super()
     }
     fn set_prop(&mut self, name: &str, value: Option<&serde_json::Value>) {
         if name == "dark" {
             // Explicitly follow the NSH surface, which can differ from the OS appearance.
             let dark = value.and_then(|v| v.as_bool()).unwrap_or(false);
-            let name = unsafe { if dark { NSAppearanceNameDarkAqua } else { NSAppearanceNameAqua } };
+            let name = unsafe {
+                if dark {
+                    NSAppearanceNameDarkAqua
+                } else {
+                    NSAppearanceNameAqua
+                }
+            };
             let appearance = NSAppearance::appearanceNamed(name);
             self.0.setAppearance(appearance.as_deref());
         } else if name == "radius" {
@@ -42,12 +48,12 @@ pub fn register(components: &Components) {
         Rc::new(|_| {
             let mtm = MainThreadMarker::new().expect("native component main thread");
             let view = NSVisualEffectView::new(mtm);
-            view.setWantsLayer(true);
-            // Sample this app's content, not unrelated windows behind it. No app tint.
-            view.setMaterial(NSVisualEffectMaterial::UnderWindowBackground);
+            // AppKit composites a live, blurred sample of the window's content.
+            // NSView/CALayer backgroundFilters are not a working substitute here.
             view.setBlendingMode(NSVisualEffectBlendingMode::WithinWindow);
             view.setState(NSVisualEffectState::Active);
-            view.setEmphasized(false);
+            view.setMaterial(NSVisualEffectMaterial::Popover);
+            view.setWantsLayer(true);
             Box::new(GlassSurface(view))
         }),
     );

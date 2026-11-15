@@ -33,9 +33,9 @@ export function StatsPage(props: { core: Core; active: boolean }) {
       return { date, value: Number(data()?.days?.[date] ?? 0), future: d > end };
     }));
   };
-  return <View testID="page-statistics" class="flex-1 min-h-0 pb-28"
+  return <View testID="page-statistics" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <Scroll class="flex-1" contentClass="flex-col px-(--content-inset) gap-5 pb-5">
+    <Scroll class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) gap-5 pb-(--dock-scroll-clearance)">
       <View class="flex-row items-center gap-2 flex-wrap">
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">统计</Text>
         {[["day", "今日"], ["month", "本月"], ["year", "今年"], ["all", "全部"]].map(([id, label]) =>

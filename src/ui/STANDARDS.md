@@ -51,7 +51,8 @@
 
 ## 圆角与表面
 - radius 8pt：普通控件；radius-inset 6pt：快捷键/嵌套小表面；radius-panel 10pt：内容面板/设置选项卡片；radius-surface 14pt：弹出表面。
-- 窗口底色为 sidebar，主内容和设置右侧共用 background 圆角面板，四周留 8pt；面板底部不为 PlayerDock 预留。
+- 窗口底色为 sidebar，主内容和设置右侧共用 background 圆角面板，四周留 8pt。PlayerDock 高 64pt、内部水平 padding 12pt，相对主内容面板左、右、下各内缩 dock-inset 12pt，使用独立 dock-radius 20pt 圆角；macOS 使用 NSVisualEffectView 的 WithinWindow + Active + Popover 材质，实时模糊同一窗口下层内容，显式跟随应用及正在播放表面的深浅外观。原生材质独立以 dock-backdrop-opacity 90% 强度合成，适度保留底图细节；16% 不透明度的表面 tint 单独叠在模糊层上方，前景控件保持清晰且不透明；非原生回退使用 dock-blur-radius 20pt。原生模糊必须用系统窗口截图验证，NSH 的应用内截图不包含 WindowServer 的最终背景模糊合成。滚动视口延伸至面板底部，滚动内容末尾增加 dock-scroll-clearance 92pt（64pt 播放栏、12pt 底部内缩、16pt 间距），确保最后一项能滚出播放栏。侧栏底部控件距底边 16pt。
+- PlayerDock 中央控制区占内宽 40%、最大宽 384pt；两侧区域等分余量，确保上一首、播放/暂停、下一首在卡片内居中。三个控制向下偏移 4pt 靠近进度条；播放/暂停按钮 28pt、实心图标 24pt、无底色；下方进度条两端分别为当前时间和总时长。喜欢按钮紧跟歌名，使用 19pt 点击区域与 13pt 图标；正在播放页保留普通尺寸。右侧仅保留播放模式、音量、队列，统一 26pt 点击区域与 14pt 图标、间距 6pt 并水平居中；播放模式通过 tooltip 与无障碍名称说明当前状态，不在按钮下方显示文字。封面保留正在播放入口。
 - 设置的模式卡片等分剩余宽度；品牌色使用等宽自适应网格，固定保留勾槽位，选中用 ring 与勾，不改变几何。
 - 命令列表内缩 6pt，与 14pt 外圆角、8pt 选中项圆角形成同心层级。
 - 嵌套半径考虑内边距，暴露的圆角不被子背景覆盖；聚焦轮廓必须留有空间。

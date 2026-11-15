@@ -156,7 +156,6 @@ pub struct Home {
 pub struct SourceApi {
     source: Arc<Source>,
     warnings: Arc<Mutex<Vec<String>>>,
-    cover_size: u32,
 }
 impl SourceApi {
     /// Whether this source implements dedicated metadata scraping.
@@ -167,12 +166,7 @@ impl SourceApi {
         Self {
             source,
             warnings: Arc::default(),
-            cover_size: 512,
         }
-    }
-    pub fn with_cover_size(mut self, size: u32) -> Self {
-        self.cover_size = size;
-        self
     }
     pub fn take_warnings(&self) -> Vec<String> {
         std::mem::take(&mut *self.warnings.lock().unwrap())
@@ -182,7 +176,7 @@ impl SourceApi {
         self.warnings.lock().unwrap().push(message);
     }
     fn cover(&self, image: Option<&str>) -> Option<String> {
-        image.map(|s| s.replace("{size}", &self.cover_size.to_string()))
+        image.map(str::to_owned)
     }
     fn entity(&self, kind: &str, value: Value) -> Option<Entity> {
         let id = value["id"].as_str();
@@ -316,6 +310,11 @@ impl SourceApi {
             .await?;
         self.track_value(value)
             .ok_or_else(|| PluginError::new("PARSE_ERROR", "Invalid track"))
+    }
+    /// Dedicated artwork lookup; list mapping never invokes this handler.
+    pub async fn track_cover(&self, id: &str, size: u32, cancel: Option<&Cancellation>) -> Result<Option<String>> {
+        let value = self.invoke("track.cover", vec![json!(id)], json!({"size":size}), cancel).await?;
+        Ok(serde_json::from_value(value)?)
     }
     pub async fn streams(
         &self,
@@ -705,4 +704,13 @@ impl SourceApi {
             .await?,
         )?)
     }
+}
+
+/// Resolve an SDK image template at its consumption boundary.
+/// Choose the smallest supported edge >= target, or the largest supported edge.
+/// An undeclared (or empty) size list accepts the requested edge verbatim.
+pub fn resolve_cover(template: &str, target: u32, sizes: Option<&[u32]>) -> String {
+    let size = sizes.and_then(|s| s.iter().copied().filter(|n| *n >= target).min()
+        .or_else(|| s.iter().copied().max())).unwrap_or(target);
+    template.replace("{size}", &size.to_string())
 }

@@ -50,7 +50,7 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
     style={props.fit ? {height:Math.min(props.tracks.length,8)*token("track-row-height")+token("compact-control-height")+8} : {}}>
     <If when={!!error() || !!handle.error()}><Text class="text-sm text-destructive">{error() || String(handle.error())}</Text></If>
     <If when={!!selected().length && !!handle()}>
-      <View class="flex-row gap-2 px-(--content-inset) py-2">
+      <View class="flex-row gap-2 pl-(--content-inset-left) pr-(--content-inset-right) py-2">
         <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
         <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void act(async () => {
           await props.core.downloads.enqueue(await CollectionsService.selectedTracks(handle()!, selected()));

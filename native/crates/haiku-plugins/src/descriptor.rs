@@ -5,6 +5,11 @@ use serde_json::Value;
 use std::{collections::BTreeMap, path::Path};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Covers {
+    pub sizes: Vec<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Descriptor {
     pub id: String,
@@ -21,6 +26,8 @@ pub struct Descriptor {
     pub auth: Option<Value>,
     pub connection: Option<Value>,
     pub http: Option<Value>,
+    #[serde(default)]
+    pub covers: Option<Covers>,
     pub library_cards: Vec<Value>,
     #[serde(default)]
     pub builtin: bool,
@@ -120,6 +127,19 @@ pub async fn describe_package(root: &Path) -> Result<Descriptor> {
         .filter(|k| !def["auth"][k].is_null())
         .map(str::to_owned)
         .collect();
+    let covers: Option<Covers> = def
+        .get("covers")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()?;
+    if covers.as_ref().is_some_and(|c| {
+        c.sizes.is_empty() || c.sizes[0] == 0 || c.sizes.windows(2).any(|w| w[0] >= w[1])
+    }) {
+        return Err(PluginError::new(
+            "INVALID_PLUGIN",
+            "covers.sizes must be positive, nonempty and strictly ascending",
+        ));
+    }
     let descriptor = Descriptor {
         id,
         name: required("name")?,
@@ -145,6 +165,7 @@ pub async fn describe_package(root: &Path) -> Result<Descriptor> {
         }),
         connection,
         http: def.get("http").cloned(),
+        covers,
         library_cards: def["library"]["cards"]
             .as_array()
             .cloned()

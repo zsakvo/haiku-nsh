@@ -351,6 +351,9 @@ fn entity(kind: &str, value: &Value) -> Result<()> {
 }
 /// Strict validation rejects bad entries instead of silently accepting host filtering.
 pub fn validate_schema(schema: &str, value: &Value) -> Result<()> {
+    if schema == "image" {
+        return if value.is_null() || value.as_str().is_some_and(|s| !s.is_empty()) { Ok(()) } else { Err(invalid("Image must be a URL string or null")) };
+    }
     if let Some(method) = schema.strip_prefix("auth:") {
         let valid = match method {
             "login" => {
@@ -528,6 +531,7 @@ pub fn inferred_schema(path: &str) -> Option<String> {
         Some(
             match path {
                 "track.get" => "track",
+                "track.cover" => "image",
                 "track.streams" => "streams",
                 "track.lyrics" | "scrape.lyrics" => "lyrics",
                 "home" => "home",
@@ -545,7 +549,7 @@ pub fn inferred_schema(path: &str) -> Option<String> {
         )
     }
 }
-async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCase) -> Result<()> {
+async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCase, live_once: bool) -> Result<()> {
     let cancel = Cancellation::default();
     let caller = cancel.clone();
     let timer = case.abort_after_ms.map(|ms| {
@@ -589,6 +593,22 @@ async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCas
         .or_else(|| inferred_schema(&case.path))
         .ok_or_else(|| invalid("Fixture must supply a schema for this capability"))?;
     validate_schema(&schema, &value)?;
+    if live_once {
+        if case.path == "track.cover" {
+            if let Some(template) = value.as_str() {
+                let url = crate::resolve_cover(template, case.context["size"].as_u64().unwrap_or(1600) as u32,
+                    descriptor.covers.as_ref().map(|c| c.sizes.as_slice()));
+                let mut request = reqwest::Client::new().get(&url).timeout(Duration::from_secs(15));
+                if let Some(headers) = descriptor.http.as_ref().and_then(|h| h["headers"].as_object()) {
+                    for (key, value) in headers { if let Some(value) = value.as_str() { request = request.header(key, value); } }
+                }
+                let response = request.send().await.map_err(|e| invalid(&e.to_string()))?;
+                eprintln!("track.cover {url} -> HTTP {}", response.status());
+                response.error_for_status().map_err(|e| invalid(&e.to_string()))?;
+            }
+        }
+        return Ok(());
+    }
     if let Some(kind) = schema
         .strip_prefix("page:")
         .or_else(|| schema.starts_with("detail:").then_some("track"))
@@ -646,6 +666,11 @@ async fn check_case(source: &Source, descriptor: &Descriptor, case: &ContractCas
 }
 /// Run the package fixture in isolated real runtimes. Replay cannot reach the network.
 pub async fn run_contract(package: &Path, mode: ContractMode) -> Result<ContractReport> {
+    run_contract_selected(package, mode, &[]).await
+}
+/// Select capabilities for a focused acceptance run; a selected live case calls
+/// its handler once rather than traversing pagination.
+pub async fn run_contract_selected(package: &Path, mode: ContractMode, only: &[String]) -> Result<ContractReport> {
     let file = package.join("fixtures/contract.json");
     let mut fixture: ContractFixture = serde_json::from_slice(&std::fs::read(&file)?)?;
     let server = if mode == ContractMode::Live {
@@ -698,14 +723,19 @@ pub async fn run_contract(package: &Path, mode: ContractMode) -> Result<Contract
             )
         }),
     });
-    for case in &fixture.cases {
+    if only.iter().any(|path| !fixture.cases.iter().any(|case| &case.path == path)) {
+        return Err(invalid("--only contains a capability without fixture cases"));
+    }
+    let mut selected = BTreeSet::new();
+    for case in fixture.cases.iter().filter(|c| only.is_empty() || only.contains(&c.path)) {
+        if mode == ContractMode::Live && !only.is_empty() && !selected.insert(&case.path) { continue; }
         if let Some(server) = &server {
             server
                 .status
                 .store(case.status.unwrap_or(0), Ordering::Release);
         }
         let start = Instant::now();
-        let result = check_case(&source, &descriptor, case).await;
+        let result = check_case(&source, &descriptor, case, mode == ContractMode::Live && !only.is_empty()).await;
         cases.push(CaseReport {
             name: case.name.clone(),
             passed: result.is_ok(),

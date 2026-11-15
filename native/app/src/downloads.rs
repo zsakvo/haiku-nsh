@@ -42,10 +42,11 @@ impl DownloadService {
         let mut directory_events = service.directory_subscribe();
         let mut events = service.subscribe();
         let owner = Owner::detached();
+        let projection_host = service.host.clone();
         owner.run(|| {
             spawn(async move {
                 while events.changed().await.is_ok() {
-                    let value = serde_json::to_value(events.borrow_and_update().clone()).unwrap();
+                    let value = crate::sources::project_covers(&projection_host, "", serde_json::to_value(events.borrow_and_update().clone()).unwrap(), 104);
                     let callbacks = callbacks.0.borrow().values().cloned().collect::<Vec<_>>();
                     for callback in callbacks {
                         callback.post(value.clone());
@@ -128,7 +129,8 @@ impl DownloadService {
         })
     }
     /// Enqueue SDK track(s) or {source,kind,id} for an album/playlist/toplist; returns after scheduling.
-    pub async fn enqueue(this: Instance<Self>, tracks: JsonValue) -> Result<(), String> {
+    pub async fn enqueue(this: Instance<Self>, mut tracks: JsonValue) -> Result<(), String> {
+        crate::sources::restore_covers(&mut tracks);
         let service = this.with(|s| s.service.clone());
         background(async move { service.enqueue(tracks).await })
             .await
@@ -185,7 +187,7 @@ impl DownloadService {
     }
     /// Latest task array: state, progress, bytes, files, warnings and errors.
     pub fn snapshot(&self) -> JsonValue {
-        serde_json::to_value(self.service.snapshot()).unwrap()
+        crate::sources::project_covers(&self.service.host, "", serde_json::to_value(self.service.snapshot()).unwrap(), 104)
     }
     /// Mark completed records missing when their audio file no longer exists.
     pub async fn verify(this: Instance<Self>) -> Result<(), String> {

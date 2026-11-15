@@ -131,7 +131,7 @@
 | 不经 JS 高频快照、仅活动行变更发布、有界挂载；暂停/缓冲/不可见停止 | CoreBridge 独立 position/buffered、Cursor 行变更 signal、Rust virtual_list；`paused_progress_is_frozen_position_not_in_low_frequency_state` 与组件 clock 测试 E1 | 已实现并有证据（架构/暂停场景）；遮挡/恢复和 release CPU 无本机完整证据，G01/G21；不能用此测试声称原生合成时间轴已实现。 |
 | macOS 正在播放逐字 CoreText/CA | 当前 Rust 时钟驱动宽度；`specs/MACOS.md` §5：用户 2026-11-11 决定 KaraokeLayer 暂不实现 | 按 SPEC 决定不做（当前阶段）；H 中 debug CPU 均值 14.3% 的原日志本机缺失，不声称 release 性能已验。 |
 | 手动→缓存→文件→插件→提供方、sidecar 优先/附加译文、UTF-8/GBK/UTF-16/1MiB、纯文兜底、8/25s | `local_scan::read_lyrics`、Lyrics Service、Origin；`tests/remote.rs`、本地扫描/编码/超时测试，E1/E5 | 已实现并有证据；依 D6 无会员门槛。 |
-| 当前选择即加载/暂停恢复也加载；进度不重取、切歌取消、手工永存/自动依媒体缓存开关 | `presentation::bind_lyrics` computed 输入、Service generation/fingerprint；`pending_local_lyrics_survive_pause_and_download_settings_then_switch_tracks`、priority/cancel 测试 E1 | 已实现并有证据；initialNowPlaying 夹具初始开事件问题保留 G22，Dock 正常入口有通过证据。 |
+| 当前选择即加载/暂停恢复也加载；进度不重取、切歌取消、手工永存/自动依媒体缓存开关 | `presentation::bind_lyrics` computed 输入、Service generation/fingerprint；`pending_local_lyrics_survive_pause_and_download_settings_then_switch_tracks`、priority/cancel 测试 E1 | 已实现并有证据；M7-02 已修 initialNowPlaying 初始开事件反馈振荡，回归与真实预览通过；Dock 正常入口亦有通过证据。 |
 | 六类内置/HTTP、排序开关、手动关键词/来源/预览/采用 | `providers.rs/service.rs`、LyricsSearch/Settings；remote 协议/Headless E1/E5 | 部分实现；Paxsenix 专用评分、令牌重取/content 兜底、Kugou 署名裁剪仍欠参考策略（G10）。 |
 
 ## F09 桌面集成
@@ -149,7 +149,7 @@
 | 关闭隐藏后台播放/重新激活/Cmd+Q、防息屏 | lifecycle/exit、`platform/media.rs` IOPM 与 open/lifecycle 联动；E1/E2、H | 已实现并有证据（基础）；最终硬件/系统操作仍待人工。M0 人工确认不替代 M6 最终应用复核。 |
 | 单一根 Dock、24px/96px 预留、双栏正在播放、封面深色主题及回退 | PlayerDock/NowPlaying、`src/ui/Chrome.tsx`；Player/几何 E1/E2；玻璃 `haiku-macos/glass.rs` H | 部分实现；原生玻璃背景已接但最终截图本机缺，完整底栏规范另见下一行。 |
 | 全栏 1px 激活拖动/排除按钮；clear glass 轮廓；独立进度层/隐藏停钟 | 当前只有 SeekBar 区域 touch 拖动；缓冲/播放是 NSH 子 View，GlassSurface 仅背景；CoreBridge 控制时钟可见性 | 部分实现；全栏拖动未覆盖（G21）。D2/D7及本仓库 PLAYBACK §6.3、MACOS §5 采用 Rust signal/NSH进度与原生玻璃背景，不能仅因缺参考CA轨迹/350ms阈值判为必须移植旧实现；应验证等价交互与可见性/性能，当前缺最终实测。 |
-| 正在播放升起/收起动画 | STATUS M1-04：用户明确批准静态显示；真实 host animated_value 不推进，Headless 正常 | 按 SPEC 决定不做（当前批准的静态方案）；底层时序原因尚未解决，G22 保留为待决优化，不作为未获批准的强制补项。 |
+| 正在播放升起/收起动画 | M7-02：320ms ease-out 入场、240ms ease-in 离场后卸载、同一原生 View 反向；降低动态效果为 150ms opacity；Headless 与真实入场中途/完成两图 | 已处理（G22）；initialNowPlaying 反馈振荡已修，review2 app 44/44、check、NSH test 91/91 通过。真实收起/反向/降低动态效果观感待人工；历史 animated_value 停滞未复现，未证明原始原因。 |
 | Windows/Linux、macOS 14+ | D1：首版只验 macOS；其他平台系统集成 no-op | 按 SPEC 决定不做（首版其他平台）；不声称已存在跨平台浮窗或全局按键。 |
 
 ## F10 本地曲库与刮削
@@ -278,10 +278,10 @@
 | G19 | 大 | F05/F08/F11/F12 | 在线曲目元数据编辑/重置缺失，历史/收藏/队列无统一有效覆盖层。**补齐**按(source,id)生效并订阅全部消费者，避免只改某列表快照。 |
 | G20 | 大 | F08/F10/F16 | 刮削高级清洗/文件名回退、歌词刮削选项与编排、专辑艺人/碟号/genre/歌词编辑及封面本地缓存。**补齐**参考语义；保留稀疏覆盖、未审阅不写标签和撤销保护；重启审阅UI还需补证据。 |
 | G21 | 大（含实机性能验收） | F06/F08/F09 | 全栏seek尚未实现，Rust/NSH进度有基础时钟测试但缺最终遮挡恢复/release性能证据。**补齐**交互并验证等价NSH方案；参考CA时间轴/350ms校正属于不同渲染实现，不要求机械照搬。若要降低原交互/性能验收标准则**需用户决定**。 |
-| G22 | 大（原因调查）；可延期 | F01/F08/F09 | Rust animated_value真实host不推进；当前静态开关已获用户批准。另有initialNowPlaying夹具初始开事件问题。**如实标注/需用户决定**是否恢复动画及修夹具；先单独调查，不强制改NSH。 |
+| G22 | 已处理（M7-02 review2） | F01/F08/F09 | 历史 animated_value 停滞在无 Core/播放中均未复现，不能归因 CoreBridge；采用样式转场及 150ms reduced-motion 淡入淡出。initialNowPlaying 振荡已修：移除 Dock 的共享 open 镜像回传，封面/关闭只 emit，由 TSX nowPlaying→NowPlaying.props.open→presentation.open 单向控制。新增 Headless 确认 500ms 内只开始一次且最终打开，实际 AppShell 初始打开/Esc 亦通过；app 44/44、nsh check、NSH test 91/91 通过；真实预览仅一次入场开始/完成，无翻转，已查看中途与完成两图。证据 .artifacts/m7-02/*review2*；真实收起/反向/降低动态效果的连续观感待人工，旧停滞原始原因不作已证明结论。 |
 | G23 | 需用户决定（落实文字/图资源为小） | F09/F16 | 应用自身许可证；Dock图标是否用带macOS圆角/留白版本。GPL来源已在QQ代码和第三方声明标明，不能代用户选择应用许可证。**需用户决定**，现满版图标为用户选定资源，不擅自重绘。 |
 
-不列为强制缺口：D1其他桌面平台首版验收、D8自建后端同步与字体下载/导入/镜像、D9旧ABI运行、D18独立设置窗口、用户批准暂缓KaraokeLayer和静态NowPlaying动画、参考§6桌面Wi-Fi限制、原版没有的支付购买。M4-05音乐来源刮削默认关闭、M6全局快捷键默认未绑定均已有审阅记录；不静默改默认值。
+不列为强制缺口：D1其他桌面平台首版验收、D8自建后端同步与字体下载/导入/镜像、D9旧ABI运行、D18独立设置窗口、用户批准暂缓KaraokeLayer、参考§6桌面Wi-Fi限制、原版没有的支付购买。M4-05音乐来源刮削默认关闭、M6全局快捷键默认未绑定均已有审阅记录；不静默改默认值。
 
 ## 累积待人工确认（M1–M6 去重）
 

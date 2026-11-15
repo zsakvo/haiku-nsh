@@ -399,6 +399,8 @@ declare module 'haiku' {
     author?: string;
     logo?: string;
     description?: string;
+    /** Supported template pixel edges, in ascending order; omitted means any size. */
+    covers?: { sizes: number[] };
     http?: {
       headers?: Record<string, string>;
       timeout?: number;
@@ -413,6 +415,8 @@ declare module 'haiku' {
         id: string,
         ctx: Context & { quality: Quality; format?: Format },
       ): Promise<Stream[]>;
+      /** Best artwork at least size pixels; only called for current/next playback. */
+      cover?(id: string, ctx: Context & { size: number }): Promise<Image | null>;
       lyrics?(id: string, ctx: Context): Promise<Lyrics | null>;
     };
     album?: {

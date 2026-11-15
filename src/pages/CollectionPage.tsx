@@ -1,4 +1,4 @@
-import { cleanup, effect, resource, signal, Text, untracked, View } from "nsh";
+import { cleanup, effect, resource, signal, Text, token, untracked, View } from "nsh";
 import { CollectionsService, Core, TrackList } from "haiku/native";
 import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
@@ -85,8 +85,8 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
     });
   }
   return <View testID={liked ? "page-favorites" : "page-playlist"}
-    class="flex-1 min-h-0 pb-28" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <View class="px-(--content-inset) pb-4 gap-4">
+    class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
+    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-4 gap-4">
       <View class="flex-row gap-5 items-start">
         <If when={!liked}><CollectionArtwork covers={covers()} /></If>
         <View class="flex-1 min-w-0 gap-2">
@@ -151,7 +151,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
         description={liked ? "点击底栏的喜欢按钮，或在曲目菜单中选择喜欢。" : "在曲目菜单中选择“加入歌单”，把音乐放在这里。"} />
     </If>
     <If when={!!collection()?.trackCount && !!source()}>
-      <TrackList source={source()!} active={props.active && !editor() && !deleting() && !trackEditor()}
+      <TrackList bottomInset={token("dock-scroll-clearance")} source={source()!} active={props.active && !editor() && !deleting() && !trackEditor()}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onPlay={(event) => void act(() => service.playSource(event.source, event.id))}
         onAction={(event) => void command(event.command, event.ids)}
