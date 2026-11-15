@@ -1,17 +1,19 @@
-import { cleanup, effect, List, resource, Scroll, signal, Text, View } from "nsh";
+import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
 import type { Route } from "../shell/navigation";
 import { Button } from "../ui/Button";
-import { CardShelf, ErrorState, Shelf, Skeleton } from "../ui/Discovery";
+import { CardShelf, ErrorState, Shelf, Skeleton, Spinner } from "../ui/Discovery";
 import { EmptyState } from "../ui/EmptyState";
 import { SettingSelect } from "../ui/SettingsControls";
-import { entityRoute, SourceGrid, SourceTracks } from "./SourceContent";
+import { entityRoute, SourceGrid } from "./SourceContent";
+import { feedGap, FeedRow, type FeedItem } from "./HomeFeed";
 import { usePageRefresh } from "../shell/pageRefresh";
 import { usePageSource } from "../shell/pageSource";
 import { HomeEntries, type HomeEntry } from "./HomeEntries";
-type HomeShelf={id:string;title:string;kind:string;items:any[];entries:HomeEntry[];more?:any};
-type HomeFeed={shelves:HomeShelf[];cached:boolean};
+import { HomeTracks } from "./HomeTracks";
+type HomeShelf={id:string;title:string;kind:string;items:any[];entries:HomeEntry[];more?:any;layout?:"feed"};
+type HomeFeed={shelves:HomeShelf[];cached:boolean;fallbackCover?:string;next?:string|null};
 type Categories={groups:{title:string;items:{id:string;title:string}[]}[];sorts?:{id:string;title:string}[]};
 function sources(snapshot:PluginSnapshot, capability:string) {
   return snapshot.sources.filter(s=>s.enabled).flatMap(s=>{
@@ -38,11 +40,16 @@ export function HomePage(props:Props) {
   const state=useSource(props,"home","homeSourceId");
   useToolbarSource(()=>props.active,state);
   const feeds=signal<Record<string,HomeFeed>>({}),errors=signal<Record<string,string>>({}),revision=signal(0);
+  const loadingMore=signal(false),moreError=signal("");
+  const feedWidth=signal(0);
+  const columns=()=>Math.max(1,Math.floor((feedWidth()+feedGap)/(token("listening-cover-size")+feedGap)));
+  let ahead:{source:string;cursor:string;version:number;page:Promise<HomeFeed>}|null=null;
   let version=0,lastRefresh=0,closed=false;cleanup(()=>{closed=true;version++;});
   const current=()=>feeds()[state.selected()];
   const identity=()=>props.active&&state.selected()?JSON.stringify([state.selected(),revision()]):undefined;
   const home=resource(identity,async key=>{
     const v=++version;const [source,refresh]=JSON.parse(key);errors.set({...errors(),[source]:""});
+    ahead=null;loadingMore.set(false);moreError.set("");
     const valid=()=>!closed&&v===version&&identity()===key;
     try {
       const force=refresh>lastRefresh;lastRefresh=refresh;
@@ -55,6 +62,65 @@ export function HomePage(props:Props) {
     }catch(e){if(valid())errors.set({...errors(),[source]:String(e)});}
   });
   const refresh=()=>revision.set(revision()+1);
+  // Keep each virtual row bounded. A single unbounded waterfall would defeat recycling.
+  type Section=HomeShelf&{continued?:boolean;feed?:FeedItem[]};
+  function sectionRows(shelves:HomeShelf[]){
+    const out:Section[]=[];
+    for(const s of shelves){
+      const last=out[out.length-1];
+      if(s.layout==="feed"){
+        const items=(s.kind==="entries"?s.entries:s.items).map((item,index)=>({key:`${s.id}:${index}`,kind:s.kind,item}));
+        for (const item of items) {
+          const previous=out[out.length-1];
+          if(previous?.feed&&previous.title===s.title&&previous.feed.length<columns()){
+            out[out.length-1]={...previous,feed:[...previous.feed,item]};
+          }else{
+            out.push({...s,id:item.key,continued:previous?.title===s.title,feed:[item]});
+          }
+        }
+      } else out.push({...s,continued:!last?.feed&&last?.title===s.title});
+    }
+    return out;
+  }
+  const merged=computed(()=>sectionRows(current()?.shelves??[]));
+  const openFeed=(e:FeedItem)=>e.kind==="entries"?link(e.item.to):props.navigate(entityRoute(e.item));
+  // Append the next page when the scroll nears the bottom; shelves with repeated ids are skipped.
+  // QQ continuation pages are small (one shelf) and take 0.5–4 s each, so one page is always
+  // requested ahead: scrolling appends the buffered page at once and starts the next request.
+  function prefetch(source:string,cursor:string){
+    if(ahead?.source!==source||ahead.cursor!==cursor||ahead.version!==version){
+      const page=props.core.sources.homePage(source,cursor) as Promise<HomeFeed>;
+      ahead={source,cursor,version,page};
+      page.catch(()=>{if(ahead?.page===page)ahead=null;});
+    }
+    return ahead.page;
+  }
+  effect(()=>{const feed=current();if(props.active&&feed?.next&&!feed.cached&&!home.loading()&&!moreError())void prefetch(state.selected(),feed.next).catch(()=>{});});
+  async function more(){
+    const source=state.selected(),feed=current(),v=version;
+    if(!props.active||!feed?.next||feed.cached||loadingMore()||home.loading())return;
+    loadingMore.set(true);moreError.set("");
+    let cursor:string|null=feed.next,combined=feed.shelves;
+    try{
+      const rowsBefore=merged().length,seen=new Set(feed.shelves.map(s=>s.id)),cursors=new Set<string>();
+      // Native load-more rearms when row count grows. Fill a partial row across
+      // network pages and skip unsupported-only pages without waiting for another scroll.
+      for(let batch=0;cursor&&batch<8;batch++){
+        cursors.add(cursor);
+        const page=await prefetch(source,cursor);
+        if(closed||v!==version||state.selected()!==source||current()!==feed)return;
+        if(page.next&&cursors.has(page.next))throw new Error("来源返回了重复的分页位置");
+        const added=page.shelves.filter(s=>{if(seen.has(s.id))return false;seen.add(s.id);return true;});
+        combined=[...combined,...added];cursor=page.next??null;
+        if(sectionRows(combined).length>rowsBefore)break;
+      }
+      feeds.set({...feeds(),[source]:{...feed,shelves:combined,next:cursor}});
+    }catch(e){if(v===version&&state.selected()===source){
+      moreError.set(String(e));
+      if(current()===feed&&combined!==feed.shelves)feeds.set({...feeds(),[source]:{...feed,shelves:combined,next:cursor}});
+    }}
+    finally{if(v===version)loadingMore.set(false);}
+  }
   usePageRefresh(() => props.active, { run: refresh, disabled: () => !state.selected() || home.loading() });
   function link(link:any) {
     const ref=link.reference;
@@ -62,25 +128,36 @@ export function HomePage(props:Props) {
     if(ref.kind==="radio") {props.navigate({kind:"radio",source:ref.source});return;}
     props.navigate(entityRoute(link));
   }
-  return <View testID="page-home" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <Scroll testID="home-scroll" class="flex-1" contentClass="flex-col min-h-full px-(--content-inset) pb-4">
-      <View testID="home-heading" class="pt-2 pb-(--home-title-bottom-gap)">
+  return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
+    <List testID="home-scroll" class="flex-1" each={merged()} keyExtractor={s=>s.id}
+      onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
+      estimatedItemSize={320} loadMoreThreshold={2} onLoadMore={()=>{if(!moreError())void more();}}
+      contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"
+      header={<View>
+        <View testID="home-heading" class="pt-2 pb-(--home-title-bottom-gap)">
         <Text role="header" class="text-2xl font-semibold text-foreground">推荐</Text>
-      </View>
-      <View class="flex-1 gap-6">
+        </View>
         <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
         <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
         <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
         <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
-        <Each of={current()?.shelves??[]} key={s=>s.id}>{s=><Shelf id={`shelf-${s().id}`} title={s().title} more={s().more?()=>link(s().more):undefined}>
-          <If when={s().kind==="tracks"}><SourceTracks core={props.core} tracks={s().items} active={props.active} fit /></If>
-          <If when={s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
+      </View>}
+      footer={<View>
+        <If when={loadingMore()}><Spinner label="正在加载更多推荐" /></If>
+        <If when={!!moreError()}><ErrorState message={moreError()} retry={()=>void more()} /></If>
+        <If when={!!current()?.next&&!loadingMore()&&!moreError()}>
+          <Button label="加载更多推荐" size="sm" variant="ghost" onPress={()=>void more()} />
+        </If>
+      </View>}>
+        {s=><View class="pb-6"><Shelf id={`shelf-${s().id}`} title={s().continued?"":s().title} tight={s().continued} more={s().more?()=>link(s().more):undefined}>
+          <If when={!!s().feed}><FeedRow core={props.core} items={s().feed!} columns={columns()} open={openFeed} /></If>
+          <If when={!s().feed&&s().kind==="tracks"}><HomeTracks core={props.core} tracks={s().items} active={props.active} /></If>
+          <If when={!s().feed&&s().kind==="entries"}><HomeEntries core={props.core} entries={s().entries} active={props.active}
             fallbackCover={current()?.shelves.filter(s=>s.kind==="tracks").flatMap(s=>s.items).find(e=>e.cover)?.cover} open={e=>link(e.to)} /></If>
-          <If when={s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
-            listening={s().kind==="albums"||s().kind==="programs"} open={e=>props.navigate(entityRoute(e))} /></If>
-        </Shelf>}</Each>
-      </View>
-    </Scroll>
+          <If when={!s().feed&&s().kind!=="tracks"&&s().kind!=="entries"}><CardShelf items={s().items}
+            listening hideTitle={s().kind==="toplists"} open={e=>props.navigate(entityRoute(e))} /></If>
+        </Shelf></View>}
+    </List>
   </View>;
 }
 export function CategoriesPage(props:Props) {
@@ -107,10 +184,10 @@ export function CategoriesPage(props:Props) {
     run: () => { groups.refetch(); if (category()) result.refetch(); },
     disabled: () => !state.selected() || groups.loading() || result.loading() || busy(),
   });
-  return <View testID="page-categories" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">分类</Text></View>
+  return <View testID="page-categories" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
+    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">分类</Text></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <Scroll testID="categories-scroll" class="flex-1" contentClass="flex-col px-(--content-inset) gap-4 pb-4">
+    <Scroll testID="categories-scroll" class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) gap-4 pb-(--dock-scroll-clearance)">
       <If when={!!groups.error()}><ErrorState message={String(groups.error())} retry={()=>groups.refetch()} /></If>
       <If when={!category()}>
         <If when={groups.loading()}><Skeleton label="正在加载分类…" /></If>
@@ -147,18 +224,18 @@ export function RadioPage(props:Props) {
     run: () => channels.refetch(),
     disabled: () => channels.loading() || !state.available().some(p => p.id === state.selected() && p.caps.includes("radio.channels")),
   });
-  return <View testID="page-radio" class="flex-1 min-h-0 pb-28" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="px-(--content-inset) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text></View>
+  return <View testID="page-radio" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
+    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text></View>
     <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <If when={!!state.available().length}><View class="px-(--content-inset) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel}
+    <If when={!!state.available().length}><View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel}
       variant={!!radio()&&!radio().channel?"primary":"secondary"} onPress={()=>void start()} /></View></Shelf>
       <If when={!!error()||!!channels.error()}><ErrorState message={error()||String(channels.error())} retry={()=>channels.refetch()} /></If>
       <If when={!!radio()?.error}><ErrorState message={radio().error} retry={()=>void start(radio().channel??undefined)} /></If>
       <If when={!!radio()}><Text class="text-sm text-muted-foreground">{radio().loading?"正在获取下一批曲目…":`持续播放 · 队列 ${player().tracks.length} 首`}</Text></If>
       <Text role="header" class="text-lg font-semibold text-foreground">频道</Text>
       <If when={channels.loading()}><Skeleton label="正在加载频道…" /></If>
-    </View><List testID="radio-channels" each={channels()??[]} keyExtractor={c=>c.id} estimatedItemSize={44} class="flex-1">
-      {c=><View class="px-(--content-inset) py-1 items-start"><Button label={c().title} selected={radio()?.channel===c().id} variant={radio()?.channel===c().id?"primary":"secondary"} onPress={()=>void start(c().id)} /></View>}
+    </View><List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} testID="radio-channels" each={channels()??[]} keyExtractor={c=>c.id} estimatedItemSize={44} class="flex-1">
+      {c=><View class="pl-(--content-inset-left) pr-(--content-inset-right) py-1 items-start"><Button label={c().title} selected={radio()?.channel===c().id} variant={radio()?.channel===c().id?"primary":"secondary"} onPress={()=>void start(c().id)} /></View>}
     </List></If>
   </View>;
 }

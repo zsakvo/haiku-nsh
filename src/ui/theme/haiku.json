@@ -12,6 +12,8 @@
       "navigation-icon-size": "1.25rem",
       "navigation-refresh-icon-size": "0.75rem",
       "home-title-bottom-gap": "1.125rem",
+      "home-track-row-height": "5.25rem",
+      "home-track-cover-size": "3.25rem",
       "recommendation-cover-width": "9.375rem",
       "recommendation-cover-height": "11.875rem",
       "recommendation-cover-gap": "0.6875rem",
@@ -20,6 +22,8 @@
       "listening-card-height": "12.375rem",
       "listening-card-title-size": "0.75rem",
       "content-inset": "1.25rem",
+      "content-inset-left": "1.5rem",
+      "content-inset-right": "3rem",
       "panel-gap": "0.5rem",
       "navigation-row-height": "2rem",
       "sidebar-icon-size": "0.9375rem",
@@ -35,7 +39,8 @@
       "brand-option-min-width": "7rem",
       "font-sans": "system-ui",
       "font-mono": "monospace",
-      "dock-clearance": "7rem"
+      "dock-clearance": "7rem",
+      "dock-scroll-clearance": "5.75rem"
     },
     "light": {
       "background": "#fcfbfa",

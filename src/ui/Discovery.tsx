@@ -1,4 +1,4 @@
-import { Image, Scroll, signal, Text, token, View } from "nsh";
+import { createMotion, Image, Scroll, signal, Text, token, View } from "nsh";
 import { Button as BaseButton } from "nsh/base";
 import { Button, focus } from "./Button";
 import { Icon } from "./Icon";
@@ -9,34 +9,42 @@ export function ErrorState(props:{message:string;retry:()=>void;cached?:boolean}
   return <View class="gap-2 py-2"><Text style={{numberOfLines:expanded()?0:2}} class="text-sm text-destructive">{props.cached?`刷新失败，继续显示缓存：${props.message}`:props.message}</Text>
     <View class="flex-row gap-2"><Button label="重试" size="sm" onPress={props.retry} /><Button label={expanded()?"收起详情":"展开详情"} size="sm" variant="ghost" onPress={()=>expanded.set(!expanded())} /></View></View>;
 }
+/** Bottom-of-feed loading marker: a single spinning glyph, no layout placeholder. */
+export function Spinner(props:{label:string}) {
+  const motion=createMotion({enter:"spin"});
+  return <View accessibilityLabel={props.label} class="items-center py-4">
+    <View style={motion.style}><Icon name="sync" color="muted-foreground" /></View>
+  </View>;
+}
 export function Skeleton(props:{label:string}) {
   return <View accessibilityLabel={props.label} class="gap-2 py-2"><Text class="text-sm text-muted-foreground">{props.label}</Text><View class="h-24 rounded-(--radius-panel) bg-muted" /></View>;
 }
-export function Shelf(props:{id:string;title:string;more?:()=>void;children?:any}) {
-  return <View testID={props.id} class="gap-2 shrink-0"><View class="flex-row items-center justify-between gap-3">
+export function Shelf(props:{id:string;title:string;more?:()=>void;tight?:boolean;children?:any}) {
+  return <View testID={props.id} class={`gap-2 shrink-0 ${props.tight?"-mt-3":""}`}><If when={!!props.title||!!props.more}><View class="flex-row items-center justify-between gap-3">
     <Text role="header" class="text-base font-semibold text-foreground">{props.title}</Text>
     <If when={!!props.more}><Button label={`更多${props.title}`} variant="ghost" size="sm" onPress={()=>props.more?.()} /></If>
-  </View>{props.children}</View>;
+  </View></If>{props.children}</View>;
 }
-export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:()=>void;listening?:boolean}) {
+export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:()=>void;listening?:boolean;hideTitle?:boolean}) {
   const coverClass=()=>props.listening?"size-(--listening-cover-size)":"size-28";
   return <BaseButton accessibilityLabel={props.title} onPress={props.onPress}
     class={`shrink-0 gap-2 items-start rounded-(--radius-panel) ${props.listening
       ?"w-(--listening-cover-size)"
-      :"w-32 p-2 hover:bg-accent active:bg-muted"} ${focus}`}>
+      :"w-28 hover:bg-accent active:bg-muted"} ${focus}`}>
     <View class={`${coverClass()} rounded-(--radius) bg-muted overflow-hidden items-center justify-center`}>
       <If when={!!props.cover}><Image src={props.cover} class={coverClass()} style={{objectFit:"cover"}} /></If><If when={!props.cover}><Text class="text-muted-foreground">♪</Text></If>
-    </View><Text class={`w-full text-sm ${props.listening?"text-muted-foreground":"text-foreground"}`}
+    </View><If when={!props.hideTitle}><Text class={`w-full text-sm ${props.listening?"text-muted-foreground":"text-foreground"}`}
       style={props.listening
         ?{fontSize:token("listening-card-title-size"),numberOfLines:2,textOverflow:"ellipsis"}
-        :{numberOfLines:1}}>{props.title}</Text>
+        :{numberOfLines:1}}>{props.title}</Text></If>
     <If when={!!props.subtitle}><Text class="text-xs text-muted-foreground" style={{numberOfLines:1}}>{props.subtitle}</Text></If>
   </BaseButton>;
 }
-export function CardShelf(props:{items:any[];open:(item:any)=>void;listening?:boolean}) {
-  return <Scroll horizontal class={`${props.listening?"h-(--listening-card-height)":"h-44"} shrink-0`}
-    contentClass={`flex-row ${props.listening?"gap-(--recommendation-cover-gap)":"gap-1 pb-2"}`}>
-    <Each of={props.items} key={e=>JSON.stringify(e.reference)}>{e=><Card title={e().title} cover={e().cover} listening={props.listening} onPress={()=>props.open(e())} />}</Each>
+export function CardShelf(props:{items:any[];open:(item:any)=>void;listening?:boolean;hideTitle?:boolean}) {
+  const height=()=>props.hideTitle?"h-(--listening-cover-size)":props.listening?"h-(--listening-card-height)":"h-44";
+  return <Scroll horizontal class={`${height()} shrink-0`}
+    contentClass={`flex-row ${props.listening?"gap-(--recommendation-cover-gap)":"gap-5 pb-2"}`}>
+    <Each of={props.items} key={e=>JSON.stringify(e.reference)}>{e=><Card title={e().title} cover={e().cover} listening={props.listening} hideTitle={props.hideTitle} onPress={()=>props.open(e())} />}</Each>
   </Scroll>;
 }
 /** Cover navigation and playback are sibling controls with separate keyboard stops. */

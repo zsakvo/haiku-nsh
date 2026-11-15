@@ -1,0 +1,53 @@
+import { expect, open, test } from "nsh/test";
+const options = { platform: "macos" as const, width: 1200, height: 600, network: "live" as const };
+
+test("song shelf pages by six, keeps the last partial page and resets on replacement", async () => {
+  const app = await open("../../../HomeTracksFixture.tsx", options);
+  await app.waitFor("id:home-tracks-next");
+  await app.hover("id:home-tracks");
+  expect(app.enabled("id:home-tracks-previous")).toBe(false);
+  await app.press("id:home-tracks-next");
+  await app.waitFor("role:button[夜航]");
+  expect(app.enabled("id:home-tracks-previous")).toBe(true);
+  await app.press("id:home-tracks-next");
+  await app.waitFor("role:button[最后一首]");
+  expect(app.enabled("id:home-tracks-next")).toBe(false);
+  await app.setViewport(900, 600);
+  await app.press("id:home-tracks-previous");
+  await app.waitFor("role:button[夜航]");
+  await app.press("id:home-tracks-previous");
+  await app.waitFor("role:button[樱华彩]");
+  expect(app.enabled("id:home-tracks-previous")).toBe(false);
+  await app.scroll("id:home-tracks-scroll", 900);
+  await app.waitUntil(() => app.enabled("id:home-tracks-previous"));
+  await app.press("只显示两首");
+  await app.waitFor("role:button[樱华彩]");
+  expect(app.shows("id:home-tracks-next")).toBe(false);
+  expect(app.shows("role:button[天和山雨雪]")).toBe(false);
+});
+
+test("song cards play the complete shelf, toggle likes and keep queue and playlist actions", async () => {
+  const app = await open("../../../HomeTracksFixture.tsx", options);
+  await app.waitFor("role:button[樱华彩]");
+  await app.hover("role:button[樱华彩]");
+  await app.press("role:button[喜欢樱华彩]");
+  await app.waitFor("text:喜欢 1 首");
+  await app.press("role:button[樱华彩]");
+  await app.waitFor("text:队列 14 首 · 樱华彩");
+  await app.press("role:button[更多樱华彩的操作]");
+  await app.waitFor("role:menuitem[加入队列]");
+  await app.press("role:menuitem[加入队列]");
+  await app.waitFor("text:队列 15 首 · 樱华彩");
+  await app.rightClick("role:button[樱华彩]");
+  await app.waitFor("role:menuitem[取消喜欢]");
+  await app.press("role:menuitem[取消喜欢]");
+  await app.waitFor("text:喜欢 0 首");
+  await app.press("role:button[更多樱华彩的操作]");
+  await app.waitFor("text:加入歌单");
+  await app.press("text:加入歌单");
+  await app.waitFor("role:menuitem[新建歌单…]");
+  await app.press("role:menuitem[新建歌单…]");
+  await app.type("label:歌单名称", "推荐收藏");
+  await app.press("保存歌单");
+  await app.waitUntil(() => !app.shows("label:歌单名称"));
+});

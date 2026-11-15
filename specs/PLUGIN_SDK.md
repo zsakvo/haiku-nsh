@@ -264,6 +264,8 @@ type Lyrics = { format: "lrc" | "krc" | "yrc" | "ttml" | "plain"; text: string; 
 
 ```ts
 home(ctx & { cursor?: Cursor; refresh: boolean }): Promise<{ shelves: Shelf[]; next?: Cursor }>;
+// 任一 Shelf 可带 layout?: "feed"：属于无限混排信息流；宿主把相邻的 feed 货架按原顺序合并成一个瀑布流。
+// 单曲与歌单交错时，插件按出现顺序每段同类内容输出一个 feed 货架。
 type Shelf =
   | { id; title; type: "tracks";    items: Track[];    more?: Link }
   | { id; title; type: "playlists"; items: Playlist[]; more?: Link }

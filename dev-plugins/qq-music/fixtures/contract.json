@@ -3326,6 +3326,73 @@
                     ]
                   }
                 ]
+              },
+              {
+                "id": 207,
+                "title_content": "Another group",
+                "v_niche": [
+                  {
+                    "v_card": [
+                      {
+                        "id": 1,
+                        "type": 200,
+                        "jumptype": 10046,
+                        "title": "Song",
+                        "card_extra_info": {
+                          "Tracks": [
+                            {
+                              "id": 1,
+                              "mid": "mid1",
+                              "title": "Fixture Song 1",
+                              "interval": 180,
+                              "type": 0,
+                              "singer": [
+                                {
+                                  "mid": "singer1",
+                                  "name": "Fixture Artist"
+                                }
+                              ],
+                              "album": {
+                                "id": 123,
+                                "mid": "album1",
+                                "name": "Fixture Album",
+                                "publishDate": "2026-01-01"
+                              },
+                              "file": {
+                                "media_mid": "media1",
+                                "size_128mp3": 128,
+                                "size_320mp3": 320,
+                                "size_flac": 1000,
+                                "size_192ogg": 192,
+                                "size_96aac": 96,
+                                "size_new": [
+                                  2000,
+                                  0,
+                                  0,
+                                  321,
+                                  0,
+                                  640
+                                ],
+                                "size_192aac": 192,
+                                "size_96ogg": 96,
+                                "size_48aac": 48
+                              }
+                            }
+                          ],
+                          "SongList": [
+                            {
+                              "ID": 1,
+                              "MID": "mid1",
+                              "Name": "Song",
+                              "SingerName": "Fixture Artist",
+                              "Cover": "https://fixture.invalid/song.png"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -3350,7 +3417,163 @@
           "code": 0,
           "data": {
             "retcode": 0,
-            "v_shelf": []
+            "v_shelf": [
+              {
+                "id": 279,
+                "title_template": "至臻专辑",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 10002,
+                    "v_card": [
+                      {
+                        "id": 100,
+                        "type": 400,
+                        "subtype": 414,
+                        "jumptype": 10002,
+                        "title": "Artist 0",
+                        "subtitle": "Album 0",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 900,
+                              "MID": "",
+                              "Name": "Album preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": 279,
+                "title_template": "",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 10002,
+                    "v_card": [
+                      {
+                        "id": 101,
+                        "type": 400,
+                        "subtype": 414,
+                        "jumptype": 10002,
+                        "title": "Artist 1",
+                        "subtitle": "Album 1",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 901,
+                              "MID": "",
+                              "Name": "Album preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": 279,
+                "title_template": "",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 10002,
+                    "v_card": [
+                      {
+                        "id": 102,
+                        "type": 400,
+                        "subtype": 414,
+                        "jumptype": 10002,
+                        "title": "Artist 2",
+                        "subtitle": "Album 2",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 902,
+                              "MID": "",
+                              "Name": "Album preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": 279,
+                "title_template": "",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 10002,
+                    "v_card": [
+                      {
+                        "id": 103,
+                        "type": 400,
+                        "subtype": 414,
+                        "jumptype": 10002,
+                        "title": "Artist 3",
+                        "subtitle": "Album 3",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 903,
+                              "MID": "",
+                              "Name": "Album preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": 279,
+                "title_template": "",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 10002,
+                    "v_card": [
+                      {
+                        "id": 104,
+                        "type": 400,
+                        "subtype": 414,
+                        "jumptype": 10002,
+                        "title": "Artist 4",
+                        "subtitle": "Album 4",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 904,
+                              "MID": "",
+                              "Name": "Album preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         }
       },
@@ -3720,6 +3943,100 @@
           }
         }
       }
+    },
+    {
+      "path": "/cgi-bin/musicu.fcg",
+      "method": "POST",
+      "body": {
+        "code": 0,
+        "req_0": {
+          "code": 0,
+          "data": {
+            "retcode": 0,
+            "v_shelf": [
+              {
+                "id": 212,
+                "title_template": "为你推荐",
+                "title_content": "",
+                "v_niche": [
+                  {
+                    "style": 212,
+                    "v_card": [
+                      {
+                        "id": 20,
+                        "type": 500,
+                        "jumptype": 10014,
+                        "title": "Playlist first",
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 99,
+                              "MID": "preview",
+                              "Name": "Do not expand playlist preview",
+                              "SingerName": "",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": 30,
+                        "type": 200,
+                        "jumptype": 10046,
+                        "title": "Track second",
+                        "subtitle": "Singer"
+                      },
+                      {
+                        "id": 21,
+                        "type": 500,
+                        "jumptype": 10014,
+                        "title": "Playlist third"
+                      },
+                      {
+                        "id": 0,
+                        "type": 200,
+                        "card_extra_info": {
+                          "SongList": [
+                            {
+                              "ID": 31,
+                              "MID": "mid31",
+                              "Name": "Fourth song",
+                              "SingerName": "Singer",
+                              "Cover": ""
+                            },
+                            {
+                              "ID": 32,
+                              "MID": "mid32",
+                              "Name": "Fifth song",
+                              "SingerName": "Singer",
+                              "Cover": ""
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "requestJson": {
+        "req_0": {
+          "module": "music.recommend.RecommendFeed",
+          "method": "get_recommend_feed",
+          "param": {
+            "page": 3,
+            "direction": 1,
+            "s_num": 7,
+            "v_cache": [
+              "207",
+              "279"
+            ]
+          }
+        }
+      }
     }
   ],
   "cases": [
@@ -3957,6 +4274,11 @@
                 }
               }
             ]
+          },
+          {
+            "id": "207:p1:s1:tracks",
+            "title": "Another group",
+            "type": "tracks"
           }
         ]
       }
@@ -3967,10 +4289,86 @@
       "args": [],
       "context": {
         "refresh": false,
-        "cursor": "{\"page\": 2, \"s_num\": 1, \"v_cache\": [\"207\"]}"
+        "cursor": "{\"page\": 2, \"s_num\": 2, \"v_cache\": [\"207\"]}"
       },
       "expectedJson": {
-        "shelves": []
+        "shelves": [
+          {
+            "id": "279:p2:s0:0",
+            "type": "albums",
+            "layout": "feed",
+            "title": "至臻专辑",
+            "items": [
+              {
+                "id": "100",
+                "title": "Album 0",
+                "artists": [
+                  "Artist 0"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "279:p2:s1:0",
+            "type": "albums",
+            "layout": "feed",
+            "title": "至臻专辑",
+            "items": [
+              {
+                "id": "101",
+                "title": "Album 1",
+                "artists": [
+                  "Artist 1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "279:p2:s2:0",
+            "type": "albums",
+            "layout": "feed",
+            "title": "至臻专辑",
+            "items": [
+              {
+                "id": "102",
+                "title": "Album 2",
+                "artists": [
+                  "Artist 2"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "279:p2:s3:0",
+            "type": "albums",
+            "layout": "feed",
+            "title": "至臻专辑",
+            "items": [
+              {
+                "id": "103",
+                "title": "Album 3",
+                "artists": [
+                  "Artist 3"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "279:p2:s4:0",
+            "type": "albums",
+            "layout": "feed",
+            "title": "至臻专辑",
+            "items": [
+              {
+                "id": "104",
+                "title": "Album 4",
+                "artists": [
+                  "Artist 4"
+                ]
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -4503,6 +4901,56 @@
           "bitrate": 48000
         }
       ]
+    },
+    {
+      "name": "home mixed waterfall preserves order and song groups",
+      "path": "home",
+      "context": {
+        "cursor": "{\"page\": 3, \"s_num\": 7, \"v_cache\": [\"207\", \"279\"]}"
+      },
+      "expectedJson": {
+        "shelves": [
+          {
+            "type": "playlists",
+            "layout": "feed",
+            "items": [
+              {
+                "id": "20"
+              }
+            ]
+          },
+          {
+            "type": "tracks",
+            "layout": "feed",
+            "items": [
+              {
+                "id": "30"
+              }
+            ]
+          },
+          {
+            "type": "playlists",
+            "layout": "feed",
+            "items": [
+              {
+                "id": "21"
+              }
+            ]
+          },
+          {
+            "type": "tracks",
+            "layout": "feed",
+            "items": [
+              {
+                "id": "mid31"
+              },
+              {
+                "id": "mid32"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

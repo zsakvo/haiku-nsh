@@ -129,9 +129,11 @@ export interface Card {
 }
 export interface FeedShelf {
   id: number;
+  style?: number;
   title_content: string;
   title_template?: string;
-  v_niche: { v_card: Card[] }[];
+  // Niche style 212 is the endless mixed waterfall at the end of the feed.
+  v_niche: { style?: number; v_card: Card[] }[];
 }
 export interface Feed {
   retcode?: number;

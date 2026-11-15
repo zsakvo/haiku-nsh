@@ -377,29 +377,51 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
   });
   checkCode(feed.retcode);
   const shelves: Shelf[] = [];
-  for (const shelf of feed.v_shelf) {
+  for (const [index, shelf] of feed.v_shelf.entries()) {
+    // Shelf ids identify templates, not instances: 207 and 279 can repeat even
+    // within one response. Album recommendations also arrive as single-card shelves.
+    const feedLayout = shelf.id === 279 || shelf.style === 212 ||
+      shelf.v_niche.some((n) => Number(n.style) === 212);
     const cards = shelf.v_niche
       .flatMap((n) => n.v_card)
       .flatMap((c) =>
-        c.card_extra_info?.SongList?.length
+        // Album/playlist cards carry a song preview; the card itself is the entity. Only cards
+        // without an entity of their own expand into their songs.
+        c.card_extra_info?.SongList?.length && [undefined, 'track'].includes(classify(c))
           ? c.card_extra_info.SongList.map((s) => ({
               ...c,
               id: s.ID,
               title: s.Name,
-              subtitle: s.SingerName,
+              subtitle: s.SingerName || c.subtitle,
               songMid: s.MID,
-              cover: s.Cover,
+              cover: s.Cover || c.cover,
+              // Song lists inside album/playlist cards are songs, whatever the parent card type.
+              song: true,
             }))
           : [c],
       );
     const base = {
-      id: String(shelf.id),
+      id: `${shelf.id}:p${position.page}:s${index}`,
       // A bare "{String}" template with empty content would leave no title, and the host
       // drops untitled shelves.
       title:
         (shelf.title_template || shelf.title_content)
           .replace(/\{String\}/g, shelf.title_content)
-          .trim() || '为你推荐',
+          .trim() || (shelf.id === 279 ? '至臻专辑' : '为你推荐'),
+    };
+    // Waterfall cards keep their order: one feed shelf per run of the same type.
+    const ordered: Shelf[] = [];
+    const add = (type: Shelf['type'], item: unknown) => {
+      const last = ordered[ordered.length - 1];
+      if (last?.type === type) (last.items as unknown[]).push(item);
+      else
+        ordered.push({
+          ...base,
+          id: `${base.id}:${ordered.length}`,
+          type,
+          items: [item],
+          layout: 'feed',
+        } as Shelf);
     };
     const tracks: Track[] = [];
     const playlists: Playlist[] = [];
@@ -407,7 +429,7 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
     const tops: Toplist[] = [];
     const entries: Extract<Shelf, { type: 'entries' }>['items'] = [];
     for (const c of cards) {
-      const kind = classify(c);
+      const kind = 'song' in c ? 'track' : classify(c);
       if (!kind) continue;
       const id = String(c.id);
       const title = c.title || c.subtitle || '';
@@ -418,19 +440,35 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
         const full = c.card_extra_info?.Tracks?.find(
           (s) => s.mid === c.songMid || String(s.id) === id,
         );
-        tracks.push(
-          full
-            ? track(full)
-            : { id: c.songMid || id, title, artists: c.subtitle ? [c.subtitle] : [], cover: art },
-        );
-      } else if (kind === 'playlist-entry')
-        entries.push({ title, cover: art, to: { playlist: id } });
-      else if (kind === 'playlist') playlists.push({ id, title, cover: art });
-      else if (kind === 'album')
-        albums.push({ id, title, cover: art, artists: c.subtitle ? [c.subtitle] : [] });
-      else if (kind === 'toplist') tops.push({ id, title, cover: art });
-      else if (kind === 'radio-entry') entries.push({ title, cover: art, to: { radio: '99' } });
+        const item = full
+          ? track(full)
+          : { id: c.songMid || id, title, artists: c.subtitle ? [c.subtitle] : [], cover: art };
+        if (feedLayout) add('tracks', item);
+        else tracks.push(item);
+      } else if (kind === 'playlist-entry') {
+        const item = { title, cover: art, to: { playlist: id } };
+        if (feedLayout) add('entries', item);
+        else entries.push(item);
+      } else if (kind === 'playlist') {
+        if (feedLayout) add('playlists', { id, title, cover: art });
+        else playlists.push({ id, title, cover: art });
+      } else if (kind === 'album') {
+        // Featured album cards put the artist in title and the album in subtitle.
+        const featured = Number(c.subtype) === 414;
+        const item = { id, title: featured ? c.subtitle || title : title, cover: art,
+          artists: (featured ? c.title : c.subtitle) ? [featured ? c.title! : c.subtitle!] : [] };
+        if (feedLayout) add('albums', item);
+        else albums.push(item);
+      } else if (kind === 'toplist') {
+        if (feedLayout) add('toplists', { id, title, cover: art });
+        else tops.push({ id, title, cover: art });
+      } else if (kind === 'radio-entry') {
+        const item = { title, cover: art, to: { radio: '99' } };
+        if (feedLayout) add('entries', item);
+        else entries.push(item);
+      }
     }
+    shelves.push(...ordered);
     if (tracks.length)
       shelves.push({ ...base, id: base.id + ':tracks', type: 'tracks', items: tracks });
     if (playlists.length)
@@ -456,7 +494,7 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
 export default definePlugin({
   id: 'qq.music',
   name: 'QQ 音乐',
-  version: '3.0.0',
+  version: '3.2.0',
   author: 'Haiku',
   logo: 'logo.png',
   http: { headers: { Referer: 'https://y.qq.com/' } },

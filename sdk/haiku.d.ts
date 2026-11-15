@@ -363,6 +363,12 @@ declare module 'haiku' {
     id: string;
     title: string;
     more?: Link;
+    /**
+     * `feed`: part of an endless mixed feed. The host lays consecutive feed shelves out as
+     * one waterfall in their given order, so a plugin keeps mixed songs and collections in
+     * order by emitting one feed shelf per run of the same type.
+     */
+    layout?: 'feed';
   } & (
     | { type: 'tracks'; items: Track[] }
     | { type: 'playlists'; items: Playlist[] }

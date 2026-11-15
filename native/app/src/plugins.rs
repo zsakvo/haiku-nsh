@@ -190,6 +190,13 @@ impl PluginService {
         let host=Self::host(&this);let cache=this.with(|s|s.home.clone());
         background(async move { cache.home(host,source,refresh).await }).await.map_err(|e|e.to_string())?.map_err(|e|e.to_string())
     }
+    /// Continuation page of home shelves; never cached.
+    pub async fn home_page(this: Instance<Self>, source: String, cursor: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let cache = this.with(|s| s.home.clone());
+        background(async move { cache.page(host, source, cursor).await })
+            .await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())
+    }
     /// Category groups with optional provider-declared sorts.
     pub async fn categories(this: Instance<Self>, source: String) -> Result<JsonValue,String> {
         let host=Self::host(&this);

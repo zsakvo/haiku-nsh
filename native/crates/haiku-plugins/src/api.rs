@@ -141,6 +141,9 @@ pub struct Shelf {
     pub items: Vec<Entity>,
     pub entries: Vec<Entry>,
     pub more: Option<Link>,
+    /// "feed": consecutive feed shelves form one waterfall (see PLUGIN_SDK.md).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Home {
@@ -627,6 +630,7 @@ impl SourceApi {
                 items,
                 entries,
                 more,
+                layout: (shelf["layout"] == "feed").then(|| "feed".into()),
             });
         }
         Ok(Home {

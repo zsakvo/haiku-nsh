@@ -27,14 +27,15 @@ const icons = { home, grid, radio, search, music, heart, clock, stats, download,
 export type IconName = keyof typeof icons;
 export function Icon(props: {
   name: IconName;
+  class?: string;
   color?: "foreground" | "primary" | "muted-foreground" | "sidebar-foreground" | "cover-foreground";
   small?: boolean;
   sidebar?: boolean;
   navigation?: boolean;
 }) {
   // The refresh glyph fills its SVG; chevrons occupy only half the canvas height.
-  return <Image src={icons[props.name]} class={props.navigation
+  return <Image src={icons[props.name]} class={props.class ?? (props.navigation
     ? props.name === "sync" ? "size-(--navigation-refresh-icon-size)" : "size-(--navigation-icon-size)"
-    : props.sidebar ? "size-(--sidebar-icon-size)" : props.small ? "size-4" : "size-5"}
+    : props.sidebar ? "size-(--sidebar-icon-size)" : props.small ? "size-4" : "size-5")}
     style={{ tintColor: token(props.color ?? "foreground") }} />;
 }

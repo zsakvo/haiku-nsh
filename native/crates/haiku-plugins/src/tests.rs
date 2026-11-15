@@ -1118,7 +1118,7 @@ async fn qq_music_v3_rewrite_offline_contract() {
     let package =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev-plugins/qq-music");
     let descriptor = describe_package(&package).await.unwrap();
-    assert_eq!(descriptor.version, "3.0.0");
+    assert_eq!(descriptor.version, "3.2.0");
     assert_eq!(
         descriptor.auth.as_ref().unwrap()["qrcode"]["variants"],
         json!({"qq":"QQ","wx":"微信"})
@@ -1133,6 +1133,61 @@ async fn qq_music_v3_rewrite_offline_contract() {
         report.summary(),
         serde_json::to_string_pretty(&report).unwrap()
     );
+}
+
+#[tokio::test]
+async fn qq_android_session_survives_reload_and_expires() {
+    let package = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../dev-plugins/qq-music");
+    let dir = tempfile::tempdir().unwrap();
+    let host = Host::open(dir.path()).await.unwrap();
+    // Count the real adapter's requests, but answer them locally. A reload must
+    // retain the device/session pair without persisting an account credential.
+    let entry = r#"import {definePlugin} from 'haiku';
+      import {api} from './api.ts';
+      export default definePlugin({id:'qq.session',name:'QQ session',version:'1.0.0',
+        track:{streams:async(id,ctx)=>{
+          if(id==='expire'||id==='corrupt'){
+            const key='qq.android-session.14090008.v1',saved=ctx.storage.get(key);
+            ctx.storage.set(key,id==='expire'?{...saved,expires:1}:{expires:Date.now()+10000});
+            return [{url:'https://fixture.invalid/changed'}];
+          }
+          let calls=0;
+          const http={post:(url,options)=>({response:async()=>{
+            calls++;
+            const req=options.body?JSON.parse(options.body):null;
+            const body=url.includes('/proxy')?{data:JSON.stringify({data:{q16:'q16',q36:'q36'}})}
+              :{code:0,req_0:{code:0,data:req.req_0.method==='GetSession'
+                ?{session:{uid:'uid',sid:'sid'}}:{}}};
+            if(req?.req_0.method!=='GetSession'&&req?.comm){
+              const saved=ctx.storage.get('qq.android-session.14090008.v1');
+              if(req.comm.OpenUDID!==saved.guid||req.comm.QIMEI!==saved.q16)throw Error('device mismatch');
+            }
+            return new Response(JSON.stringify(body),{status:200});
+          }})};
+          await api({...ctx,http},'test','read');
+          return [{url:'https://fixture.invalid/'+calls}];
+        }}});"#;
+    host.install_files(BTreeMap::from([
+        ("plugin.ts".into(), entry.as_bytes().to_vec()),
+        ("api.ts".into(), std::fs::read(package.join("api.ts")).unwrap()),
+        ("crypto.ts".into(), std::fs::read(package.join("crypto.ts")).unwrap()),
+    ]), false).await.unwrap();
+    let source = host.activate("qq.session").await.unwrap();
+    for expected in [3, 1] {
+        let result = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
+        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}"));
+    }
+    drop(source);
+    drop(host);
+    for (expected, invalidate) in [(1, "expire"), (3, "corrupt"), (3, "")] {
+        let host = Host::open(dir.path()).await.unwrap();
+        let source = host.source("qq.session").unwrap();
+        let result = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
+        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}"));
+        if !invalidate.is_empty() {
+            source.invoke("track.streams", vec![json!(invalidate)], json!({}), None).await.unwrap();
+        }
+    }
 }
 
 #[tokio::test]

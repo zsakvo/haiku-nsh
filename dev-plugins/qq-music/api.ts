@@ -1,6 +1,6 @@
 // Ported from QQMusicApi 108617f (GPL-3.0).
 // Centralizes CGI batching, platform comm fields, signing and SDK errors.
-// Android's QIMEI and GetSession are cached in memory; account credentials belong to the host.
+// Device registration survives VM reloads; account credentials belong to the host.
 import {
   AuthRequired,
   AuthExpired,
@@ -12,7 +12,7 @@ import {
   NotFound,
 } from 'haiku';
 import type { Context, HttpOptions, Json } from 'haiku';
-import { device, hash33, qimeiRequest, sign } from './crypto.ts';
+import { device, hash33, qimeiRequest, sign, type Device } from './crypto.ts';
 import type { Credential, Envelope } from './types.ts';
 
 export interface Request {
@@ -29,8 +29,10 @@ interface Options {
 export const WEB_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const fingerprint = device();
-let session: Promise<{ q16: string; q36: string; uid: string; sid: string }> | undefined;
+type AndroidSession = Device & { q16: string; q36: string; uid: string; sid: string };
+const SESSION_KEY = 'qq.android-session.14090008.v1';
+const SESSION_TTL = 86400000;
+let session: Promise<AndroidSession> | undefined;
 let sessionExpires = 0;
 
 export function credential(ctx: Context, required = false): Credential {
@@ -94,8 +96,18 @@ export async function request(
 }
 async function androidSession(ctx: Context) {
   if (!session || Date.now() >= sessionExpires) {
-    sessionExpires = Date.now() + 86400000;
+    const cached = ctx.storage.get(SESSION_KEY) as (AndroidSession & { expires: number }) | null;
+    if (cached && Number.isFinite(cached.expires) && cached.expires > Date.now() &&
+      cached.expires <= Date.now() + SESSION_TTL &&
+      (['q16', 'q36', 'uid', 'sid', 'guid', 'androidId', 'fingerprint', 'imei'] as const)
+        .every(key => typeof cached[key] === 'string' && cached[key].length > 0)) {
+      sessionExpires = cached.expires;
+      session = Promise.resolve(cached);
+      return session;
+    }
+    sessionExpires = Date.now() + SESSION_TTL;
     session = (async () => {
+      const fingerprint = device();
       // QQMusicApi initializes QIMEI before Android CGI requests, including search and SMS.
       const res = await request(
         ctx,
@@ -115,14 +127,18 @@ async function androidSession(ctx: Context) {
             param: { uid: '', vkey: 0, caller: 0 },
           },
         ],
-        comm(credential(ctx), 'android', { ...qimei, uid: '', sid: '' }),
+        comm(credential(ctx), 'android', { ...fingerprint, ...qimei, uid: '', sid: '' }),
         'android',
       );
       const value = values[0].session;
       if (!value?.uid || !value.sid) throw new ParseError('Missing QQ Android session');
-      return { ...qimei, uid: String(value.uid), sid: value.sid };
+      const state = { ...fingerprint, ...qimei, uid: String(value.uid), sid: value.sid };
+      ctx.storage.set(SESSION_KEY, { ...state, expires: sessionExpires });
+      return state;
     })().catch((error) => {
       session = undefined;
+      sessionExpires = 0;
+      ctx.storage.delete(SESSION_KEY);
       throw error;
     });
   }
@@ -131,7 +147,7 @@ async function androidSession(ctx: Context) {
 function comm(
   c: Credential,
   platform: NonNullable<Options['platform']>,
-  state?: { q16: string; q36: string; uid: string; sid: string },
+  state?: AndroidSession,
 ): { [key: string]: Json | undefined } {
   const gTk = hash33(c.musickey, 5381);
   if (platform === 'web')
@@ -160,17 +176,17 @@ function comm(
     tmeLoginType: c.login_type || undefined,
     QIMEI: state?.q16 || '',
     QIMEI36: state?.q36 || '',
-    OpenUDID: fingerprint.guid,
-    OpenUDID2: fingerprint.guid,
-    udid: fingerprint.guid,
+    OpenUDID: state?.guid,
+    OpenUDID2: state?.guid,
+    udid: state?.guid,
     uid: state?.uid,
     sid: state?.sid,
-    aid: fingerprint.androidId,
+    aid: state?.androidId,
     os_ver: '10',
     phonetype: 'MI 6',
     devicelevel: '29',
     newdevicelevel: '29',
-    rom: fingerprint.fingerprint,
+    rom: state?.fingerprint,
   };
 }
 async function send<T extends unknown[]>(
