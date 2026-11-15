@@ -477,15 +477,20 @@ mod tests {
         let transition = Transition::new(move || open.get());
         view()
             .flex_1()
+            // The test's own controls stay above the full-window overlay (z 10), so presses reach them.
             .child(
-                nsh_base::button()
-                    .on_press(move || open.set(true))
-                    .child(text("Open")),
-            )
-            .child(
-                nsh_base::button()
-                    .on_press(move || open.set(false))
-                    .child(text("Close")),
+                view()
+                    .z_index(20)
+                    .child(
+                        nsh_base::button()
+                            .on_press(move || open.set(true))
+                            .child(text("Open")),
+                    )
+                    .child(
+                        nsh_base::button()
+                            .on_press(move || open.set(false))
+                            .child(text("Close")),
+                    ),
             )
             .child(text(move || format!("phase:{:?}", transition.phase.get())))
             .child(text(move || format!("clicks:{}", clicks.get())))

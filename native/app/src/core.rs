@@ -620,7 +620,7 @@ impl Core {
     /// Software identity shared by Settings and the application About menu.
     pub fn about_info() -> JsonValue {
         let manifest: JsonValue=serde_json::from_str(include_str!("../../../nsh.json")).unwrap();
-        serde_json::json!({"version":manifest["version"],"framework":"0.4.0",
+        serde_json::json!({"version":manifest["version"],"framework":"0.5.1",
             "license":"应用许可证尚未声明。",
             "notices":include_str!("../assets/THIRD_PARTY_NOTICES.txt")})
     }

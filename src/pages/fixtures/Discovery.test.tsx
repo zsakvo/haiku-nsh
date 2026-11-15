@@ -14,7 +14,9 @@ test("home shelves play, navigate cards/entries/more and categories page sorts a
   await app.press("role:button[最新精选 1]");await app.waitFor("id:page-source-detail");
   await app.keyboard.press("mod+[");await app.press("全部分类");await app.waitFor("text:语种");
   await app.press("role:button[安静]");await app.waitFor("role:button[最新精选 1]");
-  await app.press("id:nav-home");await app.press("id:shelf-playlists >> role:button[夜航精选]");await app.waitFor("id:page-source-detail");
+  await app.press("id:nav-home");
+  // The playing dock floats over the bottom of the page; bring the shelf above it first.
+  await app.scroll("id:home-scroll",200);await app.press("id:shelf-playlists >> role:button[夜航精选]");await app.waitFor("id:page-source-detail");
   await app.keyboard.press("mod+[");await app.press("更多精选歌单");await app.waitFor("text:已显示 4 个歌单");
   await app.press("id:nav-home");await app.hover("id:shelf-entries >> role:button[林间频道]");
   await app.press("id:shelf-entries >> role:button[播放林间频道]");

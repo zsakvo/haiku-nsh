@@ -12,4 +12,4 @@ nsh-app-haiku = { path = "../../../native/app" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 haiku-macos = { path = "../../../native/crates/haiku-macos" }
-nsh-platform-macos = "=0.4.0"
+nsh-platform-macos = "=0.5.1"

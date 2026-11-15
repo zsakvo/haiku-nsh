@@ -1,4 +1,4 @@
-import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, View } from "nsh";
+import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, untracked, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
 import type { Route } from "../shell/navigation";
@@ -40,9 +40,11 @@ export function HomePage(props:Props) {
   const state=useSource(props,"home","homeSourceId");
   useToolbarSource(()=>props.active,state);
   const feeds=signal<Record<string,HomeFeed>>({}),errors=signal<Record<string,string>>({}),revision=signal(0);
-  const loadingMore=signal(false),moreError=signal("");
+  const loadingMore=signal(false),moreError=signal(""),wantMore=signal(false);
   const feedWidth=signal(0);
   const columns=()=>Math.max(1,Math.floor((feedWidth()+feedGap)/(token("listening-cover-size")+feedGap)));
+  // Most rows are feed rows: a square cover as wide as its column, a title line and the row's bottom padding.
+  const rowEstimate=()=>feedWidth()>0?Math.round((feedWidth()-feedGap*(columns()-1))/columns())+42:200;
   let ahead:{source:string;cursor:string;version:number;page:Promise<HomeFeed>}|null=null;
   let version=0,lastRefresh=0,closed=false;cleanup(()=>{closed=true;version++;});
   const current=()=>feeds()[state.selected()];
@@ -55,6 +57,8 @@ export function HomePage(props:Props) {
       const force=refresh>lastRefresh;lastRefresh=refresh;
       const first=await props.core.sources.home(source,force) as HomeFeed;
       if(!valid())return;feeds.set({...feeds(),[source]:first});
+      // A refreshed feed with as many rows as before does not raise onLoadMore again.
+      if(force)wantMore.set(true);
       if(first.cached) {
         const fresh=await props.core.sources.home(source,true) as HomeFeed;
         if(valid())feeds.set({...feeds(),[source]:fresh});
@@ -64,25 +68,43 @@ export function HomePage(props:Props) {
   const refresh=()=>revision.set(revision()+1);
   // Keep each virtual row bounded. A single unbounded waterfall would defeat recycling.
   type Section=HomeShelf&{continued?:boolean;feed?:FeedItem[]};
+  // List matches rows by identity: feed items and unchanged rows stay the same objects
+  // across appends, so a new page binds only its own rows instead of every mounted cell.
+  const feedItems=new WeakMap<HomeShelf,FeedItem[]>();
+  function itemsOf(s:HomeShelf){
+    let items=feedItems.get(s);
+    if(!items){
+      items=(s.kind==="entries"?s.entries:s.items).map((item,index)=>({key:`${s.id}:${index}`,kind:s.kind,item}));
+      feedItems.set(s,items);
+    }
+    return items;
+  }
   function sectionRows(shelves:HomeShelf[]){
-    const out:Section[]=[];
+    const out:Section[]=[],perRow=columns();
     for(const s of shelves){
       const last=out[out.length-1];
       if(s.layout==="feed"){
-        const items=(s.kind==="entries"?s.entries:s.items).map((item,index)=>({key:`${s.id}:${index}`,kind:s.kind,item}));
-        for (const item of items) {
+        for (const item of itemsOf(s)) {
           const previous=out[out.length-1];
-          if(previous?.feed&&previous.title===s.title&&previous.feed.length<columns()){
-            out[out.length-1]={...previous,feed:[...previous.feed,item]};
-          }else{
-            out.push({...s,id:item.key,continued:previous?.title===s.title,feed:[item]});
-          }
+          if(previous?.feed&&previous.title===s.title&&previous.feed.length<perRow)previous.feed.push(item);
+          else out.push({...s,id:item.key,continued:previous?.title===s.title,feed:[item]});
         }
       } else out.push({...s,continued:!last?.feed&&last?.title===s.title});
     }
     return out;
   }
-  const merged=computed(()=>sectionRows(current()?.shelves??[]));
+  const sameRow=(a:Section,b:Section)=>a.title===b.title&&a.continued===b.continued&&a.kind===b.kind
+    &&a.items===b.items&&a.entries===b.entries&&a.more===b.more
+    &&(a.feed===b.feed||!!a.feed&&!!b.feed&&a.feed.length===b.feed.length&&a.feed.every((f,i)=>f===b.feed![i]));
+  let rows=new Map<string,Section>();
+  const merged=computed(()=>{
+    const next=new Map<string,Section>();
+    const out=sectionRows(current()?.shelves??[]).map(row=>{
+      const old=rows.get(row.id),kept=old&&sameRow(old,row)?old:row;
+      next.set(row.id,kept);return kept;
+    });
+    rows=next;return out;
+  });
   const openFeed=(e:FeedItem)=>e.kind==="entries"?link(e.item.to):props.navigate(entityRoute(e.item));
   // Append the next page when the scroll nears the bottom; shelves with repeated ids are skipped.
   // QQ continuation pages are small (one shelf) and take 0.5–4 s each, so one page is always
@@ -121,6 +143,14 @@ export function HomePage(props:Props) {
     }}
     finally{if(v===version)loadingMore.set(false);}
   }
+  // The list raises onLoadMore once per row count. One that lands while the first page or
+  // another page is still loading is kept, and runs as soon as the feed can continue.
+  effect(()=>{
+    const feed=current();
+    if(wantMore()&&props.active&&feed?.next&&!feed.cached&&!home.loading()&&!loadingMore()&&!moreError()){
+      wantMore.set(false);untracked(()=>void more());
+    }
+  });
   usePageRefresh(() => props.active, { run: refresh, disabled: () => !state.selected() || home.loading() });
   function link(link:any) {
     const ref=link.reference;
@@ -131,7 +161,7 @@ export function HomePage(props:Props) {
   return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
     <List testID="home-scroll" class="flex-1" each={merged()} keyExtractor={s=>s.id}
       onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
-      estimatedItemSize={320} loadMoreThreshold={2} onLoadMore={()=>{if(!moreError())void more();}}
+      estimatedItemSize={rowEstimate()} loadMoreThreshold={2} onLoadMore={()=>wantMore.set(true)}
       contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"
       header={<View>
         <View testID="home-heading" class="pt-2 pb-(--home-title-bottom-gap)">

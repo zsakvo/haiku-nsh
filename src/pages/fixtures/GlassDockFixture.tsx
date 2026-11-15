@@ -1,12 +1,13 @@
 import { effect, resource, Text, View } from "nsh";
-import { Window } from "nsh/desktop";
+import { currentWindow } from "nsh/desktop";
 import { Core, NowPlaying, PlayerDock } from "haiku/native";
 import { AppShell } from "../../shell/AppShell";
 import { createAppearance } from "../../ui/theme";
 
 function PlaybackScene() {
   createAppearance("dark");
-  effect(() => { Core.initialize(); Window.setTitle("Haiku · M6-04 Dark"); });
+  const win = currentWindow();
+  effect(() => { Core.initialize(); win.set({ title: "Haiku · M6-04 Dark" }); });
   return <View class="flex-1 bg-background"><NowPlaying open /><PlayerDock /></View>;
 }
 

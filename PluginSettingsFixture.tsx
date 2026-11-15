@@ -19,7 +19,8 @@ function Fixture() {
   return <View class="flex-1">
     <If when={!!ready()}>
       <Settings open onClose={() => {}} appearance={appearance} initialCategory="来源" />
-      <View class="absolute bottom-0 flex-row gap-2">
+      {/* Test controls stay above the settings surface (z-10), so presses reach them. */}
+      <View class="absolute bottom-0 z-20 flex-row gap-2">
         <Text testID="fixture-url">{url()}</Text>
         <Text testID="fixture-commits">{`commits:${commits()}`}</Text>
         <Text>{report()}</Text>

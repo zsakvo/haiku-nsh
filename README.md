@@ -1,6 +1,6 @@
 # Haiku
 
-NSH 0.4.0 mixed application for macOS. `App.tsx` imports the Rust API from
+NSH 0.5.1 mixed application for macOS. `App.tsx` imports the Rust API from
 `haiku/native`; `native/app` owns that API, and `native/Cargo.toml` owns the
 workspace. The domain crates under `native/crates` own playback, local library,
 storage, audio and the isolated plugin runtime.

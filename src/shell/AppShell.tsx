@@ -1,5 +1,5 @@
 import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
-import { Menu as DesktopMenu, Window } from "nsh/desktop";
+import { currentWindow, Menu as DesktopMenu } from "nsh/desktop";
 import { Scrollbar } from "nsh/base";
 import { Core, PluginService, PlayerDock, NowPlaying } from "haiku/native";
 import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
@@ -44,6 +44,7 @@ export function AppShell(props: {
   backupPath?: string; initialBackupDialog?: "export" | "import";
   initialLyricsSearch?: boolean;
 } = {}) {
+  const win = currentWindow();
   Scrollbar.setTheme({horizontal:{
     class:"hidden pointer-events-none",thumbClass:"hidden pointer-events-none",
   }});
@@ -78,7 +79,7 @@ export function AppShell(props: {
   keymap.bind(shortcuts.refresh, refreshPage, { when: "always" });
   const appBindings = signal<Record<string,string>>({});
   const installed=new Map<string,{chord:string;stop:()=>void}>();
-  const handlers:Record<string,()=>void>={navigateBack:goBack,navigateForward:goForward,openCommandPalette:showCommands,openSettings:showSettings,closeWindow:()=>Window.close()};
+  const handlers:Record<string,()=>void>={navigateBack:goBack,navigateForward:goForward,openCommandPalette:showCommands,openSettings:showSettings,closeWindow:()=>win.close()};
   function reconcileBindings(bindings:ShortcutBinding[]) {
     const app=bindings.filter(b=>b.scope==="app");
     for(const b of app) {
@@ -112,8 +113,7 @@ export function AppShell(props: {
   const binding=(id:string,fallback:string)=>appBindings()[id]??fallback;
   effect(() => {
     Core.initialize();
-    Window.setTitle("Haiku");
-    Window.setTitleBar({ style: "hidden", height: token("toolbar-height") });
+    win.set({ title: "Haiku", titleBar: { style: "hidden", height: token("toolbar-height") } });
   });
   effect(() => {
     DesktopMenu.setApplicationMenu([
