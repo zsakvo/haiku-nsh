@@ -5,3 +5,9 @@ strip = false
 
 [profile.release.build-override]
 strip = false
+
+# objc2 verifies every Objective-C message's signature against the runtime in
+# debug builds (msg_send_check → class_getInstanceMethod). The macOS host sends
+# thousands per frame while scrolling, which halved the development frame rate.
+[profile.dev.package.objc2]
+debug-assertions = false
