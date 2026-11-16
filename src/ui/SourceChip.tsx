@@ -12,8 +12,6 @@ function SourceMark(props: { logo?: string; testID?: string }) {
 /** A compact source selector sharing the navigation toolbar's control height. */
 export function SourceChip(props: {
   items: SourceOption[]; value: string; disabled?: boolean; onChange: (value: string) => void;
-  /** Drop the chip outline when it sits inside a shared capsule. */
-  bare?: boolean;
 }) {
   const selected = () => props.items.find((item) => item.id === props.value) ?? props.items[0];
   return <Select testID="source-chip" accessibilityLabel="来源" value={props.value}
@@ -21,9 +19,9 @@ export function SourceChip(props: {
     disabled={props.disabled} align="end" class="shrink-0 max-w-56"
     popupClass={`${popupSurface} min-w-40 p-1`} listClass="max-h-64" itemClass={`${popupItem} selected:bg-accent`}
     onChange={(event) => { if (event.value !== null) props.onChange(event.value); }}
-    trigger={<View class={`min-h-7 max-w-56 flex-row items-center gap-1.5 rounded-full ${props.bare ? "" : "border border-border bg-muted "}px-2.5 py-1 hover:bg-accent active:bg-muted disabled:opacity-35 ${focus}`}>
+    trigger={<View class={`h-(--navigation-control-height) max-w-56 flex-row items-center gap-1.5 rounded-(--radius) px-1.5 hover:bg-accent active:bg-muted disabled:opacity-35 ${focus}`}>
       <SourceMark testID="source-chip-icon" logo={selected()?.logo} />
-      <Text testID="source-chip-label" class="text-xs text-foreground" style={{numberOfLines:1}}>{selected()?.title ?? "选择来源"}</Text>
+      <Text testID="source-chip-label" class="text-foreground" style={{numberOfLines:1,fontSize:token("source-label-size")}}>{selected()?.title ?? "选择来源"}</Text>
     </View>}
     renderItem={(entry) => <View class="flex-row items-center gap-2">
       <SourceMark logo={props.items.find((item) => item.id === entry.value)?.logo} />

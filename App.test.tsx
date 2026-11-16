@@ -31,7 +31,7 @@ test("back and forward retain page input; new navigation truncates forward histo
   await app.press("id:nav-back");
   expect(app.value("label:搜索词")).toBe("坂本龙一");
   expect(app.enabled("id:nav-refresh")).toBe(false);
-  await app.press("id:nav-forward");
+  await app.keyboard.press("mod+]");
   expect(app.texts()).toContain("你的音乐，放在这里");
   await app.keyboard.press("mod+[");
   await app.press("id:nav-favorites");

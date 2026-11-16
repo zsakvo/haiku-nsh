@@ -6,7 +6,7 @@ import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
-import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, FloatingNavigationCapsule, NavigationBackdrop, NavigationLayoutContext, CapsuleDivider, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, ShellFrame, ShellSidebar, NavigationBar, NavigationLayoutContext, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
@@ -147,32 +147,35 @@ export function AppShell(props: {
     }
     closeOverlay();
   }
-  // macOS uses a glass navigation capsule above the page's content.
+  // macOS: the bar floats over the page, whose content scrolls beneath it.
   const floatingNavigation = platform.os === "macos";
-  const navigationCapsuleHeight = signal(token("navigation-capsule-height"));
-  const navigationLayout = { inset: () => floatingNavigation
-    ? token("navigation-capsule-top") + navigationCapsuleHeight() + token("navigation-capsule-content-gap")
-    : 0 };
+  const scrolledPages = new Set<object>(), contentScrolled = signal(false);
+  const navigationLayout = {
+    inset: () => floatingNavigation ? token("navigation-bar-height") + token("navigation-content-gap") : 0,
+    report: (page: object, scrolled: boolean) => {
+      if (scrolled) scrolledPages.add(page); else scrolledPages.delete(page);
+      contentScrolled.set(scrolledPages.size > 0);
+    },
+  };
   const hasSources = () => !!pageSource.current()?.items().length;
-  const navigationButtons = () => [
+  const navigationBar = () => <NavigationBar floating={floatingNavigation} scrolled={contentScrolled()}>
     <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
-      disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />,
-    <IconButton navigation testID="nav-forward" icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
-      disabled={!nav.canForward() || navigationBlocked()} onPress={goForward} />,
+      disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />
     <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}
-      disabled={!canRefresh()} onPress={refreshPage} />,
-  ];
-  const sourceChip = (bare: boolean) => <If when={hasSources()}>
-    <SourceChip bare={bare} items={pageSource.current()!.items()} value={pageSource.current()!.value()}
-      disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
-  </If>;
+      disabled={!canRefresh()} onPress={refreshPage} />
+    <View class="shrink min-w-0 flex-row" style={{ width: token("navigation-search-width") }}>
+      <CommandTrigger class="flex-1" shortcut={keymap.label(binding("openCommandPalette",shortcuts.commands))} onPress={showCommands} />
+    </View>
+    <View class="flex-1" />
+    <If when={hasSources()}>
+      <SourceChip items={pageSource.current()!.items()} value={pageSource.current()!.value()}
+        disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
+    </If>
+  </NavigationBar>;
   return <PageSourceContext.Provider value={pageSource}><PageRefreshContext.Provider value={refresh}>
     <NavigationLayoutContext.Provider value={navigationLayout}><ShellFrame>
     <ShellSidebar>
       <SidebarChrome />
-      <SidebarSearch>
-        <CommandTrigger shortcut={keymap.label(binding("openCommandPalette",shortcuts.commands))} onPress={showCommands} />
-      </SidebarSearch>
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
         {["发现", "音乐库"].map((group) => <View class="gap-(--navigation-row-gap)">
           <SectionLabel label={group} />
@@ -196,13 +199,7 @@ export function AppShell(props: {
       </View>
     </ShellSidebar>
     <WindowPanel bleedRight dock>
-      <If when={!floatingNavigation}>
-        <NavigationToolbar>
-          {navigationButtons()}
-          <View class="flex-1" />
-          {sourceChip(false)}
-        </NavigationToolbar>
-      </If>
+      <If when={!floatingNavigation}>{navigationBar()}</If>
       <View class="flex-1 min-h-0" style={{ paddingTop: navigationLayout.inset() }}>
         {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
@@ -252,16 +249,7 @@ export function AppShell(props: {
           <Text class="px-5 text-sm text-muted-foreground">{core.error() ? String(core.error()) : "正在加载曲库…"}</Text>
         </If>
       </View>
-      <If when={floatingNavigation}>
-        <NavigationBackdrop height={navigationLayout.inset()} />
-        {/* The capsule is left-anchored and the buttons come first, so they keep their place
-            whether or not a page shows a source chip. */}
-        <FloatingNavigationCapsule onHeightChange={height => { if (height > 0) navigationCapsuleHeight.set(height); }}>
-          {navigationButtons()}
-          <If when={hasSources()}><CapsuleDivider /></If>
-          {sourceChip(true)}
-        </FloatingNavigationCapsule>
-      </If>
+      <If when={floatingNavigation}>{navigationBar()}</If>
     </WindowPanel>
     <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>

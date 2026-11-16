@@ -44,6 +44,9 @@ pub enum TrackListEvent {
     /// Selection changed, keyed by stable track IDs (not recycled cells).
     #[args(ids)]
     SelectionChange(Vec<String>),
+    /// Detail lists only: whether content has moved off the top, sent when that changes.
+    #[args(scrolled)]
+    ScrollChange(bool),
 }
 fn source(props: TrackListProps) -> Option<Source> {
     track_source::get(props.source.get())
@@ -608,6 +611,7 @@ fn detail_list(
     initial: usize,
 ) -> impl IntoElement {
     let bridge = crate::presentation::get().map(|p| p.bridge.clone());
+    let scrolled = std::rc::Rc::new(std::cell::Cell::new(false));
     virtual_list(
         move || source(props).map(|s| s.ids.with(Vec::len)).unwrap_or(0),
         move |at| {
@@ -710,6 +714,10 @@ fn detail_list(
         },
     )
     .test_id("detail-track-list").element_ref(&list).flex_1().min_h_0()
+    .on_scroll(move |event: &ScrollEvent| {
+        let next = event.offset.y.0 > 0.;
+        if scrolled.replace(next) != next { cx.emit(TrackListEvent::ScrollChange(next)); }
+    })
     .header(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.header.place(|s| s)).child(detail_heading()))
     .footer(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.footer.place(|s| s)))
     .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())

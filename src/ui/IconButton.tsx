@@ -11,7 +11,7 @@ export function IconButton(props: {
   return <BaseButton testID={props.testID} accessibilityLabel={props.label} disabled={props.disabled}
     selected={props.selected} onPress={props.onPress}
     tooltip={<Tooltip label={props.hint ?? props.label} />}
-    class={`size-(--compact-control-height) items-center justify-center ${props.navigation ? "rounded-full" : "rounded-(--radius)"} hover:bg-accent active:bg-muted selected:bg-accent disabled:opacity-35 ${focus}`}>
+    class={`${props.navigation ? "size-(--navigation-control-height) rounded-(--radius) border border-border bg-card" : "size-(--compact-control-height) rounded-(--radius)"} items-center justify-center hover:bg-accent active:bg-muted selected:bg-accent disabled:opacity-35 ${focus}`}>
     <Icon name={props.icon} small sidebar={props.sidebar} navigation={props.navigation} color={props.selected ? "primary" : props.sidebar ? "sidebar-foreground" : "foreground"} />
   </BaseButton>;
 }

@@ -10,7 +10,7 @@ import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { SettingSelect } from "../ui/SettingsControls";
-import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
+import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
 /** Retained likes/user playlist page with a Rust-owned virtual source and selection. */
 export function CollectionPage(props: { core: Core; id: string; active: boolean; onDeleted: () => void }) {
@@ -18,6 +18,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const mirror = mirrorCollections(props.core);
   const player = mirrorCore(props.core).player;
   const managing = signal(false);
+  const scrolled = navigationScroll(() => props.active);
   const search = signal("");
   const filter = signal("");
   const sort = signal(props.id === "__liked__" ? "newest" : "manual");
@@ -155,7 +156,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onPlay={(event) => void act(() => service.playSource(event.source, event.id))}
         onAction={(event) => void command(event.command, event.ids)}
-        onSelectionChange={(event) => selected.set(event.ids)} /></NavigationScrollArea>
+        onSelectionChange={(event) => selected.set(event.ids)} onScrollChange={(event) => scrolled(event.scrolled)} /></NavigationScrollArea>
     </If>
     <If when={!!editor()}><PlaylistEditor core={props.core}
       collection={editor() === "edit" ? collection() : undefined}

@@ -13,11 +13,11 @@ export function SearchField(props: { value: string; label: string; placeholder?:
       class="flex-1 min-w-0 text-sm text-foreground placeholder:text-muted-foreground" />
   </View>;
 }
-export function CommandTrigger(props: { shortcut: string; onPress: () => void }) {
+export function CommandTrigger(props: { shortcut: string; onPress: () => void; class?: string }) {
   return <Button accessibilityLabel="打开命令面板" onPress={props.onPress}
     tooltip={<Tooltip label={`命令面板 · ${props.shortcut}`} />}
-    class={`min-h-(--compact-control-height) min-w-(--command-entry-min-width) flex-row items-center gap-2 rounded-full border border-border bg-card px-3 py-0.5 hover:bg-accent active:bg-muted ${focus}`}>
-    <Icon name="search" sidebar color="muted-foreground" />
-    <Text style={{ fontSize: token("sidebar-hint-size") }} class="flex-1 text-muted-foreground">前往…</Text><Kbd sidebar label={props.shortcut} />
+    class={`h-(--navigation-control-height) min-w-(--command-entry-min-width) flex-row items-center gap-2 rounded-(--radius) border border-border bg-muted px-3 hover:bg-accent active:bg-muted ${focus} ${props.class ?? ""}`}>
+    <Icon name="search" small color="muted-foreground" />
+    <Text class="flex-1 text-sm text-muted-foreground" style={{ numberOfLines: 1 }}>搜索或前往…</Text><Kbd sidebar label={props.shortcut} />
   </Button>;
 }

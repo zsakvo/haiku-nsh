@@ -12,7 +12,7 @@ import { usePageRefresh } from "../shell/pageRefresh";
 import { usePageSource } from "../shell/pageSource";
 import { HomeEntries, type HomeEntry } from "./HomeEntries";
 import { HomeTracks } from "./HomeTracks";
-import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
+import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 type HomeShelf={id:string;title:string;kind:string;items:any[];entries:HomeEntry[];more?:any;layout?:"feed"};
 type HomeFeed={shelves:HomeShelf[];cached:boolean;fallbackCover?:string;next?:string|null};
 type Categories={groups:{title:string;items:{id:string;title:string}[]}[];sorts?:{id:string;title:string}[]};
@@ -40,6 +40,7 @@ function MissingSource(props:{settings:()=>void}) {return <EmptyState title="还
 export function HomePage(props:Props) {
   const state=useSource(props,"home","homeSourceId");
   useToolbarSource(()=>props.active,state);
+  const scrolled=navigationScroll(()=>props.active);
   const feeds=signal<Record<string,HomeFeed>>({}),errors=signal<Record<string,string>>({}),revision=signal(0);
   const loadingMore=signal(false),moreError=signal(""),wantMore=signal(false);
   const feedWidth=signal(0);
@@ -183,7 +184,7 @@ export function HomePage(props:Props) {
   }
   return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
     <NavigationScrollArea>
-    <List testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id}
+    <List testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id} onScroll={e=>scrolled(e.offset.y>0)}
       onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
       estimatedItemSize={rowEstimate()} loadMoreThreshold={2} onLoadMore={()=>wantMore.set(true)}
       contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"

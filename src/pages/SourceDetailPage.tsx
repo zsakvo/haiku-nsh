@@ -8,7 +8,7 @@ import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { DetailHeader, DetailAction } from "../ui/DetailHeader";
 import { usePageRefresh } from "../shell/pageRefresh";
-import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
+import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
 /** One retained page per EntityRef. Resources reject stale loads; pagination also checks its epoch. */
 export function SourceDetailPage(props: { core: Core; reference: string; active: boolean; navigate: (route: Route) => void }) {
@@ -108,7 +108,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   }
   return <View testID="page-source-detail" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <NavigationScrollArea><SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail
+    <NavigationScrollArea><SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail onScrolled={navigationScroll(() => props.active)}
       header={<NavigationScrollHeader class="gap-2">
         <If when={first.loading() && !info()}>
           <View accessibilityLabel="正在加载详情" class={`flex-row gap-6 pb-2 ${isPlaylist() ? "pt-(--playlist-detail-top-gap)" : ""}`}>

@@ -32,7 +32,7 @@ test("local library scan, groups, recycled selection, sparse batch edit and filt
     await app.press("id:nav-refresh");
     await app.waitUntil(() => !app.shows("label:Elsewhere"));
     expect(app.texts()).toContain("已选择 1 首");
-    await app.press("id:nav-forward");
+    await app.keyboard.press("mod+]");
     await app.waitFor("label:Song Beta");
     await app.keyboard.press("mod+shift+r");
     await app.waitUntil(() => app.enabled("id:nav-refresh"));
