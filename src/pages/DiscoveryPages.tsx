@@ -12,6 +12,7 @@ import { usePageRefresh } from "../shell/pageRefresh";
 import { usePageSource } from "../shell/pageSource";
 import { HomeEntries, type HomeEntry } from "./HomeEntries";
 import { HomeTracks } from "./HomeTracks";
+import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 type HomeShelf={id:string;title:string;kind:string;items:any[];entries:HomeEntry[];more?:any;layout?:"feed"};
 type HomeFeed={shelves:HomeShelf[];cached:boolean;fallbackCover?:string;next?:string|null};
 type Categories={groups:{title:string;items:{id:string;title:string}[]}[];sorts?:{id:string;title:string}[]};
@@ -48,13 +49,20 @@ export function HomePage(props:Props) {
   let ahead:{source:string;cursor:string;version:number;page:Promise<HomeFeed>}|null=null;
   let version=0,lastRefresh=0,closed=false;cleanup(()=>{closed=true;version++;});
   const current=()=>feeds()[state.selected()];
-  const identity=()=>props.active&&state.selected()?JSON.stringify([state.selected(),revision()]):undefined;
+  // Load once the page is first shown; afterwards only a manual refresh (or a new source) reloads,
+  // so entering and leaving the page never refetches the feed.
+  const visited=signal(false);
+  effect(()=>{if(props.active&&!visited())visited.set(true);});
+  const identity=()=>visited()&&state.selected()?JSON.stringify([state.selected(),revision()]):undefined;
   const home=resource(identity,async key=>{
-    const v=++version;const [source,refresh]=JSON.parse(key);errors.set({...errors(),[source]:""});
+    const [source,refresh]=JSON.parse(key);
+    const force=refresh>lastRefresh;lastRefresh=refresh;
+    // Switching back to a source already loaded keeps its feed.
+    if(!force&&feeds()[source]&&!feeds()[source].cached){moreError.set("");return;}
+    const v=++version;errors.set({...errors(),[source]:""});
     ahead=null;loadingMore.set(false);moreError.set("");
     const valid=()=>!closed&&v===version&&identity()===key;
     try {
-      const force=refresh>lastRefresh;lastRefresh=refresh;
       const first=await props.core.sources.home(source,force) as HomeFeed;
       if(!valid())return;feeds.set({...feeds(),[source]:first});
       // A refreshed feed with as many rows as before does not raise onLoadMore again.
@@ -174,20 +182,18 @@ export function HomePage(props:Props) {
     </Shelf></View>;
   }
   return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
+    <NavigationScrollArea>
     <List testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id}
       onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
       estimatedItemSize={rowEstimate()} loadMoreThreshold={2} onLoadMore={()=>wantMore.set(true)}
       contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"
-      header={<View>
-        <View testID="home-heading" class="pt-2 pb-(--home-title-bottom-gap)">
-        <Text role="header" class="text-2xl font-semibold text-foreground">推荐</Text>
-        </View>
+      header={<NavigationScrollHeader>
         <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
         <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
         <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
         <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
         <Each of={lead()} key={s=>s.id}>{section}</Each>
-      </View>}
+      </NavigationScrollHeader>}
       footer={<View>
         <If when={loadingMore()}><Spinner label="正在加载更多推荐" /></If>
         <If when={!!moreError()}><ErrorState message={moreError()} retry={()=>void more()} /></If>
@@ -197,6 +203,7 @@ export function HomePage(props:Props) {
       </View>}>
         {section}
     </List>
+    </NavigationScrollArea>
   </View>;
 }
 export function CategoriesPage(props:Props) {

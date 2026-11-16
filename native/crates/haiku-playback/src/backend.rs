@@ -103,6 +103,10 @@ pub trait AudioBackend: Send + Sync + 'static {
 }
 /// M4 can replace this local-only implementation with download/cache/stream resolution.
 pub trait TrackResolver: Send + Sync + 'static {
+    /// Complete sparse remote metadata before opening audio; local tracks stay local.
+    fn metadata(&self, track: Track) -> BoxFuture<'_, Track> {
+        Box::pin(async move { track })
+    }
     fn resolve(&self, track: Track) -> BoxFuture<'_, Result<PathBuf, Error>> {
         Box::pin(async move { LocalResolver.resolve(track).await })
     }

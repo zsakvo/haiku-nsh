@@ -10,6 +10,7 @@ import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { SettingSelect } from "../ui/SettingsControls";
+import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
 /** Retained likes/user playlist page with a Rust-owned virtual source and selection. */
 export function CollectionPage(props: { core: Core; id: string; active: boolean; onDeleted: () => void }) {
@@ -84,13 +85,13 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       }
     });
   }
-  const header = () => <View class="gap-3 pb-2">
-      <DetailHeader title={collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}
+  const header = () => <NavigationScrollHeader class="gap-3 pb-2">
+      <DetailHeader playlist title={collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}
         cover={collection()?.cover || covers().find((cover):cover is string=>!!cover)}
         description={collection()?.description} metadata={`${collection()?.trackCount ?? 0} 首`}>
-        <DetailAction label="播放全部" icon="play" primary disabled={!collection()?.trackCount || !source()}
+        <DetailAction label="播放全部" icon="play" primary pill disabled={!collection()?.trackCount || !source()}
           onPress={() => void act(() => service.playSource(source()!, ""))} />
-        <DetailAction label="下载全部" icon="download" disabled={!collection()?.trackCount}
+        <DetailAction label="下载全部" icon="download" pill disabled={!collection()?.trackCount}
           onPress={() => void act(() => props.core.downloads.enqueue(service.tracks(props.id)))} />
         <Menu trigger={<Button label="…" accessibilityLabel="更多歌单操作" variant="ghost" size="sm" onPress={()=>{}} />}>
           <MenuItem onSelect={()=>managing.set(!managing())}><Text>{managing()?"收起歌单管理":"管理歌单"}</Text></MenuItem>
@@ -142,19 +143,19 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       <If when={!!error() || !!source.error()}><Text class="text-sm text-destructive">{error() || String(source.error())}</Text>
         <Button label="重试" size="sm" onPress={() => { error.set(""); source.refetch(); }} />
       </If>
-    </View>;
+    </NavigationScrollHeader>;
   return <View testID={liked ? "page-favorites" : "page-playlist"}
     class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
     <If when={!!source()} else={<View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-2">
       <Text class="text-sm text-muted-foreground">{source.error()?String(source.error()):"正在加载歌单…"}</Text>
       <If when={!!source.error()}><Button label="重试" size="sm" onPress={()=>source.refetch()} /></If>
     </View>}>
-      <TrackList detail header={header()} bottomInset={token("dock-scroll-clearance")} source={source()!}
+      <NavigationScrollArea><TrackList detail header={header()} bottomInset={token("dock-scroll-clearance")} source={source()!}
         active={props.active && !editor() && !deleting() && !trackEditor()}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onPlay={(event) => void act(() => service.playSource(event.source, event.id))}
         onAction={(event) => void command(event.command, event.ids)}
-        onSelectionChange={(event) => selected.set(event.ids)} />
+        onSelectionChange={(event) => selected.set(event.ids)} /></NavigationScrollArea>
     </If>
     <If when={!!editor()}><PlaylistEditor core={props.core}
       collection={editor() === "edit" ? collection() : undefined}

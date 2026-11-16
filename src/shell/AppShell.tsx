@@ -6,7 +6,7 @@ import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
-import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, FloatingNavigationCapsule, CapsuleDivider, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, FloatingNavigationCapsule, NavigationBackdrop, NavigationLayoutContext, CapsuleDivider, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
@@ -147,8 +147,12 @@ export function AppShell(props: {
     }
     closeOverlay();
   }
-  // macOS reclaims the toolbar row: navigation and source float over the content in one glass capsule.
+  // macOS uses a glass navigation capsule above the page's content.
   const floatingNavigation = platform.os === "macos";
+  const navigationCapsuleHeight = signal(token("navigation-capsule-height"));
+  const navigationLayout = { inset: () => floatingNavigation
+    ? token("navigation-capsule-top") + navigationCapsuleHeight() + token("navigation-capsule-content-gap")
+    : 0 };
   const hasSources = () => !!pageSource.current()?.items().length;
   const navigationButtons = () => [
     <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
@@ -162,7 +166,8 @@ export function AppShell(props: {
     <SourceChip bare={bare} items={pageSource.current()!.items()} value={pageSource.current()!.value()}
       disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
   </If>;
-  return <PageSourceContext.Provider value={pageSource}><PageRefreshContext.Provider value={refresh}><ShellFrame>
+  return <PageSourceContext.Provider value={pageSource}><PageRefreshContext.Provider value={refresh}>
+    <NavigationLayoutContext.Provider value={navigationLayout}><ShellFrame>
     <ShellSidebar>
       <SidebarChrome />
       <SidebarSearch>
@@ -190,7 +195,7 @@ export function AppShell(props: {
         <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(binding("openSettings",shortcuts.settings))}`} onPress={showSettings} />
       </View>
     </ShellSidebar>
-    <WindowPanel bleedRight>
+    <WindowPanel bleedRight dock>
       <If when={!floatingNavigation}>
         <NavigationToolbar>
           {navigationButtons()}
@@ -198,7 +203,7 @@ export function AppShell(props: {
           {sourceChip(false)}
         </NavigationToolbar>
       </If>
-      <View class="flex-1 min-h-0" style={floatingNavigation ? { paddingTop: token("navigation-toolbar-inset") } : {}}>
+      <View class="flex-1 min-h-0" style={{ paddingTop: navigationLayout.inset() }}>
         {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
           <HomePage core={core()!} active={nav.current().kind==="home"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
@@ -248,7 +253,10 @@ export function AppShell(props: {
         </If>
       </View>
       <If when={floatingNavigation}>
-        <FloatingNavigationCapsule>
+        <NavigationBackdrop height={navigationLayout.inset()} />
+        {/* The capsule is left-anchored and the buttons come first, so they keep their place
+            whether or not a page shows a source chip. */}
+        <FloatingNavigationCapsule onHeightChange={height => { if (height > 0) navigationCapsuleHeight.set(height); }}>
           {navigationButtons()}
           <If when={hasSources()}><CapsuleDivider /></If>
           {sourceChip(true)}
@@ -279,5 +287,5 @@ export function AppShell(props: {
         { id: "settings", label: "打开设置…", group: "应用", shortcut: binding("openSettings",shortcuts.settings) },
         ...modes.map((mode) => ({ id: `mode:${mode.id}`, label: `外观：${mode.label}`, group: "外观", checked: appearance.mode() === mode.id })),
       ]} />
-  </ShellFrame></PageRefreshContext.Provider></PageSourceContext.Provider>;
+  </ShellFrame></NavigationLayoutContext.Provider></PageRefreshContext.Provider></PageSourceContext.Provider>;
 }

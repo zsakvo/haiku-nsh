@@ -22,7 +22,7 @@ pub struct SeekBarProps {
     /// Place elapsed and duration labels beside the track instead of below it.
     #[prop(default)]
     pub inline_times: Prop<bool>,
-    /// Reference immersive progress geometry without time labels.
+    /// Reference immersive progress geometry.
     #[prop(default)]
     pub immersive: Prop<bool>,
 }
@@ -85,7 +85,7 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
                 .items_center()
                 .gap_2()
                 .child(when(
-                    move || props.inline_times.get() && !props.immersive.get(),
+                    move || props.inline_times.get(),
                     move || {
                         text(move || time(preview.get().unwrap_or(props.position.get())))
                             .test_id("seek-time")
@@ -238,7 +238,7 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
                         ),
                 )
                 .child(when(
-                    move || props.inline_times.get() && !props.immersive.get(),
+                    move || props.inline_times.get(),
                     move || {
                         text(move || time(props.duration.get()))
                             .test_id("seek-duration")
@@ -251,7 +251,7 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
                 )),
         )
         .child(when(
-            move || !props.inline_times.get() && !props.immersive.get(),
+            move || !props.inline_times.get(),
             move || {
                 view()
                     .flex_row()

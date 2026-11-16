@@ -8,9 +8,11 @@ import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { DetailHeader, DetailAction } from "../ui/DetailHeader";
 import { usePageRefresh } from "../shell/pageRefresh";
+import { NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
 /** One retained page per EntityRef. Resources reject stale loads; pagination also checks its epoch. */
 export function SourceDetailPage(props: { core: Core; reference: string; active: boolean; navigate: (route: Route) => void }) {
+  const isPlaylist = () => JSON.parse(props.reference)[1] === "playlist";
   const tracks = signal<any[]>([]), albums = signal<any[]>([]);
   const next = signal<string | null>(null), albumNext = signal<string | null>(null);
   const info = signal<any>(null), canFavorite = signal(false), expanded = signal(false);
@@ -106,11 +108,11 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   }
   return <View testID="page-source-detail" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail
-      header={<View class="gap-2">
+    <NavigationScrollArea><SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail
+      header={<NavigationScrollHeader class="gap-2">
         <If when={first.loading() && !info()}>
-          <View accessibilityLabel="正在加载详情" class="flex-row gap-6 pb-2">
-            <View class="size-(--detail-cover-size) rounded-(--detail-cover-radius) bg-muted" />
+          <View accessibilityLabel="正在加载详情" class={`flex-row gap-6 pb-2 ${isPlaylist() ? "pt-(--playlist-detail-top-gap)" : ""}`}>
+            <View class={`rounded-(--detail-cover-radius) bg-muted shrink-0 ${isPlaylist() ? "size-(--playlist-detail-cover-size)" : "size-(--detail-cover-size)"}`} />
             <View class="flex-1 gap-3"><View class="h-6 w-64 bg-muted rounded-(--radius)" /><View class="h-4 w-48 bg-muted rounded-(--radius)" /></View>
           </View>
         </If>
@@ -119,12 +121,12 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
           <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />
         </If>
         <If when={!!info()}>
-          <DetailHeader title={info().title} cover={info().cover} description={info().description}
+          <DetailHeader playlist={isPlaylist()} title={info().title} cover={info().cover} description={info().description}
             metadata={[info().creator || info().subtitle || (info().artists ?? []).map((a:any)=>typeof a==="string"?a:a.name).join(" / "),
               info().track_count != null ? `${info().track_count} 首` : null, info().year].filter(Boolean).join(" · ")}>
-            <DetailAction label="播放全部" icon="play" primary disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
+            <DetailAction label="播放全部" icon="play" primary pill={isPlaylist()} disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
             <If when={info().reference?.kind !== "artist"}>
-              <DetailAction label="下载全部" icon="download" disabled={busy()} onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
+              <DetailAction label="下载全部" icon="download" pill={isPlaylist()} disabled={busy()} onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
             </If>
             <Menu trigger={<Button label="…" accessibilityLabel="更多歌单操作" variant="ghost" size="sm" onPress={()=>{}} />}>
               <MenuItem disabled={!tracks().length || busy()} onSelect={() => void act(() => play(true))}><Text>随机播放</Text></MenuItem>
@@ -141,11 +143,11 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
             <Text class="text-sm font-semibold text-foreground">热门曲目</Text>
           </If>
         </If>
-      </View>}
+      </NavigationScrollHeader>}
       footer={<View class="py-3 flex-row gap-3 items-center">
         <If when={!!info()}><Text class="text-xs text-muted-foreground">{`已加载 ${tracks().length} 首`}</Text></If>
         <If when={!!next()}><Button label="加载更多曲目" size="sm" loading={busy()} onPress={() => void act(() => more("tracks"))} /></If>
-      </View>} />
+      </View>} /></NavigationScrollArea>
     <Dialog open={expanded()} onOpenChange={e=>{if(!e.open)expanded.set(false);}} class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">歌单简介</Text>
       <Text class="text-sm text-muted-foreground">{info()?.description}</Text>

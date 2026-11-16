@@ -8,6 +8,40 @@ use std::{cell::RefCell, collections::BTreeMap, rc::Rc, sync::Arc};
 
 pub struct SourceResolver(pub Arc<Host>);
 impl TrackResolver for SourceResolver {
+    fn metadata(&self, mut track: Track) -> BoxFuture<'_, Track> {
+        Box::pin(async move {
+            if track.local_path.is_some()
+                || track.duration.is_some_and(|d| d.is_finite() && d > 0.)
+            {
+                return track;
+            }
+            let Ok(source) = self.0.source(&track.source) else {
+                return track;
+            };
+            if !source.descriptor().capabilities.iter().any(|c| c == "track.get") {
+                return track;
+            }
+            struct CancelOnDrop(haiku_plugins::Cancellation);
+            impl Drop for CancelOnDrop {
+                fn drop(&mut self) {
+                    self.0.cancel();
+                }
+            }
+            let cancel = CancelOnDrop(Default::default());
+            let api = SourceApi::new(source);
+            if let Ok(Ok(detail)) = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                api.track(&track.id, Some(&cancel.0)),
+            )
+            .await
+            {
+                if detail.entity_ref() == track.entity_ref() {
+                    track.duration = detail.duration.filter(|d| d.is_finite() && *d > 0.);
+                }
+            }
+            track
+        })
+    }
     fn candidates(
         &self,
         track: Track,

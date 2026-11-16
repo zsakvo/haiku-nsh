@@ -4,12 +4,106 @@ use haiku_lyrics::{LyricLine, Lyrics};
 use haiku_macos::karaoke::Clock;
 use nsh_base::{button, theme};
 use nsh_core::prelude::*;
+use nsh_core::time::{Instant, now};
 use serde_json::json;
-use std::{
-    rc::Rc,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::BTreeMap, rc::Rc, sync::Arc, time::Duration};
+
+/// One page-owned animation; recycled rows only register their measured geometry.
+#[derive(Clone, Copy)]
+struct LyricScroll {
+    list: ElementRef,
+    owner: Owner,
+    rows: Stored<BTreeMap<u64, (Position, ElementRef)>>,
+    next_row: Stored<u64>,
+    task: Stored<Option<Spawned<()>>>,
+    active: Stored<bool>,
+    quiet_until: Stored<Instant>,
+}
+
+impl LyricScroll {
+    fn new(list: ElementRef) -> Self {
+        Self {
+            list,
+            owner: Owner::current(),
+            rows: stored(BTreeMap::new()),
+            next_row: stored(0),
+            task: stored(None),
+            active: stored(false),
+            quiet_until: stored(now()),
+        }
+    }
+
+    fn row(self, at: Position) -> ElementRef {
+        let row = element_ref();
+        let id = self.next_row.get();
+        self.next_row.replace(id + 1);
+        self.rows.with(|rows| rows.insert(id, (at, row)));
+        cleanup(move || {
+            self.rows.with(|rows| rows.remove(&id));
+        });
+        row
+    }
+
+    fn cancel(self) {
+        if let Some(task) = self.task.replace(None) {
+            task.cancel();
+        }
+        self.active.replace(false);
+        self.quiet_until.replace(now());
+    }
+
+    fn is_programmatic(self) -> bool {
+        self.active.get() || now() < self.quiet_until.get()
+    }
+
+    fn locate(self, index: usize) {
+        self.cancel();
+        self.active.replace(true);
+        let task = self.owner.run(|| {
+            spawn(async move {
+                // Seeking swaps the active text renderer. Measure after its layout settles.
+                next_frame().await;
+                next_frame().await;
+                let row = self
+                    .rows
+                    .with(|rows| rows.values().find(|(at, _)| at.index() == index).copied());
+                let geometry = if let Some((at, row)) = row {
+                    let (viewport, row) = futures::join!(self.list.measure(), row.measure());
+                    viewport.zip(row).filter(|_| at.index() == index)
+                } else {
+                    None
+                };
+                if let Some((viewport, row)) = geometry.filter(|_| !reduce_motion()) {
+                    let from = row.page.y.0 - viewport.page.y.0;
+                    let to = (viewport.frame.size.height.0 - row.frame.size.height.0) * 0.5;
+                    let started = now();
+                    loop {
+                        let t = (now().duration_since(started).as_secs_f32() / 0.48).min(1.);
+                        let eased = t * t * t * (t * (t * 6. - 15.) + 10.);
+                        // Preserve the row's current visible position on the first frame.
+                        // Each frame has one concrete offset, with no competing native tween.
+                        self.list.scroll_to_index(
+                            index as u32,
+                            percentage(0.),
+                            px(from + (to - from) * eased),
+                            false,
+                        );
+                        if t >= 1. {
+                            break;
+                        }
+                        next_frame().await;
+                    }
+                } else {
+                    self.list
+                        .scroll_to_index(index as u32, percentage(0.5), px(0.), false);
+                }
+                self.quiet_until.replace(now() + Duration::from_millis(80));
+                self.active.replace(false);
+            })
+        });
+        self.task.replace(Some(task));
+    }
+}
 
 fn line(lyrics: Signal<Arc<Lyrics>>, at: Position) -> Option<LyricLine> {
     lyrics.with(|l| l.lines.get(at.index()).cloned())
@@ -49,14 +143,10 @@ fn player_font() -> SharedString {
     });
     configured
         .unwrap_or_else(|| {
-            if cfg!(target_os = "macos") {
-                "Songti SC".into()
-            } else {
-                tokens()
-                    .font("font-sans")
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "system-ui".into())
-            }
+            tokens()
+                .font("font-sans")
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "system-ui".into())
         })
         .into()
 }
@@ -138,7 +228,7 @@ fn karaoke_line(p: Rc<Presentation>, at: Position) -> impl IntoElement {
         },
     ))
 }
-/// Virtual lyrics follow the cursor except during a four-second user browsing interval.
+/// Virtual lyrics resume following on the first line change after manual scrolling stops.
 pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
     let lyrics = p.lyrics;
     let current = p.line;
@@ -157,44 +247,50 @@ pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
     );
     let native = haiku_macos::karaoke::available();
     let list = element_ref();
-    let deadline = stored(Instant::now());
-    let programmatic_until = stored(Instant::now());
+    let scroll = LyricScroll::new(list);
+    let scrolling_until = stored(now());
+    let dragging = stored(false);
     let last_follow = stored(None::<usize>);
-    let follow = move || {
-        if Instant::now() < deadline.get() {
-            return;
-        }
-        if let Some(at) = current.get_untracked() {
-            if last_follow.get() != Some(at) {
-                last_follow.replace(Some(at));
-                programmatic_until.replace(Instant::now() + Duration::from_millis(200));
-                list.scroll_to_index(at as u32, percentage(0.5), px(0.), false);
-            }
-        }
-    };
+    let pending_seek = stored(None::<(u64, usize)>);
+    let seek_revision = stored(0_u64);
+    let previous_lyrics = stored(lyrics.get_untracked());
     effect(move || {
         current.get();
-        lyrics.get();
-        follow();
-    });
-    spawn(async move {
-        loop {
-            timer(Duration::from_millis(250)).await;
-            follow();
+        let content = lyrics.get();
+        if !Arc::ptr_eq(&previous_lyrics.get(), &content) {
+            previous_lyrics.replace(content);
+            scroll.cancel();
+            pending_seek.replace(None);
+            last_follow.replace(None);
+        }
+        if pending_seek.get().is_none() && !dragging.get() && now() >= scrolling_until.get() {
+            if let Some(at) = current.get_untracked() {
+                if last_follow.get() != Some(at) {
+                    last_follow.replace(Some(at));
+                    scroll.locate(at);
+                }
+            }
         }
     });
+    let browse = move || {
+        scroll.cancel();
+        pending_seek.replace(None);
+        scrolling_until.replace(now() + Duration::from_millis(260));
+        last_follow.replace(None);
+    };
     let controller = p.bridge.controller.clone();
-    view().flex_1().min_h_0()
+    view().relative().flex_1().min_h_0()
         .child(virtual_list(
             move ||lyrics.with(|l| l.lines.len()),
             move |at| {
                 let c = controller.clone();
                 let p = p.clone();
-                button()
+                let row = scroll.row(at);
+                view().element_ref(&row).child(button()
                     .accessibility_label(move ||Some(line(lyrics,at).map(|l|l.text).unwrap_or_default().into()))
                     .disabled(move ||!lyrics.with(|l| l.synced))
 
-                    .py(px(10.)).justify_center().gap(px(6.))
+                    .px_3().py(px(10.)).justify_center().gap(px(6.))
                     .app_class("rounded-(--radius) hover:bg-now-playing-surface active:opacity-80 focus-visible:outline-2 focus-visible:outline-lyric-active")
                     .opacity(move || {
                         if !lyrics.with(|l| l.synced) { return 1_f32; }
@@ -206,40 +302,70 @@ pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
                     })
                     .on_press(move || if let Some(l) = line(lyrics,at) {
                         let c = c.clone();
-                        spawn(async move { if let Err(e) = c.execute(haiku_playback::Command::Seek(l.at)).await { log::error!("lyric seek: {e}"); } });
+                        let target = at.index();
+                        let request = seek_revision.get().wrapping_add(1);
+                        seek_revision.replace(request);
+                        pending_seek.replace(Some((request, target)));
+                        scroll.cancel();
+                        dragging.replace(false);
+                        scroll.owner.run(|| spawn(async move {
+                            let result = c.execute(haiku_playback::Command::Seek(l.at)).await;
+                            if pending_seek.get() != Some((request, target)) {
+                                return;
+                            }
+                            pending_seek.replace(None);
+                            match result {
+                                Ok(()) => {
+                                    scrolling_until.replace(now());
+                                    last_follow.replace(Some(target));
+                                    scroll.locate(target);
+                                }
+                                Err(e) => log::error!("lyric seek: {e}"),
+                            }
+                        }));
                     })
-                    .child(when(move ||current.get() == Some(at.index()) && line(lyrics,at).is_some_and(|l|!l.words.is_empty()), move || {
-                        let p = p.clone();
-                        view().w_full()
-                            .child(when(move ||native, move ||native_line(
-                                move ||json!(line(lyrics,at).map(|l|l.words).unwrap_or_default()), clock)))
-                            .child(when(move ||!native, move ||karaoke_line(p.clone(),at)))
-                    }))
-                    .child(when(move ||current.get() != Some(at.index()) || line(lyrics,at).is_none_or(|l|l.words.is_empty()), move || {
-                        text(move ||line(lyrics,at).map(|l|l.text).unwrap_or_default())
+                    // Keep the text's layout while the current row gains its native overlay.
+                    .child(view().relative().w_full()
+                        .child(text(move ||line(lyrics,at).map(|l|l.text).unwrap_or_default())
                             .text_size(px(24.)).font_family(player_font).line_height(nsh_core::LineHeight::Multiple(1.4)).font_weight(FontWeight::MEDIUM)
+                            .opacity(move || if current.get() == Some(at.index()) && line(lyrics,at).is_some_and(|l|!l.words.is_empty()) {0_f32} else {1_f32})
                             .text_color(move ||theme().color(if current.get() == Some(at.index()) {"lyric-active"} else {"lyric-inactive"}).unwrap())
-                    }))
+                        )
+                        .child(when(move ||current.get() == Some(at.index()) && line(lyrics,at).is_some_and(|l|!l.words.is_empty()), move || {
+                            let p = p.clone();
+                            view().absolute().inset_0().pointer_events(nsh_core::PointerEvents::None)
+                                .child(when(move ||native, move ||native_line(
+                                    move ||json!(line(lyrics,at).map(|l|l.words).unwrap_or_default()), clock)))
+                                .child(when(move ||!native, move ||karaoke_line(p.clone(),at)))
+                        }))
+                    )
                     .child(when(move || line(lyrics,at).and_then(|l|l.translation).is_some_and(|s|!s.is_empty()), move ||
                         text(move ||line(lyrics,at).and_then(|l|l.translation).unwrap_or_default())
                             .text_size(px(19.)).font_family(player_font)
-                            .text_color(move ||theme().color(if current.get() == Some(at.index()) {"lyric-active"} else {"now-playing-muted"}).unwrap())))
+                            .text_color(move ||theme().color(if current.get() == Some(at.index()) {"lyric-active"} else {"now-playing-muted"}).unwrap()))))
             })
+            .test_id("lyrics-list")
+            .scrollbar(false)
             .estimated_item_size(px(90.))
             .element_ref(&list).flex_1().min_h_0()
-            .on_touch(move |event: &nsh_core::TouchEvent| if matches!(event.phase,nsh_core::TouchPhase::Move) {
-                deadline.replace(Instant::now()+Duration::from_secs(4)); last_follow.replace(None);
+            .on_wheel(move |_: &nsh_core::WheelEvent| browse())
+            .on_scroll_drag_start(move |_: &Point<Points>| {
+                dragging.replace(true);
+                browse();
+            })
+            .on_scroll_drag_end(move |_: &Point<Points>| {
+                dragging.replace(false);
+                scrolling_until.replace(now() + Duration::from_millis(260));
+            })
+            .on_scroll_end(move |_: &Point<Points>| {
+                dragging.replace(false);
+                scrolling_until.replace(now());
             })
             .on_scroll(move |_: &ScrollEvent| {
-                // A native wheel/trackpad scroll has no primary touch sequence.
-                // Ignore only the immediate event from our nonanimated follow.
-                if Instant::now() >= programmatic_until.get() {
-                    deadline.replace(Instant::now()+Duration::from_secs(4));
-                    last_follow.replace(None);
+                // Keep browsing active through momentum; ignore our own positioning.
+                if !scroll.is_programmatic() {
+                    browse();
                 }
-            })
-            .on_mouse_move(move |e: &nsh_core::MouseEvent| if e.pressed_button.is_some() {
-                deadline.replace(Instant::now()+Duration::from_secs(4)); last_follow.replace(None);
             })
             .empty(text("暂无本地歌词").text_sm().p_6().text_color(move ||theme().color("now-playing-muted").unwrap())))
 }
@@ -248,6 +374,125 @@ pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[component]
+    fn ScrollFixture() -> impl IntoElement {
+        let list = element_ref();
+        let scroll = LyricScroll::new(list);
+        view()
+            .w(px(400.))
+            .h(px(500.))
+            .child(
+                button()
+                    .accessibility_label("browse")
+                    .child(text("browse"))
+                    .on_press(move || {
+                        scroll.cancel();
+                        list.scroll_to_index(5, percentage(0.), px(0.), false);
+                    }),
+            )
+            .child(
+                button()
+                    .accessibility_label("locate")
+                    .child(text("locate"))
+                    .on_press(move || scroll.locate(8)),
+            )
+            .child(
+                button()
+                    .accessibility_label("interrupt")
+                    .child(text("interrupt"))
+                    .on_press(move || {
+                        scroll.locate(8);
+                        set_timeout(Duration::from_millis(180), move || {
+                            scroll.cancel();
+                            list.scroll_to_index(5, percentage(0.), px(0.), false);
+                        });
+                    }),
+            )
+            .child(
+                virtual_list(
+                    || 30_usize,
+                    move |at| {
+                        let row = scroll.row(at);
+                        view()
+                            .element_ref(&row)
+                            .h(move || px(if at.index() % 2 == 0 { 60. } else { 90. }))
+                            .child(text(move || format!("row {}", at.index())))
+                    },
+                )
+                .element_ref(&list)
+                .h(px(300.))
+                .flex_shrink_0()
+                .estimated_item_size(px(75.)),
+            )
+    }
+
+    #[test]
+    fn lyric_scroll_emits_intermediate_positions_and_stops_when_interrupted() {
+        use nsh_core::{Command, MountItem};
+        use nsh_engine::{EngineConfig, Root};
+        use nsh_testing::Headless;
+        let samples = Arc::new(Mutex::new(Vec::<(f32, bool)>::new()));
+        let output = samples.clone();
+        let mut app = Headless::start(EngineConfig::new(Root::of::<ScrollFixture>())).unwrap();
+        app.observe(move |_, batch| {
+            for item in &batch.items {
+                if let MountItem::Command {
+                    command: Command::ScrollTo { y, animated, .. },
+                    ..
+                } = item
+                {
+                    output.lock().unwrap().push((y.0, *animated));
+                }
+            }
+        });
+        app.wait_for("browse").unwrap();
+        app.press("browse").unwrap();
+        app.wait(Duration::from_millis(80)).unwrap();
+        samples.lock().unwrap().clear();
+        app.press("locate").unwrap();
+        app.wait(Duration::from_millis(80)).unwrap();
+        let frames = samples.lock().unwrap().clone();
+        assert!(
+            frames.len() > 8,
+            "positioning needs actual intermediate frames: {frames:?}"
+        );
+        assert!(frames.iter().all(|(_, animated)| !animated));
+        let first = frames.first().unwrap().0;
+        let last = frames.last().unwrap().0;
+        let middle = frames[frames.len() / 2].0;
+        assert!(
+            (first - 360.).abs() < 1.,
+            "first frame must keep the browsed position: {first}"
+        );
+        assert!(
+            first < middle && middle < last,
+            "{first} < {middle} < {last}"
+        );
+        assert!(
+            frames.windows(2).all(|w| w[0].0 <= w[1].0 + 0.5),
+            "{frames:?}"
+        );
+        assert!(
+            (last - 480.).abs() < 1.,
+            "variable-height target must finish centered: {last}"
+        );
+
+        app.press("browse").unwrap();
+        app.wait(Duration::from_millis(80)).unwrap();
+        samples.lock().unwrap().clear();
+        app.press("interrupt").unwrap();
+        app.wait(Duration::from_millis(40)).unwrap();
+        let stopped = samples.lock().unwrap().len();
+        assert!(stopped > 3, "interrupt must occur after animation started");
+        assert!((samples.lock().unwrap().last().unwrap().0 - 360.).abs() < 1.);
+        app.wait(Duration::from_millis(600)).unwrap();
+        assert_eq!(
+            samples.lock().unwrap().len(),
+            stopped,
+            "cancelled frames must not scroll back"
+        );
+    }
 
     #[component]
     fn ClockFixture() -> impl IntoElement {

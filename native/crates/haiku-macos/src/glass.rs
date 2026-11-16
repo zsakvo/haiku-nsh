@@ -28,6 +28,11 @@ impl NativeComponent for GlassSurface {
             };
             let appearance = NSAppearance::appearanceNamed(name);
             self.0.setAppearance(appearance.as_deref());
+        } else if name == "material" {
+            self.0.setMaterial(match value.and_then(|v| v.as_str()) {
+                Some("header") => NSVisualEffectMaterial::HeaderView,
+                _ => NSVisualEffectMaterial::Popover,
+            });
         } else if name == "radius" {
             use objc::{msg_send, sel, sel_impl};
             unsafe {

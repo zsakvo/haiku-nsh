@@ -108,6 +108,7 @@ struct Request {
     reply: oneshot::Sender<Result<(), Error>>,
 }
 enum Completion {
+    Metadata(u64, Track),
     Radio(u64, Result<Vec<Track>, Error>),
     Open(u64, Result<(), Error>),
     Prepare(u64, Result<(), Error>),
@@ -495,18 +496,15 @@ impl Actor {
         let backend = self.backend.clone();
         let resolver = self.resolver.clone();
         let completed = self.completed.clone();
-        let open = self.addresses.open(
-            backend,
-            resolver,
-            self.clock.clone(),
-            track,
-            self.backend.configuration().audio_quality,
-            generation,
-            false,
-            position,
-        );
+        let addresses = self.addresses.clone();
+        let clock = self.clock.clone();
+        let quality = self.backend.configuration().audio_quality;
         self.open_task = Some(tokio::spawn(async move {
-            let result = open.await;
+            let track = resolver.metadata(track).await;
+            let _ = completed.send(Completion::Metadata(generation, track.clone()));
+            let result = addresses
+                .open(backend, resolver, clock, track, quality, generation, false, position)
+                .await;
             let _ = completed.send(Completion::Open(generation, result));
         }));
     }
@@ -529,18 +527,15 @@ impl Actor {
         let backend = self.backend.clone();
         let resolver = self.resolver.clone();
         let completed = self.completed.clone();
-        let open = self.addresses.open(
-            backend,
-            resolver,
-            self.clock.clone(),
-            track,
-            self.backend.configuration().audio_quality,
-            generation,
-            true,
-            0.,
-        );
+        let addresses = self.addresses.clone();
+        let clock = self.clock.clone();
+        let quality = self.backend.configuration().audio_quality;
         self.prepare_task = Some(tokio::spawn(async move {
-            let result = open.await;
+            let track = resolver.metadata(track).await;
+            let _ = completed.send(Completion::Metadata(generation, track.clone()));
+            let result = addresses
+                .open(backend, resolver, clock, track, quality, generation, true, 0.)
+                .await;
             let _ = completed.send(Completion::Prepare(generation, result));
         }));
     }
@@ -707,6 +702,22 @@ impl Actor {
     }
     fn completion(&mut self, done: Completion) {
         match done {
+            Completion::Metadata(generation, track) => {
+                let index = if generation == self.state.generation {
+                    Some(self.queue.index)
+                } else {
+                    self.prepared.as_ref()
+                        .filter(|p| p.generation == generation)
+                        .map(|p| p.index)
+                };
+                if let Some(selected) = index.and_then(|i| self.queue.tracks.get_mut(i as usize)) {
+                    if selected.entity_ref() == track.entity_ref() && *selected != track {
+                        *selected = track;
+                        self.publish(true);
+                        self.dirty = true;
+                    }
+                }
+            }
             Completion::Radio(token,result)=>self.radio_completion(token,result),
             Completion::Open(generation, result)
                 if generation == self.state.generation && self.state.status == Status::Loading =>

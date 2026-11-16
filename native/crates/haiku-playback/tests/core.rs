@@ -224,12 +224,15 @@ struct Harness {
 }
 impl Harness {
     fn new(path: Option<PathBuf>) -> Self {
+        Self::with_resolver(path, Arc::new(Resolver))
+    }
+    fn with_resolver(path: Option<PathBuf>, resolver: Arc<dyn TrackResolver>) -> Self {
         let audio = Arc::new(Fake::default());
         let clock = Arc::new(FakeClock::default());
         let (events, rx) = mpsc::unbounded_channel();
         *audio.events.lock().unwrap() = Some(events.clone());
         let player =
-            Controller::start(audio.clone(), Arc::new(Resolver), clock.clone(), rx, path).unwrap();
+            Controller::start(audio.clone(), resolver, clock.clone(), rx, path).unwrap();
         Self {
             player,
             audio,
@@ -272,6 +275,39 @@ impl Drop for Harness {
     fn drop(&mut self) {
         self.player.shutdown();
     }
+}
+
+struct DetailedResolver;
+impl TrackResolver for DetailedResolver {
+    fn metadata(&self, mut track: Track) -> BoxFuture<'_, Track> {
+        Box::pin(async move {
+            tokio::task::yield_now().await;
+            track.duration = Some(if track.id == "/0.flac" { 120. } else { 240. });
+            track
+        })
+    }
+    fn resolve(&self, track: Track) -> BoxFuture<'_, Result<PathBuf, Error>> {
+        Resolver.resolve(track)
+    }
+}
+
+#[tokio::test]
+async fn sparse_track_duration_reaches_current_queue_seek_and_gapless_successor() {
+    let h = Harness::with_resolver(None, Arc::new(DetailedResolver));
+    h.play(2).await;
+    let state = h.state(|s| s.tracks[1].duration == Some(240.)).await;
+    assert_eq!(state.current.as_ref().unwrap().duration, Some(120.));
+    assert_eq!(state.tracks[0].duration, Some(120.));
+    h.command(Command::Seek(999.)).await;
+    assert_eq!(h.player.progress().position, 120.);
+
+    // Seeking invalidates and re-arms the prepared stream.
+    h.settle().await;
+    let generation = h.audio.calls.lock().unwrap().iter().rev()
+        .find(|(method, _)| method == "prepare:/1.flac").unwrap().1;
+    h.emit(generation, AudioEventKind::TrackChanged);
+    let next = h.state(|s| s.index == 1).await;
+    assert_eq!(next.current.unwrap().duration, Some(240.));
 }
 
 #[tokio::test]
