@@ -22,6 +22,7 @@ mod now_playing_controls;
 mod platform;
 mod player_controls;
 mod player_dock;
+mod player_popovers;
 mod player_theme;
 mod plugins;
 mod sources;
@@ -48,6 +49,7 @@ pub use track_list::TrackList;
 fn native_views(components: &nsh_platform_macos::Components) {
     haiku_macos::glass::register(components);
     haiku_macos::karaoke::register(components);
+    haiku_macos::player_popover::register(components);
 }
 
 /// The native API imported by the TSX entry.

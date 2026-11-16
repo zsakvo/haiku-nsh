@@ -1,4 +1,4 @@
-import { cleanup, effect, keymap, signal, Text, token, View } from "nsh";
+import { cleanup, effect, keymap, platform, signal, Text, token, View } from "nsh";
 import { currentWindow, Menu as DesktopMenu } from "nsh/desktop";
 import { Scrollbar } from "nsh/base";
 import { Core, PluginService, PlayerDock, NowPlaying } from "haiku/native";
@@ -6,7 +6,7 @@ import { createAppearance, modes, type AppearanceMode } from "../ui/theme";
 import { SidebarItem, SectionLabel } from "../ui/Navigation";
 import { IconButton } from "../ui/IconButton";
 import { CommandTrigger } from "../ui/SearchField";
-import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, WindowPanel } from "../ui/Chrome";
+import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, NavigationToolbar, FloatingNavigationCapsule, CapsuleDivider, WindowPanel } from "../ui/Chrome";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
@@ -147,6 +147,21 @@ export function AppShell(props: {
     }
     closeOverlay();
   }
+  // macOS reclaims the toolbar row: navigation and source float over the content in one glass capsule.
+  const floatingNavigation = platform.os === "macos";
+  const hasSources = () => !!pageSource.current()?.items().length;
+  const navigationButtons = () => [
+    <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
+      disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />,
+    <IconButton navigation testID="nav-forward" icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
+      disabled={!nav.canForward() || navigationBlocked()} onPress={goForward} />,
+    <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}
+      disabled={!canRefresh()} onPress={refreshPage} />,
+  ];
+  const sourceChip = (bare: boolean) => <If when={hasSources()}>
+    <SourceChip bare={bare} items={pageSource.current()!.items()} value={pageSource.current()!.value()}
+      disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
+  </If>;
   return <PageSourceContext.Provider value={pageSource}><PageRefreshContext.Provider value={refresh}><ShellFrame>
     <ShellSidebar>
       <SidebarChrome />
@@ -175,21 +190,15 @@ export function AppShell(props: {
         <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(binding("openSettings",shortcuts.settings))}`} onPress={showSettings} />
       </View>
     </ShellSidebar>
-    <WindowPanel>
-      <NavigationToolbar>
-        <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
-          disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />
-        <IconButton navigation testID="nav-forward" icon="right" label="前进" hint={`前进 · ${keymap.label(binding("navigateForward",shortcuts.forward))}`}
-          disabled={!nav.canForward() || navigationBlocked()} onPress={goForward} />
-        <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}
-          disabled={!canRefresh()} onPress={refreshPage} />
-        <View class="flex-1" />
-        <If when={!!pageSource.current()?.items().length}>
-          <SourceChip items={pageSource.current()!.items()} value={pageSource.current()!.value()}
-            disabled={navigationBlocked()} onChange={(value)=>pageSource.current()?.select(value)} />
-        </If>
-      </NavigationToolbar>
-      <View class="flex-1 min-h-0">
+    <WindowPanel bleedRight>
+      <If when={!floatingNavigation}>
+        <NavigationToolbar>
+          {navigationButtons()}
+          <View class="flex-1" />
+          {sourceChip(false)}
+        </NavigationToolbar>
+      </If>
+      <View class="flex-1 min-h-0" style={floatingNavigation ? { paddingTop: token("navigation-toolbar-inset") } : {}}>
         {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
           <HomePage core={core()!} active={nav.current().kind==="home"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
@@ -238,6 +247,13 @@ export function AppShell(props: {
           <Text class="px-5 text-sm text-muted-foreground">{core.error() ? String(core.error()) : "正在加载曲库…"}</Text>
         </If>
       </View>
+      <If when={floatingNavigation}>
+        <FloatingNavigationCapsule>
+          {navigationButtons()}
+          <If when={hasSources()}><CapsuleDivider /></If>
+          {sourceChip(true)}
+        </FloatingNavigationCapsule>
+      </If>
     </WindowPanel>
     <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>

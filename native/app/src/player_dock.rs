@@ -1,13 +1,13 @@
 //! The only dock instance is mounted at the shell root; all commands go to Core.
 use crate::{
     player_controls::{
-        POPUP, compact_surface_control, control, hint, icon, surface_control, surface_icon,
+        compact_surface_control, hint, icon, surface_control, surface_icon,
     },
     presentation,
     seek_bar::seek_bar,
 };
 use haiku_playback::{Command, Mode, Status};
-use nsh_base::{SliderValue, popover, slider, theme};
+use nsh_base::theme;
 use nsh_core::prelude::*;
 
 #[derive(Default, Clone)]
@@ -70,8 +70,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     effect(move || cx.emit(PlayerDockEvent::LyricChange(line.get().map(|i| i as u32))));
     let c = p.bridge.controller.clone();
     let empty = move || state.with(|s| s.tracks.is_empty());
-    let volume_c = c.clone();
-    let queue_c = c.clone();
+    let (volume, queue) = crate::player_popovers::controls();
     let mode_c = c.clone();
     let previous_c = c.clone();
     let next_c = c.clone();
@@ -160,31 +159,6 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
                 .on_press(move ||send(&mode_c,Command::SetMode(match state.with_untracked(|s|s.mode) {
                     Mode::Sequential=>Mode::RepeatAll,Mode::RepeatAll=>Mode::RepeatOne,Mode::RepeatOne=>Mode::Shuffle,Mode::Shuffle=>Mode::Sequential,
                 }))))
-            .child(popover().placement(Placement::Top).popup_class(POPUP)
-                .trigger(compact_surface_control("音量","volume",false.into()))
-                .child(view().w_48().gap_3()
-                    .child(text("音量").text_sm().text_color(move ||theme().popover_foreground))
-                    .child(slider().min(0.).max(1.).step(0.01)
-                        .value(move ||Some(SliderValue::Single(state.with(|s|s.volume))))
-                        .accessibility_label("播放音量")
-                        .track_class("h-1 rounded-full bg-muted")
-                        .range_class("h-1 rounded-full bg-foreground")
-                        .indicator_class("h-1 bg-foreground")
-                        .thumb_class("size-3 rounded-full bg-foreground border border-border focus-visible:outline-2 focus-visible:outline-ring")
-                        .on_change(move |v: &SliderValue|send(&volume_c,Command::SetVolume(v.start()))))))
-            .child(popover().placement(Placement::Top).popup_class(POPUP)
-                .trigger(compact_surface_control("播放队列","queue",false.into()).disabled(empty))
-                .child(view().w_80().gap_2()
-                    .child(text("播放队列").text_sm().font_weight(FontWeight::SEMIBOLD).text_color(move ||theme().popover_foreground))
-                    .child(virtual_list(move ||state.with(|s|s.tracks.len()),move |at| {
-                        let jump_c=queue_c.clone(); let remove_c=queue_c.clone();
-                        view().flex_row().items_center().h_12().gap_2()
-                            .child(nsh_base::button().flex_1().min_w_0().h_full().px_2()
-                                .accessibility_label(move ||Some(state.with(|s|s.tracks.get(at.index()).map(|t|format!("播放 {}",t.title)).unwrap_or_default()).into()))
-                                .app_class("rounded-(--radius) hover:bg-accent active:bg-muted focus-visible:outline-2 focus-visible:outline-ring")
-                                .on_press(move ||send(&jump_c,Command::Jump(at.index() as i32)))
-                                .child(text(move ||state.with(|s|s.tracks.get(at.index()).map(|t|t.title.clone()).unwrap_or_default()))
-                                    .text_sm().truncate().text_color(move ||theme().popover_foreground)))
-                            .child(control("从队列移除","close",false).on_press(move ||send(&remove_c,Command::Remove(at.index() as i32))))
-                    }).estimated_item_size(px(48.)).h_64()))))
+            .child(volume)
+            .child(queue))
 }

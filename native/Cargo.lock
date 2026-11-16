@@ -2081,6 +2081,7 @@ dependencies = [
  "loro-internal",
  "nsh-platform-macos",
  "objc",
+ "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-core-text",

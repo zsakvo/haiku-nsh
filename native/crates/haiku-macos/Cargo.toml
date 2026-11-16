@@ -16,6 +16,7 @@ objc.workspace = true
 dispatch.workspace = true
 block.workspace = true
 nsh-platform-macos = "=0.5.1"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["NSPopover", "NSViewController", "NSScroller", "NSSlider", "NSSliderCell", "NSTableView", "NSTableColumn", "NSTableCellView", "NSTableHeaderView", "NSTableRowView", "NSImageView"] }
 block2 = "=0.6.2"
 objc2-foundation = { version = "=0.3.2", features = ["NSHTTPCookie"] }
 objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFAttributedString", "CFCGTypes"] }

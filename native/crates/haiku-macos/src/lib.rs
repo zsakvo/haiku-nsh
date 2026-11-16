@@ -9,6 +9,8 @@ pub mod events;
 #[cfg(target_os = "macos")]
 pub mod glass;
 #[cfg(target_os = "macos")]
+pub mod player_popover;
+#[cfg(target_os = "macos")]
 pub mod lifecycle;
 pub mod menubar;
 pub mod menubar_api;

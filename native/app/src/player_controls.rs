@@ -29,6 +29,7 @@ pub(crate) fn surface_icon(
         "settings" => include_str!("../../../assets/icons/settings.svg"),
         "desktop" => include_str!("../../../assets/icons/music-double-note.svg"),
         "close" => include_str!("../../../assets/icons/xmark.svg"),
+        "trash" => include_str!("../../../assets/icons/trash.svg"),
         "music" => include_str!("../../../assets/icons/music-double-note.svg"),
         _ => include_str!("../../../assets/icons/play.svg"),
     };
@@ -56,7 +57,10 @@ pub(crate) fn compact_surface_control(
     icon_name: &'static str,
     dark: Prop<bool>,
 ) -> ButtonElement {
-    sized_surface_control(label, icon_name, false, dark, true)
+    sized_surface_control(label, icon_name, false, dark, true, 32., 16.)
+}
+pub(crate) fn small_control(label: &'static str, icon_name: &'static str) -> ButtonElement {
+    sized_surface_control(label, icon_name, false, false.into(), false, 30., 18.)
 }
 pub(crate) fn surface_control(
     label: impl IntoReactive<SharedString>,
@@ -64,7 +68,15 @@ pub(crate) fn surface_control(
     primary: bool,
     dark: Prop<bool>,
 ) -> ButtonElement {
-    sized_surface_control(label, icon_name, primary, dark, false)
+    sized_surface_control(
+        label,
+        icon_name,
+        primary,
+        dark,
+        false,
+        if primary { 36. } else { 32. },
+        20.,
+    )
 }
 fn sized_surface_control(
     label: impl IntoReactive<SharedString>,
@@ -72,17 +84,13 @@ fn sized_surface_control(
     primary: bool,
     dark: Prop<bool>,
     compact: bool,
+    size: f32,
+    icon_size: f32,
 ) -> ButtonElement {
     let label = Prop::<SharedString>::from(label.into_reactive());
     button()
         .accessibility_label(move || Some(label.get()))
-        .size(px(if compact {
-            32.
-        } else if primary {
-            36.
-        } else {
-            32.
-        }))
+        .size(px(size))
         .rounded_full()
         .items_center()
         .justify_center()
@@ -109,9 +117,11 @@ fn sized_surface_control(
         .active(|s| s.opacity(0.65))
         .selected_style(|s| s.bg(move || theme().color("dock-on-dark-surface").unwrap()))
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
-        .child(view().tooltip(hint(move || label.get())).child(
-            surface_icon(icon_name, primary, dark).size(px(if compact { 16. } else { 20. })),
-        ))
+        .child(
+            view()
+                .tooltip(hint(move || label.get()))
+                .child(surface_icon(icon_name, primary, dark).size(px(icon_size))),
+        )
 }
 pub(crate) fn hint(label: impl IntoReactive<SharedString>) -> AnyElement {
     nsh_base::tooltip()
