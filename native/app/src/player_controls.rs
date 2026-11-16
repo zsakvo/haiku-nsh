@@ -77,7 +77,7 @@ fn sized_surface_control(
     button()
         .accessibility_label(move || Some(label.get()))
         .size(px(if compact {
-            26.
+            32.
         } else if primary {
             36.
         } else {
@@ -93,12 +93,24 @@ fn sized_surface_control(
                 theme().color("transparent").unwrap()
             }
         })
-        .hover(move |s| s.opacity(0.8))
+        .hover(move |s| {
+            if compact {
+                s.bg(move || {
+                    if dark.get() {
+                        theme().color("now-playing-surface").unwrap()
+                    } else {
+                        theme().color("dock-control-hover").unwrap()
+                    }
+                })
+            } else {
+                s.opacity(0.8)
+            }
+        })
         .active(|s| s.opacity(0.65))
         .selected_style(|s| s.bg(move || theme().color("dock-on-dark-surface").unwrap()))
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .child(view().tooltip(hint(move || label.get())).child(
-            surface_icon(icon_name, primary, dark).size(px(if compact { 14. } else { 20. })),
+            surface_icon(icon_name, primary, dark).size(px(if compact { 16. } else { 20. })),
         ))
 }
 pub(crate) fn hint(label: impl IntoReactive<SharedString>) -> AnyElement {
