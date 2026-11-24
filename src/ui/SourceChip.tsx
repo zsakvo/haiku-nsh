@@ -6,7 +6,7 @@ import { popupItem, popupSurface } from "./Surfaces";
 
 function SourceMark(props: { logo?: string; testID?: string }) {
   return <Image testID={props.testID} src={props.logo || "asset:/ui/icons/antenna.svg"}
-    class="size-3.5 shrink-0 rounded-sm" style={props.logo ? {} : {tintColor:token("foreground")}} />;
+    class="size-(--source-icon-size) shrink-0 rounded-sm" style={props.logo ? {} : {tintColor:token("foreground")}} />;
 }
 
 /** A compact source selector sharing the navigation toolbar's control height. */
@@ -19,7 +19,7 @@ export function SourceChip(props: {
     disabled={props.disabled} align="end" class="shrink-0 max-w-56"
     popupClass={`${popupSurface} min-w-40 p-1`} listClass="max-h-64" itemClass={`${popupItem} selected:bg-accent`}
     onChange={(event) => { if (event.value !== null) props.onChange(event.value); }}
-    trigger={<View class={`h-(--navigation-control-height) max-w-56 flex-row items-center gap-1.5 rounded-(--radius) px-1.5 hover:bg-accent active:bg-muted disabled:opacity-35 ${focus}`}>
+    trigger={<View class={`h-(--navigation-control-height) max-w-56 flex-row items-center gap-2 rounded-(--radius) px-2 hover:bg-accent active:bg-muted disabled:opacity-35 ${focus}`}>
       <SourceMark testID="source-chip-icon" logo={selected()?.logo} />
       <Text testID="source-chip-label" class="text-foreground" style={{numberOfLines:1,fontSize:token("source-label-size")}}>{selected()?.title ?? "选择来源"}</Text>
     </View>}

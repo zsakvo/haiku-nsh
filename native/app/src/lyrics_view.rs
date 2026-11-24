@@ -39,7 +39,7 @@ impl LyricScroll {
         self.next_row.replace(id + 1);
         self.rows.with(|rows| rows.insert(id, (at, row)));
         cleanup(move || {
-            self.rows.with(|rows| rows.remove(&id));
+            self.rows.try_with(|rows| rows.remove(&id));
         });
         row
     }
@@ -64,12 +64,20 @@ impl LyricScroll {
                 // Seeking swaps the active text renderer. Measure after its layout settles.
                 next_frame().await;
                 next_frame().await;
-                let row = self
-                    .rows
-                    .with(|rows| rows.values().find(|(at, _)| at.index() == index).copied());
-                let geometry = if let Some((at, row)) = row {
+                let row = self.rows.with(|rows| {
+                    rows.iter()
+                        .find(|(_, (at, _))| at.index() == index)
+                        .map(|(&id, (_, row))| (id, *row))
+                });
+                let geometry = if let Some((id, row)) = row {
                     let (viewport, row) = futures::join!(self.list.measure(), row.measure());
-                    viewport.zip(row).filter(|_| at.index() == index)
+                    viewport.zip(row).filter(|_| {
+                        self.rows
+                            .try_with(|rows| {
+                                rows.get(&id).is_some_and(|(at, _)| at.index() == index)
+                            })
+                            .unwrap_or(false)
+                    })
                 } else {
                     None
                 };
