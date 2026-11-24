@@ -69,7 +69,7 @@ export function navigationScroll(active: () => boolean) {
  * something scrolls beneath it: on macOS that content shows through a blur, and a hairline appears. */
 export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean }) {
   return <View testID="navigation-bar"
-    class={`${props.floating ? "absolute top-0 left-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) pt-(--navigation-bar-top) px-(--content-inset-left)`}
+    class={`${props.floating ? "absolute top-0 left-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) px-(--content-inset-left)`}
     style={{ height: token("navigation-bar-height"), ...(props.floating ? { right: token("panel-gap") } : { marginRight: token("panel-gap") }) }}
     desktop={{ windowDrag: true }}>
     <View class="absolute inset-0 rounded-t-(--radius-panel) overflow-hidden pointer-events-none">
