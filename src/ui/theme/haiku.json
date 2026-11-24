@@ -13,7 +13,7 @@
       "navigation-content-gap": "0.75rem",
       "navigation-search-width": "20rem",
       "source-icon-size": "1.125rem",
-      "source-label-size": "0.875rem",
+      "source-label-size": "0.7rem",
       "navigation-button-gap": "0.625rem",
       "navigation-icon-size": "1.125rem",
       "navigation-refresh-icon-size": "0.8125rem",
@@ -63,6 +63,8 @@
     "light": {
       "navigation-backdrop-tint": "#fcfbfad9",
       "navigation-backdrop-border": "#0000000d",
+      "source-chip-tint": "#ffffffb8",
+      "source-chip-border": "#00000018",
       "background": "#fcfbfa",
       "foreground": "#272522",
       "card": "#ffffff",
@@ -149,6 +151,8 @@
     "dark": {
       "navigation-backdrop-tint": "#1c1b1ad9",
       "navigation-backdrop-border": "#ffffff14",
+      "source-chip-tint": "#2b2825a6",
+      "source-chip-border": "#ffffff1f",
       "background": "#1c1b1a",
       "foreground": "#f2efeb",
       "card": "#242220",
