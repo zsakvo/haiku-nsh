@@ -61,8 +61,8 @@
       "dock-progress-width": "24rem"
     },
     "light": {
-      "navigation-backdrop-tint": "#fcfbfad9",
-      "navigation-backdrop-border": "#0000000d",
+      "navigation-backdrop-tint": "#fcfbfa9e",
+      "navigation-backdrop-border": "#00000012",
       "source-chip-tint": "#ffffffb8",
       "source-chip-border": "#00000018",
       "background": "#fcfbfa",
@@ -149,8 +149,8 @@
       "now-playing-progress-buffered": "#ffffff38"
     },
     "dark": {
-      "navigation-backdrop-tint": "#1c1b1ad9",
-      "navigation-backdrop-border": "#ffffff14",
+      "navigation-backdrop-tint": "#1c1b1aa8",
+      "navigation-backdrop-border": "#ffffff1a",
       "source-chip-tint": "#2b2825a6",
       "source-chip-border": "#ffffff1f",
       "background": "#1c1b1a",

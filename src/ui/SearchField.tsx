@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { Kbd } from "./Navigation";
 import { Tooltip } from "./Surfaces";
 import { focus } from "./Button";
+import { NavigationControlBackdrop } from "./Chrome";
 export function SearchField(props: { value: string; label: string; placeholder?: string; onChange: (value: string) => void; onSubmit?: () => void; autoFocus?: boolean; sidebar?: boolean }) {
   return <View class="min-h-(--compact-control-height) flex-row items-center gap-2 rounded-(--radius) border border-input bg-card px-2 py-1 focus-within:border-ring">
     <Icon name="search" small sidebar={props.sidebar} color="muted-foreground" />
@@ -16,7 +17,8 @@ export function SearchField(props: { value: string; label: string; placeholder?:
 export function CommandTrigger(props: { shortcut: string; onPress: () => void; class?: string }) {
   return <Button accessibilityLabel="打开命令面板" onPress={props.onPress}
     tooltip={<Tooltip label={`命令面板 · ${props.shortcut}`} />}
-    class={`h-(--navigation-control-height) min-w-(--command-entry-min-width) flex-row items-center gap-2 rounded-(--radius) border border-border bg-muted px-3 hover:bg-accent active:bg-muted ${focus} ${props.class ?? ""}`}>
+    class={`group relative h-(--navigation-control-height) min-w-(--command-entry-min-width) flex-row items-center gap-2 overflow-hidden rounded-(--radius) border border-source-chip-border px-3 ${focus} ${props.class ?? ""}`}>
+    <NavigationControlBackdrop />
     <Icon name="search" small color="muted-foreground" />
     <Text class="flex-1 text-sm text-muted-foreground" style={{ numberOfLines: 1 }}>搜索或前往…</Text><Kbd sidebar label={props.shortcut} />
   </Button>;

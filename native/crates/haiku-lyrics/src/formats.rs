@@ -155,7 +155,7 @@ pub fn parse_ttml(xml: &str) -> Lyrics {
                     .unwrap_or(at + offset),
                 text: text.trim().into(),
                 words,
-                translation: (!translation.trim().is_empty()).then(|| translation.trim().into()),
+                translation: crate::clean_translation(&translation),
             });
         }
     }

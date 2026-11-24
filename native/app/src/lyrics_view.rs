@@ -13,6 +13,7 @@ use std::{collections::BTreeMap, rc::Rc, sync::Arc, time::Duration};
 struct LyricScroll {
     list: ElementRef,
     owner: Owner,
+    window_centered: bool,
     rows: Stored<BTreeMap<u64, (Position, ElementRef)>>,
     next_row: Stored<u64>,
     task: Stored<Option<Spawned<()>>>,
@@ -21,10 +22,11 @@ struct LyricScroll {
 }
 
 impl LyricScroll {
-    fn new(list: ElementRef) -> Self {
+    fn new(list: ElementRef, window_centered: bool) -> Self {
         Self {
             list,
             owner: Owner::current(),
+            window_centered,
             rows: stored(BTreeMap::new()),
             next_row: stored(0),
             task: stored(None),
@@ -83,7 +85,15 @@ impl LyricScroll {
                 };
                 if let Some((viewport, row)) = geometry.filter(|_| !reduce_motion()) {
                     let from = row.page.y.0 - viewport.page.y.0;
-                    let to = (viewport.frame.size.height.0 - row.frame.size.height.0) * 0.5;
+                    let to = if self.window_centered {
+                        (window().height.0 * 0.5 - viewport.page.y.0 - row.frame.size.height.0 * 0.5)
+                            .clamp(
+                                0.,
+                                (viewport.frame.size.height.0 - row.frame.size.height.0).max(0.),
+                            )
+                    } else {
+                        (viewport.frame.size.height.0 - row.frame.size.height.0) * 0.5
+                    };
                     let started = now();
                     loop {
                         let t = (now().duration_since(started).as_secs_f32() / 0.48).min(1.);
@@ -102,8 +112,23 @@ impl LyricScroll {
                         next_frame().await;
                     }
                 } else {
+                    let offset = if self.window_centered {
+                        self.list
+                            .measure()
+                            .await
+                            .map(|viewport| {
+                                let viewport_center =
+                                    viewport.page.y.0 + viewport.frame.size.height.0 * 0.5;
+                                let max_shift = viewport.frame.size.height.0 * 0.4;
+                                (window().height.0 * 0.5 - viewport_center)
+                                    .clamp(-max_shift, max_shift)
+                            })
+                            .unwrap_or(0.)
+                    } else {
+                        0.
+                    };
                     self.list
-                        .scroll_to_index(index as u32, percentage(0.5), px(0.), false);
+                        .scroll_to_index(index as u32, percentage(0.5), px(offset), false);
                 }
                 self.quiet_until.replace(now() + Duration::from_millis(80));
                 self.active.replace(false);
@@ -255,7 +280,7 @@ pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
     );
     let native = haiku_macos::karaoke::available();
     let list = element_ref();
-    let scroll = LyricScroll::new(list);
+    let scroll = LyricScroll::new(list, true);
     let scrolling_until = stored(now());
     let dragging = stored(false);
     let last_follow = stored(None::<usize>);
@@ -386,7 +411,7 @@ mod tests {
     #[component]
     fn ScrollFixture() -> impl IntoElement {
         let list = element_ref();
-        let scroll = LyricScroll::new(list);
+        let scroll = LyricScroll::new(list, false);
         view()
             .w(px(400.))
             .h(px(500.))

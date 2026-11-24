@@ -131,6 +131,16 @@ pub fn parse(text: &str) -> Lyrics {
     }
 }
 
+/// 清洗译文行：去掉首尾空白，丢弃空串及 QQ 音乐未翻译占位符 `//`。
+pub(crate) fn clean_translation(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed == "//" {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
 /// 解析 KRC 逐字歌词。每行形如：
 /// `[lineStartMs,lineDurMs]<wordOffMs,wordDurMs,0>字<wordOffMs,wordDurMs,0>字...`
 /// 行内时间为相对行首的毫秒，转成绝对秒存入 [`Word`]。忽略 `[ti:]`/`[ar:]`/`[offset:]` 等元数据。
@@ -149,9 +159,7 @@ pub fn parse_krc(text: &str) -> Lyrics {
             continue;
         }
         if let Some(t) = translations.get(idx) {
-            if !t.trim().is_empty() {
-                parsed.translation = Some(t.clone());
-            }
+            parsed.translation = clean_translation(t);
         }
         idx += 1;
         lines.push(parsed);
@@ -225,8 +233,8 @@ pub fn merge_translation(lyrics: &mut Lyrics, translation_text: &str) {
             }
         }
         if let Some((_, txt)) = best {
-            if !txt.trim().is_empty() {
-                line.translation = Some(txt.to_string());
+            if let Some(cleaned) = clean_translation(txt) {
+                line.translation = Some(cleaned);
             }
         }
     }

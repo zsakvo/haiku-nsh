@@ -1,4 +1,4 @@
-import { cleanup, colorScheme, context, effect, nativeComponent, signal, token, View, type JSX } from "nsh";
+import { cleanup, colorScheme, context, effect, nativeComponent, platform, signal, token, View, type JSX } from "nsh";
 import { titleBar } from "nsh/desktop";
 
 /** One geometry policy for the main window and the settings surface. */
@@ -42,6 +42,18 @@ export function ShellToolbar(props: { children?: JSX.Element; testID?: string })
 export const GlassSurface = nativeComponent<{ radius: number; dark: boolean; material?: "header" | "popover" }>(
   "haiku.GlassSurface", { props: ["radius", "dark", "material"] },
 );
+/** Shared frosted glass fill for top navigation bar controls (buttons, search, source capsule). */
+export function NavigationControlBackdrop(props: { pill?: boolean }) {
+  const macos = platform.os === "macos";
+  const radiusClass = props.pill ? "rounded-full" : "rounded-(--radius)";
+  const radius = () => props.pill ? token("navigation-control-height") / 2 : token("radius");
+  return <View class={`absolute inset-0 overflow-hidden ${radiusClass} pointer-events-none`}>
+    <If when={macos}>
+      <GlassSurface class="absolute inset-0 pointer-events-none" radius={radius()} material="popover" dark={colorScheme() === "dark"} />
+    </If>
+    <View class="absolute inset-0 bg-source-chip-tint transition-colors duration-200 ease-out motion-reduce:transition-none group-hover:bg-accent group-active:bg-muted group-selected:bg-accent" />
+  </View>;
+}
 export const NavigationLayoutContext = context<{
   inset: () => number;
   /** Whether a page's content has scrolled beneath the bar; pages report false when inactive. */
@@ -77,7 +89,11 @@ export function NavigationBar(props: { children?: JSX.Element; floating: boolean
         <GlassSurface class="absolute inset-0 pointer-events-none" radius={0} material="header" dark={colorScheme() === "dark"} />
       </If>
       <View class={`absolute inset-0 ${props.floating ? "bg-navigation-backdrop-tint" : "bg-background"}`} />
-      <View testID="navigation-bar-divider" class="absolute bottom-0 inset-x-0 h-px bg-navigation-backdrop-border"
+      <If when={props.floating}>
+        <View class="absolute inset-0 bg-background transition-opacity duration-200 motion-reduce:transition-none"
+          style={{ opacity: props.scrolled ? 0 : 1 }} />
+      </If>
+      <View testID="navigation-bar-divider" class="absolute bottom-0 inset-x-0 h-px bg-navigation-backdrop-border transition-opacity duration-200 motion-reduce:transition-none"
         style={{ opacity: props.scrolled ? 1 : 0 }} />
     </View>
     {props.children}

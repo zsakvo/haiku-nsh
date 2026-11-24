@@ -1,9 +1,9 @@
-import { colorScheme, Image, platform, signal, Text, token, View, type ViewRef } from "nsh";
+import { Image, platform, signal, Text, token, View, type ViewRef } from "nsh";
 import { Button as BaseButton, Select } from "nsh/base";
 import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
 import type { SourceOption } from "../shell/pageSource";
 import { focus } from "./Button";
-import { GlassSurface } from "./Chrome";
+import { NavigationControlBackdrop } from "./Chrome";
 import { popupItem, popupSurface } from "./Surfaces";
 
 function SourceMark(props: { logo?: string; testID?: string }) {
@@ -16,16 +16,10 @@ export function SourceChip(props: {
   items: SourceOption[]; value: string; disabled?: boolean; onChange: (value: string) => void;
 }) {
   const selected = () => props.items.find((item) => item.id === props.value) ?? props.items[0];
-  const macos = platform.os === "macos";
-  const nativeMenu = macos && desktopAvailable;
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
   const triggerClass = `group relative h-(--navigation-control-height) max-w-56 flex-row items-center gap-2 overflow-hidden rounded-full border border-source-chip-border px-3 disabled:opacity-35 ${focus}`;
   const triggerBody = () => <>
-    <View class="absolute inset-0 overflow-hidden rounded-full pointer-events-none">
-      <If when={macos}>
-        <GlassSurface class="absolute inset-0 pointer-events-none" radius={token("navigation-control-height") / 2} material="popover" dark={colorScheme() === "dark"} />
-      </If>
-      <View class="absolute inset-0 bg-source-chip-tint group-hover:bg-accent group-active:bg-muted group-selected:bg-accent" />
-    </View>
+    <NavigationControlBackdrop pill />
     <SourceMark testID="source-chip-icon" logo={selected()?.logo} />
     <Text testID="source-chip-label" class="text-foreground" style={{numberOfLines:1,fontSize:token("source-label-size")}}>{selected()?.title ?? "选择来源"}</Text>
   </>;

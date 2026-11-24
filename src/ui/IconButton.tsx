@@ -2,6 +2,7 @@ import { Button as BaseButton } from "nsh/base";
 import { Icon, type IconName } from "./Icon";
 import { Tooltip } from "./Surfaces";
 import { focus } from "./Button";
+import { NavigationControlBackdrop } from "./Chrome";
 export function IconButton(props: {
   icon: IconName; label: string; hint?: string; disabled?: boolean;
   selected?: boolean; onPress: () => void;
@@ -11,7 +12,10 @@ export function IconButton(props: {
   return <BaseButton testID={props.testID} accessibilityLabel={props.label} disabled={props.disabled}
     selected={props.selected} onPress={props.onPress}
     tooltip={<Tooltip label={props.hint ?? props.label} />}
-    class={`${props.navigation ? "size-(--navigation-control-height) rounded-(--radius) border border-border bg-card" : "size-(--compact-control-height) rounded-(--radius)"} items-center justify-center hover:bg-accent active:bg-muted selected:bg-accent disabled:opacity-35 ${focus}`}>
+    class={`${props.navigation
+      ? "group relative size-(--navigation-control-height) overflow-hidden rounded-(--radius) border border-source-chip-border"
+      : "size-(--compact-control-height) rounded-(--radius) hover:bg-accent active:bg-muted selected:bg-accent"} items-center justify-center disabled:opacity-35 ${focus}`}>
+    <If when={!!props.navigation}><NavigationControlBackdrop /></If>
     <Icon name={props.icon} small sidebar={props.sidebar} navigation={props.navigation} color={props.selected ? "primary" : props.sidebar ? "sidebar-foreground" : "foreground"} />
   </BaseButton>;
 }
