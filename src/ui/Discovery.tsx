@@ -35,7 +35,7 @@ export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:
       <If when={!!props.cover}><Image src={props.cover} class={coverClass()} style={{objectFit:"cover"}} /></If><If when={!props.cover}><Text class="text-muted-foreground">♪</Text></If>
     </View><If when={!props.hideTitle}><Text class={`w-full text-sm ${props.listening?"text-muted-foreground":"text-foreground"}`}
       style={props.listening
-        ?{fontSize:token("listening-card-title-size"),numberOfLines:2,textOverflow:"ellipsis"}
+        ?{fontSize:token("listening-card-title-size"),numberOfLines:1,textOverflow:"ellipsis"}
         :{numberOfLines:1}}>{props.title}</Text></If>
     <If when={!!props.subtitle}><Text class="text-xs text-muted-foreground" style={{numberOfLines:1}}>{props.subtitle}</Text></If>
   </BaseButton>;

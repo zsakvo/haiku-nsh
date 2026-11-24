@@ -59,7 +59,7 @@ pub fn SeekBar(props: SeekBarProps, cx: Scope<SeekBarEvent>) -> impl IntoElement
     let valid = move || props.duration.get().is_finite() && props.duration.get() > 0.;
     let muted = move || {
         if props.now_playing.get() {
-            theme().color("dock-on-dark-muted").unwrap()
+            theme().color("now-playing-muted").unwrap()
         } else {
             theme().muted_foreground
         }

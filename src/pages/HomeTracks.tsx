@@ -1,5 +1,6 @@
-import { cleanup, effect, Image, List, platform, reduceMotion, signal, Text, token, View, type JSX, type ListRef } from "nsh";
+import { cleanup, effect, Image, List, platform, reduceMotion, signal, Text, token, View, type JSX, type ListRef, type Point, type ViewRef } from "nsh";
 import { Button as BaseButton, Submenu } from "nsh/base";
+import { isAvailable as desktopAvailable, Menu as DesktopMenu, type MenuItem as DesktopMenuItem } from "nsh/desktop";
 import { PluginService, type Core } from "haiku/native";
 import type { Collection } from "../state/collections";
 import { focus } from "../ui/Button";
@@ -56,6 +57,32 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
       props.tracks.findIndex(candidate => trackKey(candidate) === trackKey(track))));
     pending.set("");
   }
+  function nativeMenuItems(track: HomeTrack): DesktopMenuItem[] {
+    const userPlaylists = playlists().filter(item => item.kind === "user");
+    return [
+      { label: "播放", onSelect: () => void play(track) },
+      { label: "下一首播放", onSelect: () => void run(() => props.core.player.playNext(track)) },
+      { label: "加入队列", onSelect: () => void run(() => props.core.player.append([track])) },
+      { type: "separator" },
+      { label: "下载", onSelect: () => void run(() => props.core.downloads.enqueue([track])) },
+      {
+        label: liked().has(trackKey(track)) ? "取消喜欢" : "喜欢",
+        onSelect: () => void run(() => props.core.collections.setLiked(track)),
+      },
+      { type: "separator" },
+      {
+        label: "加入歌单",
+        submenu: [
+          ...userPlaylists.map((item): DesktopMenuItem => ({
+            label: item.title,
+            onSelect: () => void run(() => props.core.collections.add(item.id, [track])),
+          })),
+          ...(userPlaylists.length ? [{ type: "separator" as const }] : []),
+          { label: "新建歌单…", onSelect: () => creating.set([track]) },
+        ],
+      },
+    ];
+  }
   function commands(track: HomeTrack) {
     return <>
       <MenuItem onSelect={() => void play(track)}><Text>播放</Text></MenuItem>
@@ -101,7 +128,8 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
                 play={() => void play(track())}
                 like={() => void run(() => props.core.collections.setLiked(track()))}
                 download={() => void run(() => props.core.downloads.enqueue([track()]))}
-                commands={() => commands(track())} />}
+                commands={() => commands(track())}
+                nativeMenuItems={() => nativeMenuItems(track())} />}
             </Each>
           </View>}</Each>
         </View>}
@@ -132,55 +160,83 @@ function HomeTrackCard(props: {
   track: HomeTrack; liked: boolean; busy: boolean; disabled: boolean;
   play: () => void; like: () => void; download: () => void;
   commands: () => JSX.Element;
+  nativeMenuItems: () => DesktopMenuItem[];
 }) {
   const artists = () => props.track.artists.map(artist => typeof artist === "string" ? artist : artist.name).join(" / ") || "未知艺术家";
   const quality = () => props.track.quality?.includes("hires") ? "Hi-Res"
     : props.track.quality?.includes("lossless") ? "无损" : "";
   const visibility = platform.desktop ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100";
-  return <ContextMenu trigger={
-    <View class="group flex-row items-center gap-1 rounded-(--radius-panel) hover:bg-card focus-within:bg-card"
-      style={{ height: token("home-track-row-height") }}>
-      <BaseButton accessibilityLabel={props.track.title} disabled={props.disabled} onPress={props.play}
-        class={`flex-1 min-w-0 flex-row items-center gap-3 h-full rounded-(--radius) ${focus}`}>
-        <View class="relative size-(--home-track-cover-size) shrink-0 rounded-(--radius-inset) bg-muted overflow-hidden items-center justify-center">
-          <If when={!!props.track.cover}><Image src={props.track.cover!}
-            class="absolute inset-0" style={{ objectFit: "cover" }} /></If>
-          <If when={!props.track.cover}><Icon name="music" color="muted-foreground" /></If>
-          <View class={`absolute inset-0 items-center justify-center bg-cover-shade ${visibility}`}>
-            <Icon name={props.busy ? "sync" : "play"} color="cover-foreground" />
-          </View>
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
+  const menuOpen = signal(false);
+  let moreRef: ViewRef | undefined;
+  async function openNativeMenu(at?: Point) {
+    if (menuOpen()) return;
+    menuOpen.set(true);
+    try {
+      await DesktopMenu.popup(props.nativeMenuItems(), at);
+    } finally {
+      menuOpen.set(false);
+    }
+  }
+  async function openMoreMenu() {
+    const measured = await moreRef?.measure();
+    const at = measured
+      ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+      : undefined;
+    await openNativeMenu(at);
+  }
+  const card = <View class="group flex-row items-center gap-1 rounded-(--radius-panel) focus-within:bg-card"
+    style={{ height: token("home-track-row-height") }}
+    onContextMenu={nativeMenu ? event => void openNativeMenu(event.pagePosition) : undefined}>
+    <BaseButton accessibilityLabel={props.track.title} disabled={props.disabled} onPress={props.play}
+      class={`flex-1 min-w-0 flex-row items-center gap-3 h-full rounded-(--radius) ${focus}`}>
+      <View class="relative size-(--home-track-cover-size) shrink-0 rounded-(--radius-inset) bg-muted overflow-hidden items-center justify-center">
+        <If when={!!props.track.cover}><Image src={props.track.cover!}
+          class="absolute inset-0" style={{ objectFit: "cover" }} /></If>
+        <If when={!props.track.cover}><Icon name="music" color="muted-foreground" /></If>
+        <View class={`absolute inset-0 items-center justify-center bg-cover-shade ${visibility}`}>
+          <Icon name={props.busy ? "sync" : "play"} color="cover-foreground" />
         </View>
-        <View class="flex-1 min-w-0 gap-1 items-start">
-          <Text class="w-full text-sm font-semibold text-foreground"
-            style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{props.track.title}</Text>
-          <View class="w-full flex-row items-center gap-1">
-            <If when={props.liked}><Text accessibilityLabel="已喜欢" class="shrink-0 text-sm text-primary">♥</Text></If>
-            <If when={!!quality()}><View class="shrink-0 rounded-sm border border-warning px-1">
-              <Text class="text-xs text-warning">{quality()}</Text>
-            </View></If>
-            <Text class="flex-1 min-w-0 text-xs text-muted-foreground"
-              style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{artists()}</Text>
-          </View>
-        </View>
-      </BaseButton>
-      <View class={`flex-row items-center ${visibility}`}>
-        <BaseButton accessibilityLabel={`下载${props.track.title}`} onPress={props.download}
-          tooltip={<Tooltip label="下载" />}
-          class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-          <Icon name="download" small color="muted-foreground" />
-        </BaseButton>
-        <BaseButton accessibilityLabel={`${props.liked ? "取消喜欢" : "喜欢"}${props.track.title}`} onPress={props.like}
-          tooltip={<Tooltip label={props.liked ? "取消喜欢" : "喜欢"} />}
-          class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-          <If when={props.liked}><Text class="text-base text-primary">♥</Text></If>
-          <If when={!props.liked}><Icon name="heart" small color="muted-foreground" /></If>
-        </BaseButton>
-        <Menu trigger={<BaseButton accessibilityLabel={`更多${props.track.title}的操作`} onPress={() => {}}
-          tooltip={<Tooltip label="更多操作" />}
-          class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-          <Text class="text-base text-muted-foreground">…</Text>
-        </BaseButton>}>{props.commands()}</Menu>
       </View>
+      <View class="flex-1 min-w-0 gap-1 items-start">
+        <Text class="w-full text-sm font-semibold text-foreground"
+          style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{props.track.title}</Text>
+        <View class="w-full flex-row items-center gap-1">
+          <If when={props.liked}><Text accessibilityLabel="已喜欢" class="shrink-0 text-sm text-primary">♥</Text></If>
+          <If when={!!quality()}><View class="shrink-0 rounded-sm border border-warning px-1">
+            <Text class="text-xs text-warning">{quality()}</Text>
+          </View></If>
+          <Text class="flex-1 min-w-0 text-xs text-muted-foreground"
+            style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{artists()}</Text>
+        </View>
+      </View>
+    </BaseButton>
+    <View class={`flex-row items-center ${visibility}`}>
+      <BaseButton accessibilityLabel={`下载${props.track.title}`} onPress={props.download}
+        tooltip={<Tooltip label="下载" />}
+        class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
+        <Icon name="download" small color="muted-foreground" />
+      </BaseButton>
+      <BaseButton accessibilityLabel={`${props.liked ? "取消喜欢" : "喜欢"}${props.track.title}`} onPress={props.like}
+        tooltip={<Tooltip label={props.liked ? "取消喜欢" : "喜欢"} />}
+        class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
+        <If when={props.liked}><Text class="text-base text-primary">♥</Text></If>
+        <If when={!props.liked}><Icon name="heart" small color="muted-foreground" /></If>
+      </BaseButton>
+      {nativeMenu
+        ? <View ref={node => { moreRef = node; }}>
+            <BaseButton accessibilityLabel={`更多${props.track.title}的操作`} selected={menuOpen()}
+              onPress={() => void openMoreMenu()} tooltip={<Tooltip label="更多操作" />}
+              class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted selected:bg-accent ${focus}`}>
+              <Text class="text-base text-muted-foreground">…</Text>
+            </BaseButton>
+          </View>
+        : <Menu trigger={<BaseButton accessibilityLabel={`更多${props.track.title}的操作`} onPress={() => {}}
+            tooltip={<Tooltip label="更多操作" />}
+            class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
+            <Text class="text-base text-muted-foreground">…</Text>
+          </BaseButton>}>{props.commands()}</Menu>}
     </View>
-  }>{props.commands()}</ContextMenu>;
+  </View>;
+  return nativeMenu ? card : <ContextMenu trigger={card}>{props.commands()}</ContextMenu>;
 }

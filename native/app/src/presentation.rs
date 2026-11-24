@@ -5,13 +5,13 @@ use base64::Engine;
 use haiku_library::service::Library;
 use haiku_lyrics::{Cursor, Lyrics};
 use haiku_model::Track;
-use haiku_palette::{Color, RequestVersion};
+use haiku_palette::{CoverTheme, RequestVersion};
 use nsh_core::prelude::*;
 use std::{cell::RefCell, collections::VecDeque, io::Read, rc::Rc, sync::Arc};
 
 #[derive(Clone)]
 struct Cover {
-    palette: Vec<Color>,
+    theme: CoverTheme,
     uri: String,
     path: String,
 }
@@ -25,7 +25,7 @@ pub(crate) struct Presentation {
     pub lyrics: Signal<Arc<Lyrics>>,
     pub line: Signal<Option<usize>>,
     pub open: Signal<bool>,
-    palette: RefCell<Option<Vec<Color>>>,
+    cover_theme: RefCell<Option<CoverTheme>>,
     cache: RefCell<VecDeque<(String, Cover)>>,
     request: RefCell<RequestVersion>,
 }
@@ -34,8 +34,8 @@ pub(crate) fn get() -> Option<Rc<Presentation>> {
 }
 pub(crate) fn reapply_theme() {
     if let Some(p) = get() {
-        let palette = p.palette.borrow().clone().unwrap_or_default();
-        crate::player_theme::apply(&palette);
+        let theme = p.cover_theme.borrow().clone();
+        crate::player_theme::apply(theme.as_ref());
     }
 }
 fn cover_key(path: &str) -> String {
@@ -47,7 +47,7 @@ fn cover_key(path: &str) -> String {
     )
 }
 fn load_cover(path: String) -> Option<Cover> {
-    let palette = haiku_palette::extract_file(&path).ok()?;
+    let theme = haiku_palette::extract_cover_theme_file(&path).ok()?;
     let mut bytes = Vec::new();
     std::fs::File::open(&path)
         .ok()?
@@ -69,7 +69,7 @@ fn load_cover(path: String) -> Option<Cover> {
     // Native local media is app-owned. The image service receives bytes, never an
     // ungranted file URL; the same bounded cache prewarms artwork and palette.
     Some(Cover {
-        palette,
+        theme,
         path,
         uri: format!(
             "data:{mime};base64,{}",
@@ -89,7 +89,7 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             lyrics: signal(Arc::new(Lyrics::default())),
             line: signal(None),
             open: signal(false),
-            palette: RefCell::new(None),
+            cover_theme: RefCell::new(None),
             cache: RefCell::new(VecDeque::new()),
             request: RefCell::new(RequestVersion::default()),
         })
@@ -151,8 +151,8 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             let version = p.request.borrow_mut().advance();
             p.artwork.set(String::new());
             p.artwork_path.set(None);
-            *p.palette.borrow_mut() = None;
-            crate::player_theme::apply(&[]);
+            *p.cover_theme.borrow_mut() = None;
+            crate::player_theme::apply(None);
             let weak = Rc::downgrade(&p);
             spawn(async move {
                 let Some(track) = selected else { return };
@@ -166,8 +166,8 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 p.remember(key, cover.clone());
                 p.artwork.set(cover.uri);
                 p.artwork_path.set(Some(cover.path));
-                *p.palette.borrow_mut() = Some(cover.palette.clone());
-                crate::player_theme::apply(&cover.palette);
+                *p.cover_theme.borrow_mut() = Some(cover.theme.clone());
+                crate::player_theme::apply(Some(&cover.theme));
             });
         });
         // Cursor publishes line changes only. Word fills read the same Rust clock directly.

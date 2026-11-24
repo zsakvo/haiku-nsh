@@ -32,6 +32,313 @@ impl Color {
     }
 }
 
+/// Straight-alpha RGBA color for cover-derived player presentation tokens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct RgbaColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl RgbaColor {
+    pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { r, g, b, a }
+    }
+
+    fn from_hct(hue: f64, chroma: f64, tone: f64, alpha: f64) -> Self {
+        let rgb = Rgb::from(Hct::from(hue, chroma.max(0.0), tone.clamp(0.0, 100.0)));
+        Self {
+            r: rgb.red,
+            g: rgb.green,
+            b: rgb.blue,
+            a: (alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
+        }
+    }
+}
+
+/// Adaptive Now Playing color roles derived from a cover's visual dominant color.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CoverTheme {
+    pub is_light: bool,
+    pub background: RgbaColor,
+    pub shade_top: RgbaColor,
+    pub shade_bottom: RgbaColor,
+    pub foreground: RgbaColor,
+    pub muted: RgbaColor,
+    pub surface: RgbaColor,
+    pub lyric_active: RgbaColor,
+    pub lyric_inactive: RgbaColor,
+    pub progress_track: RgbaColor,
+    pub progress_buffered: RgbaColor,
+}
+
+fn relative_luminance(r: u8, g: u8, b: u8) -> f64 {
+    let linear = |c: u8| {
+        let v = f64::from(c) / 255.0;
+        if v <= 0.04045 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+}
+
+fn composite_over(fg: RgbaColor, bg: RgbaColor) -> (u8, u8, u8) {
+    let a = f64::from(fg.a) / 255.0;
+    let mix = |f: u8, b: u8| (f64::from(f) * a + f64::from(b) * (1.0 - a)).round().clamp(0.0, 255.0) as u8;
+    (mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b))
+}
+
+fn contrast_ratio(fg: RgbaColor, bg: RgbaColor) -> f64 {
+    let (r, g, b) = composite_over(fg, bg);
+    let l1 = relative_luminance(r, g, b);
+    let l2 = relative_luminance(bg.r, bg.g, bg.b);
+    let (hi, lo) = if l1 >= l2 { (l1, l2) } else { (l2, l1) };
+    (hi + 0.05) / (lo + 0.05)
+}
+
+fn with_min_contrast(
+    hue: f64,
+    chroma: f64,
+    tone: f64,
+    base_alpha: f64,
+    min_contrast: f64,
+    bg: RgbaColor,
+) -> RgbaColor {
+    let mut alpha = base_alpha;
+    while alpha < 0.96 {
+        let candidate = RgbaColor::from_hct(hue, chroma, tone, alpha);
+        if contrast_ratio(candidate, bg) >= min_contrast {
+            return candidate;
+        }
+        alpha = (alpha + 0.04).min(0.96);
+    }
+    RgbaColor::from_hct(hue, chroma, tone, alpha)
+}
+
+fn hue_distance(a: f64, b: f64) -> f64 {
+    let d = (a - b).abs() % 360.0;
+    d.min(360.0 - d)
+}
+
+/// Build an adaptive light/dark cover theme from a dominant HCT color and the cover's average tone.
+fn build_cover_theme(hue: f64, chroma: f64, dominant_tone: f64, average_tone: f64) -> CoverTheme {
+    let is_light = if dominant_tone >= 66.0 {
+        true
+    } else if dominant_tone < 46.0 {
+        false
+    } else {
+        // In the mid-tone band, follow the cover's overall mood so light covers stay airy
+        // and dark covers stay rich while guaranteeing strong foreground contrast.
+        (dominant_tone * 0.6 + average_tone * 0.4) >= 56.0
+    };
+
+    let (bg_tone, bg_chroma) = if is_light {
+        let tone = if dominant_tone >= 66.0 {
+            dominant_tone.clamp(80.0, 94.0)
+        } else {
+            (dominant_tone + 18.0).clamp(78.0, 88.0)
+        };
+        (tone, chroma.min(34.0))
+    } else {
+        let tone = if dominant_tone < 46.0 {
+            dominant_tone.clamp(14.0, 34.0)
+        } else {
+            (dominant_tone - 18.0).clamp(20.0, 34.0)
+        };
+        (tone, chroma.min(44.0))
+    };
+
+    let background = RgbaColor::from_hct(hue, bg_chroma, bg_tone, 1.0);
+    // Keep typography and icons subtly tinted with the cover's hue; neutral covers stay grayscale.
+    let text_chroma = if bg_chroma < 4.0 {
+        0.0
+    } else {
+        (bg_chroma * 0.32).clamp(2.0, 14.0)
+    };
+
+    if is_light {
+        let shade_top = RgbaColor::from_hct(hue, bg_chroma * 0.55, (bg_tone + 6.0).min(99.0), 0.22);
+        let shade_bottom =
+            RgbaColor::from_hct(hue, (bg_chroma * 1.05).min(38.0), (bg_tone - 12.0).max(64.0), 0.18);
+        let foreground = RgbaColor::from_hct(hue, text_chroma, 14.0, 1.0);
+        let muted = with_min_contrast(hue, text_chroma, 16.0, 0.62, 4.6, background);
+        let surface = RgbaColor::from_hct(hue, text_chroma, 12.0, 0.08);
+        let lyric_active = RgbaColor::from_hct(hue, text_chroma * 0.9, 10.0, 1.0);
+        let lyric_inactive = with_min_contrast(hue, text_chroma, 14.0, 0.48, 3.2, background);
+        let progress_track = RgbaColor::from_hct(hue, text_chroma, 12.0, 0.14);
+        let progress_buffered = RgbaColor::from_hct(hue, text_chroma, 12.0, 0.26);
+        CoverTheme {
+            is_light,
+            background,
+            shade_top,
+            shade_bottom,
+            foreground,
+            muted,
+            surface,
+            lyric_active,
+            lyric_inactive,
+            progress_track,
+            progress_buffered,
+        }
+    } else {
+        let shade_top =
+            RgbaColor::from_hct(hue, (bg_chroma * 0.9).min(42.0), (bg_tone + 14.0).min(48.0), 0.14);
+        let shade_bottom = RgbaColor::from_hct(hue, bg_chroma * 0.85, (bg_tone - 10.0).max(4.0), 0.28);
+        let foreground = RgbaColor::from_hct(hue, text_chroma * 0.65, 95.0, 1.0);
+        let muted = with_min_contrast(hue, text_chroma * 0.75, 92.0, 0.70, 4.6, background);
+        let surface = RgbaColor::from_hct(hue, text_chroma * 0.5, 96.0, 0.12);
+        let lyric_active = RgbaColor::from_hct(hue, text_chroma * 0.4, 98.0, 1.0);
+        let lyric_inactive = with_min_contrast(hue, text_chroma * 0.7, 94.0, 0.56, 3.2, background);
+        let progress_track = RgbaColor::from_hct(hue, text_chroma * 0.5, 96.0, 0.18);
+        let progress_buffered = RgbaColor::from_hct(hue, text_chroma * 0.5, 96.0, 0.32);
+        CoverTheme {
+            is_light,
+            background,
+            shade_top,
+            shade_bottom,
+            foreground,
+            muted,
+            surface,
+            lyric_active,
+            lyric_inactive,
+            progress_track,
+            progress_buffered,
+        }
+    }
+}
+
+/// Derive a complete cover theme from a single representative RGB color.
+pub fn cover_theme_from_rgb(r: u8, g: u8, b: u8) -> CoverTheme {
+    let hct = Hct::new(Rgb::new(r, g, b));
+    build_cover_theme(hct.get_hue(), hct.get_chroma(), hct.get_tone(), hct.get_tone())
+}
+
+/// Extract the visual dominant color and adaptive light/dark presentation theme from RGBA pixels.
+pub fn extract_cover_theme_rgba(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+) -> Result<CoverTheme, String> {
+    let expected_len = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|length| length.checked_mul(4));
+    if width == 0 || height == 0 || expected_len != Some(pixels.len() as u64) {
+        return Err("Invalid RGBA dimensions".into());
+    }
+    let sampled = sample_pixels(width, height, pixels, None);
+    if sampled.is_empty() {
+        return Ok(cover_theme_from_rgb(20, 22, 25));
+    }
+    let quantized = QuantizerCelebi::quantize(&sampled, 128);
+    let mut entries: Vec<(Hct, u32)> = quantized
+        .color_to_count
+        .into_iter()
+        .filter(|(_, count)| *count > 0)
+        .map(|(rgb, count)| (Hct::new(rgb), count))
+        .collect();
+    if entries.is_empty() {
+        return Ok(cover_theme_from_rgb(20, 22, 25));
+    }
+    entries.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let total: f64 = entries.iter().map(|(_, count)| f64::from(*count)).sum();
+    let average_tone: f64 = entries
+        .iter()
+        .map(|(hct, count)| hct.get_tone() * f64::from(*count))
+        .sum::<f64>()
+        / total;
+
+    // Merge neighboring quantized bins so smooth gradients keep their true area weight.
+    struct Cluster {
+        seed_hue: f64,
+        seed_chroma: f64,
+        seed_tone: f64,
+        weight: f64,
+        hue_cos: f64,
+        hue_sin: f64,
+        chroma_sum: f64,
+        tone_sum: f64,
+    }
+    let mut clusters: Vec<Cluster> = Vec::new();
+    for (hct, count) in entries {
+        let w = f64::from(count);
+        let h = hct.get_hue();
+        let c = hct.get_chroma();
+        let t = hct.get_tone();
+        let rad = h.to_radians();
+        if let Some(cluster) = clusters.iter_mut().find(|existing| {
+            let tone_close = (existing.seed_tone - t).abs() <= 14.0;
+            let both_neutral = existing.seed_chroma < 8.0 && c < 8.0;
+            tone_close && (both_neutral || hue_distance(existing.seed_hue, h) <= 18.0)
+        }) {
+            cluster.weight += w;
+            cluster.hue_cos += rad.cos() * w * c.max(1.0);
+            cluster.hue_sin += rad.sin() * w * c.max(1.0);
+            cluster.chroma_sum += c * w;
+            cluster.tone_sum += t * w;
+        } else {
+            clusters.push(Cluster {
+                seed_hue: h,
+                seed_chroma: c,
+                seed_tone: t,
+                weight: w,
+                hue_cos: rad.cos() * w * c.max(1.0),
+                hue_sin: rad.sin() * w * c.max(1.0),
+                chroma_sum: c * w,
+                tone_sum: t * w,
+            });
+        }
+    }
+
+    let winner = clusters
+        .into_iter()
+        .max_by(|a, b| {
+            let score = |cluster: &Cluster| {
+                let pop = cluster.weight / total;
+                let chroma = cluster.chroma_sum / cluster.weight;
+                let tone = cluster.tone_sum / cluster.weight;
+                // Population leads so the background matches the cover's dominant area;
+                // a gentle chroma preference breaks ties in favor of expressive artwork over borders.
+                let chroma_boost = 1.0 + 0.65 * (chroma / 48.0).min(1.0);
+                let extreme_penalty = if chroma < 6.0 && !(4.0..=98.0).contains(&tone) {
+                    0.55
+                } else {
+                    1.0
+                };
+                pop * chroma_boost * extreme_penalty
+            };
+            score(a).total_cmp(&score(b))
+        })
+        .unwrap();
+
+    let hue = if winner.hue_sin.abs() < 1e-6 && winner.hue_cos.abs() < 1e-6 {
+        winner.seed_hue
+    } else {
+        winner.hue_sin.atan2(winner.hue_cos).to_degrees().rem_euclid(360.0)
+    };
+    let chroma = winner.chroma_sum / winner.weight;
+    let tone = winner.tone_sum / winner.weight;
+    Ok(build_cover_theme(hue, chroma, tone, average_tone))
+}
+
+/// File decoding and adaptive cover theme extraction.
+pub fn extract_cover_theme_file(path: impl AsRef<Path>) -> Result<CoverTheme, String> {
+    let mut reader = image::ImageReader::open(path)
+        .map_err(|e| e.to_string())?
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(8192);
+    limits.max_image_height = Some(8192);
+    limits.max_alloc = Some(128 * 1024 * 1024);
+    reader.limits(limits);
+    let image = reader.decode().map_err(|e| e.to_string())?.to_rgba8();
+    extract_cover_theme_rgba(image.width(), image.height(), image.as_raw())
+}
+
 fn tonal_palette(source: Rgb) -> Vec<Color> {
     let source = Hct::new(source);
     let palette = TonalPalette::of(source.get_hue(), source.get_chroma().clamp(24.0, 48.0));

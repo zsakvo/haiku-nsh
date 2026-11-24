@@ -11,6 +11,7 @@ use std::rc::Rc;
 pub(crate) fn metadata(p: Rc<Presentation>, cx: Scope<NowPlayingEvent>) -> impl IntoElement {
     let track = p.track;
     view()
+        .px_3()
         .gap_2()
         .flex_shrink_0()
         .child(

@@ -46,7 +46,7 @@ function FeedCard(props: { title: string; cover?: string; track?: HomeTrack; onP
       </View></If>
     </View>
     <Text class="w-full text-muted-foreground"
-      style={{ fontSize: token("listening-card-title-size"), numberOfLines: 2, textOverflow: "ellipsis" }}>{props.title}</Text>
+      style={{ fontSize: token("listening-card-title-size"), numberOfLines: 1, textOverflow: "ellipsis" }}>{props.title}</Text>
     <If when={!!props.track}><Text class="w-full text-xs text-muted-foreground"
       style={{numberOfLines:1,textOverflow:"ellipsis"}}>{artists()}</Text></If>
   </BaseButton>;
