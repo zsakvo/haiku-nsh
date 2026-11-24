@@ -25,10 +25,10 @@ import { AboutContent } from "./About";
 import { nshChord, type ShortcutBinding } from "../state/shortcuts";
 import { Dialog } from "../ui/Surfaces";
 import { Button } from "../ui/Button";
-import { createCoreState } from "../state/core";
+import { createCoreState, type PlayerSnapshot } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
-import { CommandPalette } from "./CommandPalette";
+import { CommandPalette, type PaletteCommand } from "./CommandPalette";
 import { LyricsSearch } from "./LyricsSearch";
 import { createPageRefresh, PageRefreshContext } from "./pageRefresh";
 import { createPageSource, PageSourceContext } from "./pageSource";
@@ -53,6 +53,7 @@ export function AppShell(props: {
   const refresh = createPageRefresh();
   const pageSource = createPageSource();
   const core = createCoreState();
+  const player = signal<PlayerSnapshot | null>(null);
   const searchRequest=signal<SearchRequest|undefined>(props.initialSearch);
   function openSearch(request:SearchRequest){searchRequest.set({...request});nav.navigate({kind:"search"});}
   const plugins = createPlugins();
@@ -105,6 +106,12 @@ export function AppShell(props: {
   effect(() => {
     const c=core(); if(c) cleanup(c.shortcuts.onChange(s=>reconcileBindings((s as {bindings:ShortcutBinding[]}).bindings)));
   });
+  effect(() => {
+    const c = core();
+    if (!c) return;
+    player.set(c.player.snapshot() as PlayerSnapshot);
+    cleanup(c.player.onState((state) => player.set(state as PlayerSnapshot)));
+  });
   effect(()=>{
     const c=core();if(c) cleanup(c.settings.onOpenLyrics(()=>{
       settingsCategory.set("歌词");settingsRequest.update(v=>v+1);showSettings();
@@ -140,13 +147,128 @@ export function AppShell(props: {
   cleanup(() => DesktopMenu.setApplicationMenu(null));
   function selectCommand(id: string) {
     if (id === "settings") { showSettings(); return; }
-    if (id.startsWith("mode:")) void appearance.setMode(id.slice(5) as AppearanceMode);
+    if (id === "refresh") { closeOverlay(); if (refresh.current() && !refresh.current()!.disabled()) refresh.current()!.run(); return; }
+    if (id === "player:toggle") { void core()?.player.toggle().catch(console.error); closeOverlay(); return; }
+    if (id === "player:next") { void core()?.player.next().catch(console.error); closeOverlay(); return; }
+    if (id === "player:previous") { void core()?.player.previous().catch(console.error); closeOverlay(); return; }
+    if (id.startsWith("source:")) nav.navigate({ kind: "source", source: id.slice(7) });
+    else if (id.startsWith("mode:")) void appearance.setMode(id.slice(5) as AppearanceMode);
     else {
       const page = destinations.find((entry) => entry.id === id);
       if (page) nav.navigate({ kind: page.id });
     }
     closeOverlay();
   }
+  const destinationKeywords: Record<string, string[]> = {
+    home: ["首页", "发现", "home", "discover"],
+    categories: ["流派", "歌单分类", "categories", "genres"],
+    radio: ["FM", "私人电台", "radio"],
+    search: ["查找", "search"],
+    library: ["曲库", "本地", "音乐", "library", "local"],
+    favorites: ["收藏", "红心", "favorites", "liked"],
+    playlists: ["播放列表", "playlists"],
+    history: ["播放历史", "最近", "history"],
+    statistics: ["聆听统计", "数据", "stats", "statistics"],
+    downloads: ["离线", "下载管理", "downloads"],
+  };
+  const modeKeywords: Record<AppearanceMode, string[]> = {
+    system: ["外观", "主题", "自动", "system", "auto", "theme"],
+    light: ["外观", "主题", "亮色", "日间", "light", "theme"],
+    dark: ["外观", "主题", "暗色", "夜间", "dark", "theme"],
+  };
+  const commandItems = (): PaletteCommand[] => {
+    const current = nav.current();
+    const playback = player();
+    const playing = playback?.status === "playing" || playback?.status === "loading";
+    const list: PaletteCommand[] = [
+      ...destinations.map((page): PaletteCommand => ({
+        id: page.id,
+        label: page.label,
+        group: "页面",
+        icon: page.icon,
+        meta: current.kind === page.id ? "当前" : undefined,
+        actionLabel: "打开",
+        keywords: [`前往${page.label}`, page.group, ...(destinationKeywords[page.id] ?? [])],
+      })),
+      ...librarySources().map((source): PaletteCommand => {
+        const label = source.displayName || plugins.value().packages.find((p) => p.id === source.pluginId)?.name || source.sourceId;
+        const active = current.kind === "source" && (current as { source: string }).source === source.sourceId;
+        return {
+          id: `source:${source.sourceId}`,
+          label,
+          group: "页面",
+          icon: "folder",
+          meta: active ? "当前" : "来源",
+          actionLabel: "打开",
+          keywords: ["来源", "曲库", label],
+        };
+      }),
+    ];
+    if (playback?.current) {
+      list.push(
+        {
+          id: "player:toggle",
+          label: playing ? "暂停播放" : "继续播放",
+          group: "播放",
+          icon: playing ? "pause" : "play",
+          meta: playback.current.title,
+          shortcut: appBindings()["togglePlayback"],
+          actionLabel: playing ? "暂停" : "播放",
+          keywords: ["播放", "暂停", "play", "pause", playback.current.title],
+        },
+        {
+          id: "player:next",
+          label: "下一首",
+          group: "播放",
+          icon: "skipNext",
+          shortcut: appBindings()["nextTrack"],
+          actionLabel: "切换",
+          keywords: ["切歌", "下一曲", "next"],
+        },
+        {
+          id: "player:previous",
+          label: "上一首",
+          group: "播放",
+          icon: "skipPrev",
+          shortcut: appBindings()["previousTrack"],
+          actionLabel: "切换",
+          keywords: ["切歌", "上一曲", "prev", "previous"],
+        },
+      );
+    }
+    if (refresh.current() && !refresh.current()!.disabled()) {
+      list.push({
+        id: "refresh",
+        label: "刷新当前页面",
+        group: "操作",
+        icon: "sync",
+        shortcut: shortcuts.refresh,
+        actionLabel: "刷新",
+        keywords: ["刷新", "重载", "refresh", "reload"],
+      });
+    }
+    list.push(
+      {
+        id: "settings",
+        label: "设置…",
+        group: "操作",
+        icon: "settings",
+        shortcut: binding("openSettings", shortcuts.settings),
+        actionLabel: "打开",
+        keywords: ["打开设置", "偏好", "settings", "preferences"],
+      },
+      ...modes.map((mode): PaletteCommand => ({
+        id: `mode:${mode.id}`,
+        label: mode.label,
+        group: "外观",
+        icon: "palette",
+        checked: appearance.mode() === mode.id,
+        actionLabel: "切换",
+        keywords: [`外观：${mode.label}`, ...modeKeywords[mode.id]],
+      })),
+    );
+    return list;
+  };
   // macOS: the bar floats over the page, whose content scrolls beneath it.
   const floatingNavigation = platform.os === "macos";
   const scrolledPages = new Set<object>(), contentScrolled = signal(false);
@@ -270,10 +392,6 @@ export function AppShell(props: {
       }} />
     </If>
     <CommandPalette core={core()??undefined} initialQuery={props.initialCommandQuery} navigate={nav.navigate} search={openSearch} open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
-      items={[
-        ...destinations.map((page) => ({ id: page.id, label: `前往${page.label}`, group: "导航" })),
-        { id: "settings", label: "打开设置…", group: "应用", shortcut: binding("openSettings",shortcuts.settings) },
-        ...modes.map((mode) => ({ id: `mode:${mode.id}`, label: `外观：${mode.label}`, group: "外观", checked: appearance.mode() === mode.id })),
-      ]} />
+      items={commandItems()} />
   </ShellFrame></NavigationLayoutContext.Provider></PageRefreshContext.Provider></PageSourceContext.Provider>;
 }
