@@ -227,9 +227,7 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
         for (key, offset) in [("left", -5.), ("right", 5.)] {
             let p = keyboard.clone();
             on_key(key, move |_| {
-                let duration = p
-                    .track
-                    .with_untracked(|t| t.as_ref().and_then(|t| t.duration).unwrap_or(0.));
+                let duration = p.duration_untracked();
                 if duration > 0. {
                     crate::player_dock::send(
                         &p.bridge.controller,

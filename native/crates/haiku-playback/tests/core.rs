@@ -139,6 +139,7 @@ impl Fake {
             position,
             buffered: 1.0,
             buffering: false,
+            duration: 0.0,
         };
     }
 }
@@ -308,6 +309,37 @@ async fn sparse_track_duration_reaches_current_queue_seek_and_gapless_successor(
     h.emit(generation, AudioEventKind::TrackChanged);
     let next = h.state(|s| s.index == 1).await;
     assert_eq!(next.current.unwrap().duration, Some(240.));
+}
+
+#[tokio::test]
+async fn audio_decoded_duration_backfills_missing_track_duration_for_current_and_prepared() {
+    let h = Harness::new(None);
+    h.play(2).await;
+    let playing = h.state(|s| s.status == Status::Playing).await;
+    assert_eq!(playing.current.as_ref().unwrap().duration, None);
+
+    h.emit(playing.generation, AudioEventKind::Duration(185.5));
+    let updated = h
+        .state(|s| s.current.as_ref().and_then(|t| t.duration) == Some(185.5))
+        .await;
+    assert_eq!(updated.tracks[0].duration, Some(185.5));
+    h.command(Command::Seek(999.)).await;
+    assert_eq!(h.player.progress().position, 185.5);
+
+    h.settle().await;
+    let prepared = h
+        .audio
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|(method, _)| method == "prepare:/1.flac")
+        .unwrap()
+        .1;
+    h.emit(prepared, AudioEventKind::Duration(212.0));
+    let prepared_state = h.state(|s| s.tracks[1].duration == Some(212.0)).await;
+    assert_eq!(prepared_state.tracks[1].duration, Some(212.0));
 }
 
 #[tokio::test]

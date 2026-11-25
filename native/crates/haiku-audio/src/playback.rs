@@ -431,10 +431,15 @@ pub struct Player {
 impl Player {
     /// Coherent audio-thread counters for the core's Rust-only display clock.
     /// Reading these does not allocate or publish a JS event.
-    pub fn progress(&self) -> (u64, f64, f64, bool) {
+    pub fn progress(&self) -> (u64, f64, f64, bool, f64) {
         let _snapshot = self.handle.snapshot.lock().unwrap();
-        (self.handle.generation(), self.handle.position_secs(),
-            self.handle.buffered_fraction(), self.handle.is_buffering())
+        (
+            self.handle.generation(),
+            self.handle.position_secs(),
+            self.handle.buffered_fraction(),
+            self.handle.is_buffering(),
+            self.handle.duration_secs(),
+        )
     }
 
     /// 创建播放器：起 rodio 输出线程与流式解码运行时。
@@ -573,7 +578,7 @@ impl Player {
         start_secs: f64,
         loudness: LoudnessOptions,
         generation: u64,
-    ) -> Result<(), String> {
+    ) -> Result<Option<f64>, String> {
         let epoch = {
             let _request_guard = self.request_lock.lock().unwrap();
             let newest = self.request_generation.load(Ordering::Acquire);
@@ -608,9 +613,10 @@ impl Player {
         if self.request_epoch.load(Ordering::Acquire) != epoch {
             return Err("Superseded playback request".into());
         }
+        let duration = stream.duration_secs;
         stream.generation = generation;
         self.handle.play(stream);
-        Ok(())
+        Ok(duration)
     }
 
     /// 播放本地完整缓存文件。
@@ -620,7 +626,7 @@ impl Player {
         cache_key: Option<String>,
         loudness: LoudnessOptions,
         generation: u64,
-    ) -> Result<(), String> {
+    ) -> Result<Option<f64>, String> {
         let epoch = {
             let _request_guard = self.request_lock.lock().unwrap();
             let newest = self.request_generation.load(Ordering::Acquire);
@@ -647,9 +653,10 @@ impl Player {
         if self.request_epoch.load(Ordering::Acquire) != epoch {
             return Err("Superseded playback request".into());
         }
+        let duration = stream.duration_secs;
         stream.generation = generation;
         self.handle.play(stream);
-        Ok(())
+        Ok(duration)
     }
 
     /// 提前打开并解码下一首，但不立即出声。
@@ -660,7 +667,7 @@ impl Player {
         cache_key: Option<String>,
         loudness: LoudnessOptions,
         generation: u64,
-    ) -> Result<(), String> {
+    ) -> Result<Option<f64>, String> {
         let epoch = self.prepare_epoch.fetch_add(1, Ordering::AcqRel) + 1;
         let play_epoch = self.request_epoch.load(Ordering::Acquire);
         let (loudness_settings, loudness_key) = loudness.split();
@@ -683,9 +690,10 @@ impl Player {
         {
             return Err("Superseded playback request".into());
         }
+        let duration = stream.duration_secs;
         stream.generation = generation;
         self.handle.prepare_next(stream);
-        Ok(())
+        Ok(duration)
     }
 
     /// 提前打开本地下一首。
@@ -695,7 +703,7 @@ impl Player {
         cache_key: Option<String>,
         loudness: LoudnessOptions,
         generation: u64,
-    ) -> Result<(), String> {
+    ) -> Result<Option<f64>, String> {
         let epoch = self.prepare_epoch.fetch_add(1, Ordering::AcqRel) + 1;
         let play_epoch = self.request_epoch.load(Ordering::Acquire);
         let (loudness_settings, loudness_key) = loudness.split();
@@ -712,9 +720,10 @@ impl Player {
         {
             return Err("Superseded playback request".into());
         }
+        let duration = stream.duration_secs;
         stream.generation = generation;
         self.handle.prepare_next(stream);
-        Ok(())
+        Ok(duration)
     }
 
     pub fn clear_next(&self) {

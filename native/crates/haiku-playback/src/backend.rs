@@ -37,6 +37,7 @@ pub struct Progress {
     pub position: f64,
     pub buffered: f64,
     pub buffering: bool,
+    pub duration: f64,
 }
 #[derive(Clone, Debug)]
 pub enum AudioEventKind {
@@ -44,6 +45,7 @@ pub enum AudioEventKind {
     TrackChanged,
     Error(Error),
     Buffering(bool),
+    Duration(f64),
 }
 #[derive(Clone, Debug)]
 pub struct AudioEvent {
@@ -256,6 +258,14 @@ impl RealAudio {
             f(player);
         }
     }
+    fn report_duration(&self, generation: u64, duration: Option<f64>) {
+        if let Some(secs) = duration.filter(|d| d.is_finite() && *d > 0.0) {
+            let _ = self.events.send(AudioEvent {
+                generation,
+                kind: AudioEventKind::Duration(secs),
+            });
+        }
+    }
 }
 fn audio_error(message: String) -> Error {
     let code = if message.to_lowercase().contains("unsupported") || message.contains("不支持") {
@@ -295,7 +305,7 @@ impl AudioBackend for RealAudio {
             if !prepare {
                 *self.current.lock().unwrap() = Some(track);
             }
-            match candidate {
+            let duration = match candidate {
                 crate::Candidate::Local(path) => {
                     if prepare {
                         player
@@ -325,12 +335,15 @@ impl AudioBackend for RealAudio {
                     }
                 }
             }
-            .map_err(audio_error)
+            .map_err(audio_error)?;
+            self.report_duration(generation, duration);
+            Ok(())
         })
     }
     fn open(&self, path: PathBuf, generation: u64) -> BoxFuture<'_, Result<(), Error>> {
         Box::pin(async move {
-            self.player()?
+            let duration = self
+                .player()?
                 .play_local(
                     path.to_string_lossy().into(),
                     None,
@@ -344,12 +357,15 @@ impl AudioBackend for RealAudio {
                     generation,
                 )
                 .await
-                .map_err(audio_error)
+                .map_err(audio_error)?;
+            self.report_duration(generation, duration);
+            Ok(())
         })
     }
     fn prepare(&self, path: PathBuf, generation: u64) -> BoxFuture<'_, Result<(), Error>> {
         Box::pin(async move {
-            self.player()?
+            let duration = self
+                .player()?
                 .prepare_next_local(
                     path.to_string_lossy().into(),
                     None,
@@ -363,7 +379,9 @@ impl AudioBackend for RealAudio {
                     generation,
                 )
                 .await
-                .map_err(audio_error)
+                .map_err(audio_error)?;
+            self.report_duration(generation, duration);
+            Ok(())
         })
     }
     fn open_track(
@@ -376,18 +394,20 @@ impl AudioBackend for RealAudio {
         Box::pin(async move {
             let options = self.options(&track);
             let player = self.player()?;
-            if prepare {
+            let duration = if prepare {
                 player
                     .prepare_next_local(path.to_string_lossy().into(), None, options, generation)
                     .await
-                    .map_err(audio_error)
+                    .map_err(audio_error)?
             } else {
                 *self.current.lock().unwrap() = Some(track);
                 player
                     .play_local(path.to_string_lossy().into(), None, options, generation)
                     .await
-                    .map_err(audio_error)
-            }
+                    .map_err(audio_error)?
+            };
+            self.report_duration(generation, duration);
+            Ok(())
         })
     }
     fn configure(&self, settings: Settings) {
@@ -431,12 +451,13 @@ impl AudioBackend for RealAudio {
         let slot = self.player.lock().unwrap();
         slot.as_ref()
             .map(|p| {
-                let (generation, position, buffered, buffering) = p.progress();
+                let (generation, position, buffered, buffering, duration) = p.progress();
                 Progress {
                     generation,
                     position,
                     buffered,
                     buffering,
+                    duration,
                 }
             })
             .unwrap_or_default()

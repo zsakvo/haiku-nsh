@@ -397,14 +397,44 @@ impl Actor {
             self.states.send_replace(self.state.clone());
         }
     }
+    fn apply_duration(&mut self, generation: u64, duration: f64) {
+        if !duration.is_finite() || duration <= 0.0 {
+            return;
+        }
+        let index = if generation == self.state.generation {
+            Some(self.queue.index)
+        } else {
+            self.prepared
+                .as_ref()
+                .filter(|p| p.generation == generation)
+                .map(|p| p.index)
+        };
+        if let Some(selected) = index.and_then(|i| self.queue.tracks.get_mut(i as usize)) {
+            if !selected.duration.is_some_and(|d| d.is_finite() && d > 0.0) {
+                selected.duration = Some(duration);
+                self.publish(true);
+                self.dirty = true;
+            }
+        }
+    }
     fn sample(&mut self) {
         let audio = self.backend.progress();
         if self.state.status == Status::Playing && audio.generation == self.state.generation {
-            let mut frozen = self.frozen.lock().unwrap();
-            *frozen = Progress {
-                position: finite(audio.position, frozen.position).max(0.0),
-                ..audio
-            };
+            {
+                let mut frozen = self.frozen.lock().unwrap();
+                *frozen = Progress {
+                    position: finite(audio.position, frozen.position).max(0.0),
+                    duration: if audio.duration.is_finite() && audio.duration > 0.0 {
+                        audio.duration
+                    } else {
+                        frozen.duration
+                    },
+                    ..audio
+                };
+            }
+            if audio.duration.is_finite() && audio.duration > 0.0 {
+                self.apply_duration(audio.generation, audio.duration);
+            }
             self.dirty = true;
         }
     }
@@ -412,9 +442,16 @@ impl Actor {
         self.frozen.lock().unwrap().position
     }
     fn set_position(&self, position: f64) {
-        *self.frozen.lock().unwrap() = Progress {
+        let mut frozen = self.frozen.lock().unwrap();
+        let duration = if frozen.generation == self.state.generation {
+            frozen.duration
+        } else {
+            0.0
+        };
+        *frozen = Progress {
             generation: self.state.generation,
             position,
+            duration,
             ..Progress::default()
         };
     }
@@ -760,6 +797,10 @@ impl Actor {
         }
     }
     fn event(&mut self, event: AudioEvent) {
+        if let AudioEventKind::Duration(duration) = event.kind {
+            self.apply_duration(event.generation, duration);
+            return;
+        }
         if matches!(event.kind, AudioEventKind::TrackChanged) {
             if self
                 .prepared

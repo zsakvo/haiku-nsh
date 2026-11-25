@@ -93,6 +93,7 @@ pub(crate) fn controls(
     let toggle = previous.clone();
     let next = previous.clone();
     let seek = previous.clone();
+    let duration_p = p.clone();
     view()
         .test_id("now-playing-controls")
         .items_center()
@@ -127,7 +128,7 @@ pub(crate) fn controls(
             seek_bar()
                 .position(p.bridge.position)
                 .buffered(p.bridge.buffered)
-                .duration(move || track.with(|t| t.as_ref().and_then(|t| t.duration).unwrap_or(0.)))
+                .duration(move || duration_p.duration())
                 .now_playing(true)
                 .immersive(true)
                 .w(width)

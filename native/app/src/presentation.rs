@@ -109,7 +109,14 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
         effect(move || {
             revision.get();
             let selected = state.with(|s| s.current.clone());
-            let effective = selected.map(|t| library_for_track.track(&t.id).unwrap_or(t));
+            let effective = selected.map(|t| {
+                let fallback_duration = t.duration.filter(|d| d.is_finite() && *d > 0.);
+                let mut resolved = library_for_track.track(&t.id).unwrap_or(t);
+                if !resolved.duration.is_some_and(|d| d.is_finite() && d > 0.) {
+                    resolved.duration = fallback_duration;
+                }
+                resolved
+            });
             if track.get_untracked() != effective {
                 track.set(effective);
             }
@@ -246,6 +253,34 @@ async fn prepared_cover(
 }
 
 impl Presentation {
+    pub(crate) fn duration(&self) -> f64 {
+        let track_duration = self
+            .track
+            .with(|t| t.as_ref().and_then(|t| t.duration))
+            .filter(|d| d.is_finite() && *d > 0.);
+        track_duration.unwrap_or_else(|| {
+            let decoded = self.bridge.duration.get();
+            if decoded.is_finite() && decoded > 0. {
+                decoded
+            } else {
+                0.
+            }
+        })
+    }
+    pub(crate) fn duration_untracked(&self) -> f64 {
+        let track_duration = self
+            .track
+            .with_untracked(|t| t.as_ref().and_then(|t| t.duration))
+            .filter(|d| d.is_finite() && *d > 0.);
+        track_duration.unwrap_or_else(|| {
+            let decoded = self.bridge.duration.get_untracked();
+            if decoded.is_finite() && decoded > 0. {
+                decoded
+            } else {
+                0.
+            }
+        })
+    }
     fn remember(&self, key: String, cover: Cover) {
         let mut cache = self.cache.borrow_mut();
         cache.retain(|(k, _)| *k != key);

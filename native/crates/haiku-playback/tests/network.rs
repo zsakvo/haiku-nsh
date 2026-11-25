@@ -95,6 +95,7 @@ impl Audio {
             position,
             buffered: 0.5,
             buffering: false,
+            duration: 0.0,
         };
     }
 }

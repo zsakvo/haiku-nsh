@@ -51,6 +51,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     let previous_c = c.clone();
     let next_c = c.clone();
     let seek_c = c.clone();
+    let duration_p = p.clone();
     #[cfg(target_os = "macos")]
     let native_glass = haiku_macos::lifecycle::native_host();
     #[cfg(not(target_os = "macos"))]
@@ -112,7 +113,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
                     .child(when(move ||!state.with(|s| matches!(s.status,Status::Playing|Status::Loading)),move ||surface_icon("play-solid",false,false.into()).size_6()))))
             .child(surface_control("下一首","next-solid",false,false.into()).disabled(empty).on_press(move ||send(&next_c,Command::Next))))
           .child(seek_bar().position(p.bridge.position).buffered(p.bridge.buffered)
-            .duration(move || track.with(|t|t.as_ref().and_then(|t|t.duration).unwrap_or(0.)))
+            .duration(move || duration_p.duration())
             .now_playing(false).inline_times(true)
             .on_seek(move |seconds: &f64| send(&seek_c,Command::Seek(*seconds)))
             .w_full().min_w_0()))

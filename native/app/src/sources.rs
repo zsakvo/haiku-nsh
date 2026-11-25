@@ -35,8 +35,10 @@ impl TrackResolver for SourceResolver {
             )
             .await
             {
-                if detail.entity_ref() == track.entity_ref() {
-                    track.duration = detail.duration.filter(|d| d.is_finite() && *d > 0.);
+                if detail.source == track.source {
+                    if let Some(duration) = detail.duration.filter(|d| d.is_finite() && *d > 0.) {
+                        track.duration = Some(duration);
+                    }
                 }
             }
             track

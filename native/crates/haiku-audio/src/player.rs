@@ -82,6 +82,8 @@ pub struct DecodedStream {
     pub generation: u64,
     pub channels: u16,
     pub sample_rate: u32,
+    /// 容器/编码头给出的曲目总时长（秒）；流式无索引时可能为 `None`。
+    pub duration_secs: Option<f64>,
     /// 流在压缩数据层实际从此位置开始解码。播放线程用它校正 rodio 从 0 起算的位置。
     start_secs: f64,
     /// 当前流的共享缓冲句柄，供播放线程每 tick 读缓冲进度。
@@ -218,6 +220,8 @@ pub struct PlayerHandle {
     /// 当前曲目缓冲进度（0..=1 的 f64，按位存进 `AtomicU64`，模式同 `pos_ms`）。
     /// 播放线程每 tick 用当前流的 `SharedStream::buffered_fraction()` 刷新；Play/Stop 时清零。
     buffered: Arc<AtomicU64>,
+    /// 当前曲目解码探测到的总时长（秒，按位存进 `AtomicU64`）；未知或无活跃曲目时为 0。
+    duration_secs: Arc<AtomicU64>,
     /// 当前音频消费者是否因 PCM 环耗尽而等待生产者。
     buffering: Arc<AtomicBool>,
     /// 当前曲目的响度状态。播放线程在 Play/Stop 时换插；FRB 轮询侧据此读测量快照
@@ -238,6 +242,11 @@ impl PlayerHandle {
     /// 当前曲目缓冲进度（0..=1）。无活跃曲目时为 0。
     pub fn buffered_fraction(&self) -> f64 {
         f64::from_bits(self.buffered.load(Ordering::Relaxed))
+    }
+
+    /// 当前曲目解码探测到的总时长（秒）。未知或无活跃曲目时为 0。
+    pub fn duration_secs(&self) -> f64 {
+        f64::from_bits(self.duration_secs.load(Ordering::Relaxed))
     }
 
     pub fn is_buffering(&self) -> bool {
@@ -311,10 +320,12 @@ pub fn spawn(tx_events: UnboundedSender<SessionEvent>) -> PlayerHandle {
     let (tx, rx) = std::sync::mpsc::channel::<PlayerCmd>();
     let pos_ms = Arc::new(AtomicU64::new(0));
     let buffered = Arc::new(AtomicU64::new(0));
+    let duration_secs = Arc::new(AtomicU64::new(0.0f64.to_bits()));
     let buffering = Arc::new(AtomicBool::new(false));
     let current_loudness: Arc<Mutex<Option<Arc<TrackLoudness>>>> = Arc::new(Mutex::new(None));
     let pos_for_thread = pos_ms.clone();
     let buffered_for_thread = buffered.clone();
+    let duration_for_thread = duration_secs.clone();
     let buffering_for_thread = buffering.clone();
     let loudness_for_thread = current_loudness.clone();
     // 音效配置全局唯一：由播放线程持有，各 `RingSource` 只读共享（见 [`crate::effects`]）。
@@ -325,6 +336,7 @@ pub fn spawn(tx_events: UnboundedSender<SessionEvent>) -> PlayerHandle {
             events,
             pos_for_thread,
             buffered_for_thread,
+            duration_for_thread,
             buffering_for_thread,
             loudness_for_thread,
             effects,
@@ -336,6 +348,7 @@ pub fn spawn(tx_events: UnboundedSender<SessionEvent>) -> PlayerHandle {
         tx,
         pos_ms,
         buffered,
+        duration_secs,
         buffering,
         current_loudness,
     }
@@ -349,6 +362,7 @@ struct CurrentTrack {
     ring: Arc<Ring>,
     channels: u16,
     sample_rate: u32,
+    duration_secs: Option<f64>,
     loudness: Arc<TrackLoudness>,
     _guard: StreamGuard,
 }
@@ -747,6 +761,7 @@ fn run(
     events: SessionSender,
     pos_ms: Arc<AtomicU64>,
     buffered: Arc<AtomicU64>,
+    duration_secs: Arc<AtomicU64>,
     buffering: Arc<AtomicBool>,
     current_loudness: Arc<Mutex<Option<Arc<TrackLoudness>>>>,
     effects: Arc<EffectsConfig>,
@@ -798,6 +813,7 @@ fn run(
                     generation,
                     channels,
                     sample_rate,
+                    duration_secs: stream_duration,
                     start_secs,
                     shared,
                     ring,
@@ -845,6 +861,7 @@ fn run(
                     ring,
                     channels,
                     sample_rate,
+                    duration_secs: stream_duration,
                     loudness,
                     _guard: guard,
                 });
@@ -853,6 +870,10 @@ fn run(
                 position_base_ms = (start_secs.max(0.0) * 1000.0) as u64;
                 pos_ms.store(position_base_ms, Ordering::Relaxed);
                 buffered.store(0.0f64.to_bits(), Ordering::Relaxed);
+                duration_secs.store(
+                    stream_duration.unwrap_or(0.0).to_bits(),
+                    Ordering::Relaxed,
+                );
                 buffering.store(false, Ordering::Relaxed);
                 last_pos_ms = position_base_ms;
                 last_pos_at = Instant::now();
@@ -865,6 +886,7 @@ fn run(
                     generation,
                     channels,
                     sample_rate,
+                    duration_secs: stream_duration,
                     start_secs: _,
                     shared,
                     ring,
@@ -878,6 +900,7 @@ fn run(
                     ring,
                     channels,
                     sample_rate,
+                    duration_secs: stream_duration,
                     loudness,
                     _guard: guard,
                 };
@@ -933,6 +956,7 @@ fn run(
                         }
                     }
                     let key = pending.track.loudness.key().to_string();
+                    let next_duration = pending.track.duration_secs.unwrap_or(0.0);
                     events
                         .generation
                         .store(pending.track.generation, Ordering::Release);
@@ -941,6 +965,7 @@ fn run(
                     position_base_ms = 0;
                     pos_ms.store(0, Ordering::Relaxed);
                     buffered.store(0.0f64.to_bits(), Ordering::Relaxed);
+                    duration_secs.store(next_duration.to_bits(), Ordering::Relaxed);
                     if let Some(cur) = &current {
                         if let Ok(mut slot) = current_loudness.lock() {
                             *slot = Some(cur.loudness.clone());
@@ -1051,6 +1076,7 @@ fn run(
                 position_base_ms = 0;
                 pos_ms.store(0, Ordering::Relaxed);
                 buffered.store(0.0f64.to_bits(), Ordering::Relaxed);
+                duration_secs.store(0.0f64.to_bits(), Ordering::Relaxed);
                 buffering.store(false, Ordering::Relaxed);
                 last_pos_ms = 0;
                 last_pos_at = Instant::now();
@@ -1194,6 +1220,7 @@ fn run(
                         }
                         active = false;
                         current = None;
+                        duration_secs.store(0.0f64.to_bits(), Ordering::Relaxed);
                         buffering.store(false, Ordering::Relaxed);
                         let _ = events.send(PlayerEvent::Error(failure));
                     } else if let Some(pending) = next.take() {
@@ -1218,6 +1245,7 @@ fn run(
                             }
                         }
                         let key = pending.track.loudness.key().to_string();
+                        let next_duration = pending.track.duration_secs.unwrap_or(0.0);
                         events
                             .generation
                             .store(pending.track.generation, Ordering::Release);
@@ -1226,6 +1254,7 @@ fn run(
                         position_base_ms = 0;
                         pos_ms.store(0, Ordering::Relaxed);
                         buffered.store(0.0f64.to_bits(), Ordering::Relaxed);
+                        duration_secs.store(next_duration.to_bits(), Ordering::Relaxed);
                         buffering.store(false, Ordering::Relaxed);
                         if let Some(cur) = &current {
                             if let Ok(mut slot) = current_loudness.lock() {
@@ -1238,6 +1267,7 @@ fn run(
                     } else {
                         active = false;
                         current = None;
+                        duration_secs.store(0.0f64.to_bits(), Ordering::Relaxed);
                         buffering.store(false, Ordering::Relaxed);
                         let _ = events.send(PlayerEvent::Finished);
                     }
@@ -2249,7 +2279,7 @@ pub async fn open_stream(
         Err(_) => None,
     };
 
-    let (channels, sample_rate) = match (spec, head_failed) {
+    let (channels, sample_rate, duration_secs) = match (spec, head_failed) {
         (_, Some(msg)) => {
             shared.cancel();
             ring.cancel();
@@ -2279,6 +2309,7 @@ pub async fn open_stream(
         generation: 0,
         channels,
         sample_rate,
+        duration_secs,
         start_secs,
         guard: StreamGuard {
             shared: shared.clone(),
@@ -2311,7 +2342,7 @@ pub async fn open_local(
             .await
             .context("本地解码准备任务异常")??
     };
-    let (channels, sample_rate) = spec;
+    let (channels, sample_rate, duration_secs) = spec;
     // 本地完整文件：构造一个「已 done」的 SharedStream 占位供缓冲进度恒 1.0。
     // 使用空 URL 的假共享流会很重；这里用内存空前缀 + done 标记的轻量路径：
     // 直接 tempfile + finish。
@@ -2331,6 +2362,7 @@ pub async fn open_local(
         generation: 0,
         channels,
         sample_rate,
+        duration_secs,
         start_secs: 0.0,
         guard: StreamGuard {
             shared: shared.clone(),
@@ -2453,11 +2485,32 @@ fn decode_prepare_error(head: &[u8], detail: String) -> anyhow::Error {
     }
 }
 
+fn codec_duration_secs(params: &symphonia::core::codecs::CodecParameters) -> Option<f64> {
+    let n_frames = params.n_frames?;
+    if n_frames == 0 {
+        return None;
+    }
+    if let Some(tb) = params.time_base {
+        let time = tb.calc_time(n_frames);
+        let secs = time.seconds as f64 + time.frac;
+        if secs.is_finite() && secs > 0.0 {
+            return Some(secs);
+        }
+    }
+    if let Some(rate) = params.sample_rate.filter(|r| *r > 0) {
+        let secs = n_frames as f64 / rate as f64;
+        if secs.is_finite() && secs > 0.0 {
+            return Some(secs);
+        }
+    }
+    None
+}
+
 fn prepare_decode_file(
     path: String,
     ring: Arc<Ring>,
     loudness: Arc<TrackLoudness>,
-) -> Result<(u16, u32)> {
+) -> Result<(u16, u32, Option<f64>)> {
     let mut file = File::open(&path).with_context(|| format!("打开本地缓存失败: {path}"))?;
     let len = file.metadata().map(|m| m.len()).unwrap_or(0);
     // 头 64 字节先留一份给 sniff_container（报错时才用），再把游标拨回 0 交给 symphonia。
@@ -2487,6 +2540,7 @@ fn prepare_decode_file(
         .context("找不到音频轨")?;
     let track_id = track.id;
     let codec = track.codec_params.codec;
+    let duration_secs = codec_duration_secs(&track.codec_params);
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| decode_prepare_error(&head, format!("不支持的音频编码 {codec:?}: {e}")))?;
@@ -2517,7 +2571,7 @@ fn prepare_decode_file(
         }
     };
     thread::spawn(move || decode_loop(format, decoder, track_id, ring, None, loudness, true));
-    Ok((channels, sample_rate))
+    Ok((channels, sample_rate, duration_secs))
 }
 
 /// 主下载任务。
@@ -2676,13 +2730,13 @@ async fn download_once(
 }
 
 /// 探测格式、建解码器、解首包拿到声道/采样率，然后把后续解码循环交给独立线程。
-/// 返回 `(channels, sample_rate)`。
+/// 返回 `(channels, sample_rate, duration_secs)`。
 fn prepare_decode(
     shared: Arc<SharedStream>,
     ring: Arc<Ring>,
     start_secs: f64,
     loudness: Arc<TrackLoudness>,
-) -> Result<(u16, u32)> {
+) -> Result<(u16, u32, Option<f64>)> {
     let mss = MediaSourceStream::new(
         Box::new(StreamMediaSource {
             shared: shared.clone(),
@@ -2726,6 +2780,7 @@ fn prepare_decode(
         .context("找不到音频轨")?;
     let track_id = track.id;
     let codec = track.codec_params.codec;
+    let duration_secs = codec_duration_secs(&track.codec_params);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
@@ -2791,7 +2846,7 @@ fn prepare_decode(
         )
     });
 
-    Ok((channels, sample_rate))
+    Ok((channels, sample_rate, duration_secs))
 }
 
 /// 解码循环（独立线程）：逐 packet 解码并推入环，直到流末尾 / 错误 / 被取消。

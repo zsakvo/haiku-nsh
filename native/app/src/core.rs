@@ -27,10 +27,23 @@ pub(crate) fn decode<T: serde::de::DeserializeOwned>(value: JsonValue) -> Result
     serde_json::from_value(value)
         .map_err(|e| js_error(Error::new(ErrorCode::InvalidArgument, e.to_string())))
 }
-fn refresh_progress(core: &Controller, position: Signal<f64>, buffered: Signal<f64>) {
+fn refresh_progress(
+    core: &Controller,
+    position: Signal<f64>,
+    buffered: Signal<f64>,
+    duration: Signal<f64>,
+) {
     let progress = core.progress();
     position.set(progress.position);
     buffered.set(progress.buffered);
+    let next_duration = if progress.duration.is_finite() && progress.duration > 0.0 {
+        progress.duration
+    } else {
+        0.0
+    };
+    if duration.get_untracked() != next_duration {
+        duration.set(next_duration);
+    }
 }
 
 #[derive(Clone, Default)]
@@ -82,6 +95,7 @@ pub struct CoreBridge {
     pub(crate) settings: Signal<haiku_store::settings::Settings>,
     pub position: Signal<f64>,
     pub buffered: Signal<f64>,
+    pub duration: Signal<f64>,
     pub state: Signal<PlayerState>,
 }
 impl CoreBridge {
@@ -99,9 +113,17 @@ impl CoreBridge {
         source_host: Arc<haiku_plugins::Host>,
     ) -> Rc<Self> {
         let owner = Owner::detached();
-        let (position, buffered, state) = owner.run(|| {
-            let position = signal(controller.progress().position);
-            let buffered = signal(controller.progress().buffered);
+        let (position, buffered, duration, state) = owner.run(|| {
+            let initial_progress = controller.progress();
+            let position = signal(initial_progress.position);
+            let buffered = signal(initial_progress.buffered);
+            let duration = signal(
+                if initial_progress.duration.is_finite() && initial_progress.duration > 0.0 {
+                    initial_progress.duration
+                } else {
+                    0.0
+                },
+            );
             let state = signal(controller.state());
             let mut states = controller.subscribe();
             let core = controller.clone();
@@ -135,19 +157,19 @@ impl CoreBridge {
                                 if result.is_err() {
                                     return;
                                 }
-                                refresh_progress(&core, position, buffered);
+                                refresh_progress(&core, position, buffered, duration);
                                 break;
                             }
                             Either::Right(((), _)) => {
                                 if visible_playback {
-                                    refresh_progress(&core, position, buffered);
+                                    refresh_progress(&core, position, buffered, duration);
                                 }
                             }
                         }
                     }
                 }
             });
-            (position, buffered, state)
+            (position, buffered, duration, state)
         });
         let settings = owner.run(|| signal(settings));
         let collections_revision = owner.run(|| signal(collections.revision()));
@@ -179,6 +201,7 @@ impl CoreBridge {
             owner,
             position,
             buffered,
+            duration,
             state,
         })
     }
@@ -919,10 +942,11 @@ mod tests {
         Owner::detached().run(|| {
             let position = signal(0.0);
             let buffered = signal(0.0);
-            refresh_progress(&controller, position, buffered);
+            let duration = signal(0.0);
+            refresh_progress(&controller, position, buffered, duration);
             assert_eq!(position.get(), 12.0);
             audio.0.lock().unwrap().position = 99.0;
-            refresh_progress(&controller, position, buffered);
+            refresh_progress(&controller, position, buffered, duration);
             assert_eq!(position.get(), 12.0);
         });
         controller.shutdown();
