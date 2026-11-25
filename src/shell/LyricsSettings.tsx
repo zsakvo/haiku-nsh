@@ -2,7 +2,14 @@ import { platform, signal, Text, View } from "nsh";
 import { DesktopLyricsSettings } from "./DesktopLyricsSettings";
 import { Button } from "../ui/Button";
 import { Field } from "../ui/LibraryControls";
-import { SettingSelect, SettingSwitch } from "../ui/SettingsControls";
+import {
+  SettingCardBlock,
+  SettingRow,
+  SettingSection,
+  SettingSelectRow,
+  SettingSwitch,
+  SettingSwitchRow,
+} from "../ui/SettingsControls";
 import { lyricsProviders, type createSettings, type CustomLyricsProvider } from "../state/settings";
 
 /** Settings are persisted by Rust; the editable custom-provider form is a local draft. */
@@ -54,38 +61,41 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
       lyricsProvidersDisabled: settings().lyricsProvidersDisabled.filter(p => p !== key),
     });
   }
-  return <View testID="lyrics-settings" class="gap-4">
-    <Text role="header" class="text-lg font-semibold text-foreground">歌词</Text>
-    <If when={platform.os === "macos"}><View class="gap-3">
-      <SettingSwitch label="在媒体中心显示当前歌词" checked={settings().notificationLyrics}
-        onChange={notificationLyrics => void props.settings.update({ notificationLyrics })} />
-      <SettingSwitch label="菜单栏歌词" checked={settings().menubarLyricsVisible}
-        onChange={menubarLyricsVisible => void props.settings.update({ menubarLyricsVisible })} />
-      <SettingSelect label="菜单栏逐字高亮" value={settings().menubarLyricHighlight === "system" ? "system" : "custom"}
-        items={[{ value: "system", title: "跟随系统" }, { value: "custom", title: "自定义颜色" }]}
-        onChange={v => void props.settings.update({ menubarLyricHighlight: v === "system" ? "system" : "#007AFF" })} />
-      <If when={settings().menubarLyricHighlight !== "system"}><View class="gap-2">
-        <Field label="菜单栏高亮颜色" value={highlightDraft() || settings().menubarLyricHighlight}
-          onChange={v => highlightDraft.set(v)} placeholder="#RRGGBB" />
-        <View class="flex-row"><Button label="保存高亮颜色" onPress={() => {
-          const color=highlightDraft() || settings().menubarLyricHighlight;
-          if (!/^#[0-9a-f]{6}$/i.test(color)) { highlightError.set("请输入 #RRGGBB 格式的颜色"); return; }
-          highlightError.set(""); void props.settings.update({ menubarLyricHighlight: color });
-        }} /></View>
-        <If when={!!highlightError()}><Text class="text-sm text-destructive">{highlightError()}</Text></If>
-      </View></If>
-    </View></If>
+  return <View testID="lyrics-settings" class="flex-col gap-5">
+    <If when={platform.os === "macos"}>
+      <SettingSection title="媒体中心与菜单栏">
+        <SettingSwitchRow label="在媒体中心显示当前歌词" checked={settings().notificationLyrics}
+          onChange={notificationLyrics => void props.settings.update({ notificationLyrics })} />
+        <SettingSwitchRow divider label="菜单栏歌词" checked={settings().menubarLyricsVisible}
+          onChange={menubarLyricsVisible => void props.settings.update({ menubarLyricsVisible })} />
+        <SettingSelectRow divider label="菜单栏逐字高亮" value={settings().menubarLyricHighlight === "system" ? "system" : "custom"}
+          items={[{ value: "system", title: "跟随系统" }, { value: "custom", title: "自定义颜色" }]}
+          onChange={v => void props.settings.update({ menubarLyricHighlight: v === "system" ? "system" : "#007AFF" })} />
+        <If when={settings().menubarLyricHighlight !== "system"}>
+          <SettingCardBlock divider>
+            <View class="flex-row items-end gap-2">
+              <View class="min-w-0 flex-1">
+                <Field label="菜单栏高亮颜色" value={highlightDraft() || settings().menubarLyricHighlight}
+                  onChange={v => highlightDraft.set(v)} placeholder="#RRGGBB" />
+              </View>
+              <Button label="保存高亮颜色" onPress={() => {
+                const color = highlightDraft() || settings().menubarLyricHighlight;
+                if (!/^#[0-9a-f]{6}$/i.test(color)) { highlightError.set("请输入 #RRGGBB 格式的颜色"); return; }
+                highlightError.set(""); void props.settings.update({ menubarLyricHighlight: color });
+              }} />
+            </View>
+            <If when={!!highlightError()}><Text class="text-sm text-destructive">{highlightError()}</Text></If>
+          </SettingCardBlock>
+        </If>
+      </SettingSection>
+    </If>
     <If when={platform.os === "macos"}><DesktopLyricsSettings settings={props.settings} /></If>
-    <SettingSwitch label="自动查找远端歌词" checked={settings().lyricsAutoSearch}
-      onChange={lyricsAutoSearch => void props.settings.update({ lyricsAutoSearch })} />
-    <Text class="text-sm text-muted-foreground">本地文件与音乐来源优先；远端按以下顺序查找，逐字歌词优先。</Text>
-    <View class="gap-2">
+    <SettingSection title="远端歌词" action={<Button label="添加 HTTP 来源" size="sm" variant="ghost" onPress={() => edit()} />}>
+      <SettingSwitchRow label="自动查找远端歌词" description="本地文件与音乐来源优先；远端按以下顺序查找，逐字歌词优先。"
+        checked={settings().lyricsAutoSearch}
+        onChange={lyricsAutoSearch => void props.settings.update({ lyricsAutoSearch })} />
       <Each of={providers()} key={p => p.id}>{(p, index) =>
-        <View class="flex-row items-center gap-2 py-1">
-          <View class="flex-1 gap-1">
-            <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
-            <Text class="text-xs text-muted-foreground">{custom(p().id) ? "自定义 HTTP" : "内置提供方"}</Text>
-          </View>
+        <SettingRow divider title={p().name} description={custom(p().id) ? "自定义 HTTP" : "内置提供方"}>
           <If when={!!custom(p().id)}>
             <Button label="编辑" accessibilityLabel={`编辑 ${p().name}`} size="sm"
               onPress={() => edit(custom(p().id))} />
@@ -101,25 +111,29 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
               void props.settings.update({ lyricsProvidersDisabled: enabled
                 ? settings().lyricsProvidersDisabled.filter(id => id !== p().id)
                 : [...settings().lyricsProvidersDisabled, p().id] })} />
-        </View>
+        </SettingRow>
       }</Each>
-    </View>
-    <View class="flex-row"><Button label="添加 HTTP 来源" onPress={() => edit()} /></View>
-    <If when={editing()}><View class="gap-3 border-t border-border pt-4">
-      <Text class="text-sm font-semibold text-foreground">{id() ? "编辑 HTTP 来源" : "新建 HTTP 来源"}</Text>
-      <Field label="来源名称" value={name()} onChange={v => name.set(v)} />
-      <Field label="URL 模板" value={url()} onChange={v => url.set(v)} placeholder="https://example.com/lyrics?title={title}" />
-      <Text class="text-xs text-muted-foreground">模板变量：{"{title}、{artist}、{album}、{duration}"}，请求时自动编码。</Text>
-      <SettingSelect label="响应类型" value={response()} items={[
-        { value: "text", title: "文本 / LRC" }, { value: "json", title: "JSON" },
-      ]} onChange={v => response.set(v)} />
-      <If when={response() === "json"}><Field label="JSON 路径" value={path()} onChange={v => path.set(v)} placeholder="data.lyrics.0" /></If>
-      <Field label="Headers（JSON）" value={headers()} onChange={v => headers.set(v)} />
-      <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
-      <View class="flex-row gap-2">
-        <Button label="保存来源" variant="primary" onPress={() => void save()} />
-        <Button label="取消编辑" onPress={() => editing.set(false)} />
-      </View>
-    </View></If>
+    </SettingSection>
+    <If when={editing()}>
+      <SettingSection title={id() ? "编辑 HTTP 来源" : "新建 HTTP 来源"}>
+        <SettingCardBlock>
+          <Field label="来源名称" value={name()} onChange={v => name.set(v)} />
+          <Field label="URL 模板" value={url()} onChange={v => url.set(v)} placeholder="https://example.com/lyrics?title={title}" />
+          <Text class="text-xs text-muted-foreground">模板变量：{"{title}、{artist}、{album}、{duration}"}，请求时自动编码。</Text>
+        </SettingCardBlock>
+        <SettingSelectRow divider label="响应类型" value={response()} items={[
+          { value: "text", title: "文本 / LRC" }, { value: "json", title: "JSON" },
+        ]} onChange={v => response.set(v)} />
+        <SettingCardBlock divider>
+          <If when={response() === "json"}><Field label="JSON 路径" value={path()} onChange={v => path.set(v)} placeholder="data.lyrics.0" /></If>
+          <Field label="Headers（JSON）" value={headers()} onChange={v => headers.set(v)} />
+          <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
+          <View class="flex-row gap-2">
+            <Button label="保存来源" variant="primary" onPress={() => void save()} />
+            <Button label="取消编辑" onPress={() => editing.set(false)} />
+          </View>
+        </SettingCardBlock>
+      </SettingSection>
+    </If>
   </View>;
 }

@@ -342,7 +342,7 @@ export function SearchPage(props: {
                     <BaseButton
                       accessibilityLabel={q()}
                       onPress={() => submit(q())}
-                      class={`flex-row items-center gap-1.5 pl-3 pr-1.5 py-1.5 hover:bg-accent active:bg-muted ${focus}`}
+                      class={`flex-row items-center gap-1.5 pl-3 pr-1.5 py-1.5 active:bg-muted ${focus}`}
                     >
                       <Icon name="clock" class="size-3.5" color="muted-foreground" />
                       <Text class="text-sm text-foreground">{q()}</Text>
@@ -350,7 +350,7 @@ export function SearchPage(props: {
                     <BaseButton
                       accessibilityLabel={`删除搜索 ${q()}`}
                       onPress={() => props.core.history.remove("searches", q())}
-                      class={`items-center justify-center pl-1 pr-2.5 py-1.5 hover:bg-accent active:bg-muted ${focus}`}
+                      class={`items-center justify-center pl-1 pr-2.5 py-1.5 active:bg-muted ${focus}`}
                     >
                       <Icon name="close" class="size-3" color="muted-foreground" />
                     </BaseButton>
@@ -468,7 +468,7 @@ export function SearchPage(props: {
                     accessibilityLabel={entity().title}
                     disabled={!entity().reference}
                     onPress={() => openEntity(entityRoute(entity()))}
-                    class={`group flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) hover:bg-accent active:bg-muted disabled:opacity-40 ${focus}`}
+                    class={`flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) active:bg-muted disabled:opacity-40 ${focus}`}
                   >
                     <Text
                       class="w-10 shrink-0 text-xs text-muted-foreground"
@@ -515,7 +515,7 @@ export function SearchPage(props: {
                     >
                       {meta() || "—"}
                     </Text>
-                    <View class="w-6 shrink-0 items-end opacity-40 group-hover:opacity-100">
+                    <View class="w-6 shrink-0 items-end opacity-40">
                       <Icon name="right" class="size-3.5" color="muted-foreground" />
                     </View>
                   </BaseButton>

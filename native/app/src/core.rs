@@ -649,8 +649,10 @@ impl Core {
     }
     /// Replace semantic tokens shared by TSX and Rust.
     pub async fn apply_theme(json: String) -> Result<(), String> {
-        set_tokens(nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?);
-        crate::presentation::reapply_theme();
+        let mut tokens: nsh_core::element::Tokens =
+            nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?.into();
+        crate::presentation::apply_cover_into(&mut tokens);
+        set_tokens(tokens);
         Ok(())
     }
 }

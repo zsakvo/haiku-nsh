@@ -623,7 +623,6 @@ fn sized_like_button(dark: Prop<bool>, compact: bool) -> impl IntoElement {
         .selected(move ||liked.get()).disabled(move ||track.with(Option::is_none))
         .size_8().flex_shrink_0().rounded_full().items_center().justify_center()
         .app_class("active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
-        .hover(move |s|s.bg(move ||if dark.get(){nsh_base::theme().color("now-playing-surface").unwrap()}else{nsh_base::theme().color("dock-control-hover").unwrap()}))
         .on_press(move || {if let Some(track)=track.get_untracked(){if let Err(e)=store.set_liked(&track,None){log::error!("Like: {e}");}}})
         .child(view().tooltip(crate::player_controls::hint("喜欢 / 取消喜欢"))
             .child(image(move || nsh_core::element::ImageSrc::svg_markup(if liked.get() {

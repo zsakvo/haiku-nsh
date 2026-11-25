@@ -20,7 +20,7 @@
 
 ### 1.3 组件库（`src/ui/`，包装 `nsh/base`）
 
-按功能需要逐步建设，每个组件都具备完整的交互状态（hover、pressed、focus、selected、disabled、loading）：
+按功能需要逐步建设，每个组件都具备完整的交互状态（pressed、focus、selected、disabled、loading；全局不添加鼠标悬浮 hover 视觉效果）：
 
 Button、IconButton（带 tooltip 和无障碍名称）、Input、SearchField、Select、Switch、Checkbox、Slider、Tabs/ToggleGroup、Menu/ContextMenu、Popover、Dialog、Sheet、Toast、Badge、EmptyState（插画）、ErrorState（带重试和展开详情）、Skeleton、Card（封面卡片）、Shelf（横向货架）、SectionHeader、SettingsRow。
 
@@ -28,6 +28,7 @@ Rust 组件（TrackList、SeekBar、LyricsView、PlayerDock、Artwork）使用�
 
 ### 1.4 交互约定
 
+- 全局无 hover 视觉效果：作为桌面客户端应用，按钮、选项、菜单项、列表项、卡片、滑块等组件不添加鼠标悬浮（hover）变色、背景填充或透明度变化；交互反馈依靠 pressed、focus-visible、selected/checked 与 disabled 表达。
 - 不使用 hover 工具栏。行级操作放在右键菜单（ContextMenu）和行尾的“更多”菜单按钮中；常用操作（播放）通过双击或回车触发。
 - 每个页面都必须有加载、空、失败（带重试）、未登录四种状态。
 - 键盘：Cmd+K 打开命令面板；空格切换播放（文本输入时不触发）；Cmd+W 隐藏窗口；Cmd+Q 退出；Cmd+[ 和 Cmd+] 后退与前进；Cmd+, 打开设置；应用菜单与快捷键保持一致。

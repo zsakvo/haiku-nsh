@@ -6,8 +6,8 @@ export const chromeHeight = () => Math.max(token("toolbar-height"), titleBar().h
 export function ShellFrame(props: { children?: JSX.Element }) {
   return <View class="flex-1 flex-row bg-sidebar">{props.children}</View>;
 }
-export function ShellSidebar(props: { children?: JSX.Element }) {
-  return <View class="shrink-0 bg-sidebar" style={{ width: token("sidebar-width") }}>{props.children}</View>;
+export function ShellSidebar(props: { children?: JSX.Element; class?: string }) {
+  return <View class={`shrink-0 bg-sidebar ${props.class ?? ""}`} style={{ width: token("sidebar-width") }}>{props.children}</View>;
 }
 export function SidebarChrome(props: { children?: JSX.Element }) {
   return <View class="shrink-0 flex-row items-center justify-between pr-2 mb-(--sidebar-top-gap)"
@@ -39,7 +39,7 @@ export function NavigationControlBackdrop(props: { pill?: boolean }) {
     <If when={macos}>
       <GlassSurface class="absolute inset-0 pointer-events-none" radius={radius()} material="popover" dark={colorScheme() === "dark"} />
     </If>
-    <View class="absolute inset-0 bg-source-chip-tint transition-colors duration-200 ease-out motion-reduce:transition-none group-hover:bg-accent group-active:bg-muted group-selected:bg-accent" />
+    <View class="absolute inset-0 bg-source-chip-tint transition-colors duration-200 ease-out motion-reduce:transition-none group-active:bg-muted group-selected:bg-accent" />
   </View>;
 }
 export const NavigationLayoutContext = context<{

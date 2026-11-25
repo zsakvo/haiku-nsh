@@ -95,7 +95,7 @@ fn command(
                 cx.emit(TrackListEvent::Action(name.into(), targets(props, at)));
             }
         })
-        .app_class("rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent")
+        .app_class("rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent")
         .child(text(label))
 }
 fn selected_tracks(props: TrackListProps, at: Position) -> Vec<haiku_model::Track> {
@@ -235,7 +235,7 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
             },
         ))
 }
-const ITEM: &str = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent";
+const ITEM: &str = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent";
 fn row_menu_button(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> impl IntoElement {
     #[cfg(target_os = "macos")]
     {
@@ -506,7 +506,6 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                                 theme().background
                             }
                         })
-                        .hover(|s| s.bg(move || theme().accent))
                         .active(|s| s.bg(move || theme().muted))
                         .app_class("focus-visible:outline-2 focus-visible:outline-ring")
                         .on_press(move |event: &PressEvent| {
@@ -746,7 +745,7 @@ fn detail_list(
             let row = view()
                 .role(nsh_core::AccessibilityRole::Row).focusable(true)
                 .label(move || track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default()))
-                .app_class("flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")
+                .app_class("flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) focus-visible:outline-2 focus-visible:outline-ring")
                 .bg(move || {
                     let selected = source(props).is_some_and(|s| id_at(props, at)
                         .is_some_and(|id| s.selected.with(|set| set.contains(&id))));
@@ -791,7 +790,7 @@ fn detail_list(
                 .child(view().w_14().flex_shrink_0().child(nsh_base::button()
                     .accessibility_label(move || Some(if liked.get() { "取消喜欢".into() } else { "喜欢".into() }))
                     .disabled(write.is_none())
-                    .app_class("w-6 h-7 items-center justify-center rounded-(--radius) hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring")
+                    .app_class("w-6 h-7 items-center justify-center rounded-(--radius) focus-visible:outline-2 focus-visible:outline-ring")
                     .on_press(move || {
                         if let Some(b) = &write
                             && let Some(t) = track.get_untracked()

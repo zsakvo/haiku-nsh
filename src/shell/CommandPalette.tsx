@@ -357,7 +357,7 @@ export function CommandPalette(props: {
           </If>
           <If when={query().length > 0}>
             <Button accessibilityLabel="清空搜索" onPress={clearQuery}
-              class="size-6 items-center justify-center rounded-(--radius-inset) hover:bg-accent active:bg-muted">
+              class="size-6 items-center justify-center rounded-(--radius-inset) active:bg-muted">
               <Icon name="close" class="size-3.5" color="muted-foreground" />
             </Button>
           </If>

@@ -112,7 +112,7 @@ export function LyricsSearch(props: { core: Core; open: boolean; onClose: () => 
           {c => <BaseButton accessibilityLabel={`预览 ${c().title} ${c().sourceLabel || c().providerId}`}
             onPress={() => void choose(c())} selected={selected()?.candidateId === c().candidateId
               && selected()?.providerId === c().providerId}
-            class={`p-3 gap-1 items-start rounded-(--radius) hover:bg-accent selected:bg-accent ${focus}`}>
+            class={`p-3 gap-1 items-start rounded-(--radius) selected:bg-accent ${focus}`}>
             <Text class="text-sm font-semibold text-foreground">{c().title}</Text>
             <Text class="text-xs text-muted-foreground">{`${c().artist} · ${c().sourceLabel || c().providerId}`}</Text>
             <Text class="text-xs text-muted-foreground">{[

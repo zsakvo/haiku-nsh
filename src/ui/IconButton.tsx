@@ -17,7 +17,7 @@ export function IconButton(props: {
       ? "group relative size-(--navigation-control-height) overflow-hidden rounded-(--radius) border border-source-chip-border"
       : props.plain
         ? "size-5 rounded-(--radius-inset) active:opacity-60"
-        : "size-(--compact-control-height) rounded-(--radius) hover:bg-accent active:bg-muted selected:bg-accent"} items-center justify-center disabled:opacity-35 ${focus}`}>
+        : "size-(--compact-control-height) rounded-(--radius) active:bg-muted selected:bg-accent"} items-center justify-center disabled:opacity-35 ${focus}`}>
     <If when={!!props.navigation}><NavigationControlBackdrop /></If>
     <Icon name={props.icon}
       class={props.plain ? "size-3.5" : undefined}

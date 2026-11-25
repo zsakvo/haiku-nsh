@@ -32,10 +32,10 @@ pub(crate) struct Presentation {
 pub(crate) fn get() -> Option<Rc<Presentation>> {
     global::<Option<Rc<Presentation>>>().get()
 }
-pub(crate) fn reapply_theme() {
+pub(crate) fn apply_cover_into(tokens: &mut nsh_core::element::Tokens) {
     if let Some(p) = get() {
         let theme = p.cover_theme.borrow().clone();
-        crate::player_theme::apply(theme.as_ref());
+        crate::player_theme::apply_into(tokens, theme.as_ref());
     }
 }
 fn cover_key(path: &str) -> String {

@@ -5,7 +5,7 @@ import type { DialogProps, MenuProps, ContextMenuProps, MenuItemProps } from "ns
 import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
 import { focus } from "./Button";
 export const popupSurface = "rounded-(--radius-surface) border border-border bg-popover shadow-lg";
-export const popupItem = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
+export const popupItem = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
 export function Tooltip(props: { label: string }) {
   return <BaseTooltip class={`${popupSurface} px-2 py-1`}>
     <Text class="text-xs text-popover-foreground">{props.label}</Text>

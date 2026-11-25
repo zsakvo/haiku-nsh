@@ -1,7 +1,7 @@
 import { effect, signal, Text, View } from "nsh";
 import { BackupService, type Core } from "haiku/native";
 import { Button } from "../ui/Button";
-import { SettingSwitch } from "../ui/SettingsControls";
+import { SettingCardBlock, SettingRow, SettingSection, SettingSwitch } from "../ui/SettingsControls";
 import { Dialog } from "../ui/Surfaces";
 import { localDateTime } from "../ui/dateTime";
 
@@ -49,33 +49,36 @@ export function BackupSettings(props: {
     ].filter(([, path]) => includes.some(entry => entry.startsWith(path))).map(([name]) => name).join(" · ");
   };
   return <View testID="backup-settings" class="flex-col gap-3">
-    <Text role="header" class="text-lg font-semibold text-foreground">备份与恢复</Text>
-    <Text class="text-sm text-muted-foreground">
-      保存设置、喜欢、歌单、来源与插件。不包含音频、缓存、字体和听歌历史。
-    </Text>
-    <View class="flex-row gap-2">
-      <Button label="导出备份…" onPress={() => { error.set(""); exporting.set(true); }}
-        disabled={busy()} />
-      <Button label="导入备份…" disabled={busy()} onPress={() => void run(inspect)} />
-    </View>
-    <If when={!!exported()}><Text testID="backup-export-result" class="text-sm text-muted-foreground">
-      {`备份已导出：${exported()}`}
-    </Text></If>
-    <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
-    <If when={!!result()}>
-      <View testID="backup-import-result" class="flex-col gap-2 rounded-(--radius) border border-border p-3">
-        <Text class="text-sm font-semibold text-foreground">备份已恢复</Text>
-        <Text class="text-xs text-muted-foreground">恢复前已自动保存安全备份，最多保留 3 份。</Text>
-        <If when={!!result()?.legacyPlugins.length}>
-          <Text class="text-sm text-foreground">
-            {`以下旧版插件需要安装新版本：${result()?.legacyPlugins.join("、")}`}
+    <SettingSection title="备份与恢复">
+      <SettingRow title="备份与恢复"
+        description="保存设置、喜欢、歌单、来源与插件。不包含音频、缓存、字体和听歌历史。">
+        <Button label="导出备份…" size="sm" onPress={() => { error.set(""); exporting.set(true); }}
+          disabled={busy()} />
+        <Button label="导入备份…" size="sm" disabled={busy()} onPress={() => void run(inspect)} />
+      </SettingRow>
+      <If when={!!exported()}>
+        <SettingCardBlock divider>
+          <Text testID="backup-export-result" class="text-sm text-muted-foreground">
+            {`备份已导出：${exported()}`}
           </Text>
-        </If>
-        <Each of={result()?.warnings ?? []} key={warning => warning}>{warning =>
-          <Text class="text-sm text-muted-foreground">{warning()}</Text>
-        }</Each>
-      </View>
-    </If>
+        </SettingCardBlock>
+      </If>
+      <If when={!!result()}>
+        <SettingCardBlock divider testID="backup-import-result">
+          <Text class="text-sm font-semibold text-foreground">备份已恢复</Text>
+          <Text class="text-xs text-muted-foreground">恢复前已自动保存安全备份，最多保留 3 份。</Text>
+          <If when={!!result()?.legacyPlugins.length}>
+            <Text class="text-sm text-foreground">
+              {`以下旧版插件需要安装新版本：${result()?.legacyPlugins.join("、")}`}
+            </Text>
+          </If>
+          <Each of={result()?.warnings ?? []} key={warning => warning}>{warning =>
+            <Text class="text-sm text-muted-foreground">{warning()}</Text>
+          }</Each>
+        </SettingCardBlock>
+      </If>
+    </SettingSection>
+    <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     <Dialog open={exporting()} onOpenChange={e => { if (!busy()) exporting.set(e.open); }}
       class="w-128 max-w-full self-center mt-24 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">导出 Haiku 备份</Text>

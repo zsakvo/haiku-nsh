@@ -2,10 +2,10 @@ import { Text } from "nsh";
 import { Button as BaseButton } from "nsh/base";
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary hover:bg-primary/90 active:bg-primary/80",
-  secondary: "border border-border bg-secondary hover:bg-accent active:bg-muted",
-  ghost: "hover:bg-accent active:bg-muted selected:bg-accent",
-  destructive: "bg-destructive hover:bg-destructive/90 active:bg-destructive/80",
+  primary: "bg-primary active:bg-primary/80",
+  secondary: "border border-border bg-secondary active:bg-muted",
+  ghost: "active:bg-muted selected:bg-accent",
+  destructive: "bg-destructive active:bg-destructive/80",
 };
 const foregrounds: Record<ButtonVariant, string> = {
   primary: "text-primary-foreground", secondary: "text-secondary-foreground",

@@ -1,45 +1,100 @@
-import { Text, token, View } from "nsh";
-import { Radio, RadioGroup } from "nsh/base";
-import { brands, modes, type createAppearance } from "./theme";
-import { Icon } from "./Icon";
+import { platform, signal, Text, token, View, type ViewRef } from "nsh";
+import { Button as BaseButton, Radio, RadioGroup } from "nsh/base";
+import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
+import { brands, modes, type AppearanceMode, type createAppearance } from "./theme";
 import { focus } from "./Button";
+import { SettingRow, SettingSection, SettingSelect } from "./SettingsControls";
+import { Tooltip } from "./Surfaces";
 
-/** Appearance controls share density, cards, and fixed selection slots. */
-export function AppearanceOptions(props: { appearance: ReturnType<typeof createAppearance> }) {
-  return <View class="gap-4">
-    <If when={!!props.appearance.error()}><Text class="text-sm text-destructive">{props.appearance.error()}</Text></If>
-    <View class="gap-1">
-      <Text role="header" class="text-lg font-semibold text-foreground">让 Haiku 更像你</Text>
-      <Text class="text-sm text-muted-foreground">选择舒服的明暗与色彩，立即预览变化。</Text>
-    </View>
-    <View class="gap-2">
-      <Text role="header" class="text-sm font-medium text-foreground">外观模式</Text>
-      <RadioGroup class="flex-row gap-2">
-        {modes.map((mode) => <Radio checked={props.appearance.mode() === mode.id}
-          onChange={() => void props.appearance.setMode(mode.id)}
-          class={`group flex-1 flex-row items-center gap-2 rounded-(--radius-panel) border border-border bg-card px-3 py-2 hover:bg-accent active:bg-muted checked:ring-2 checked:ring-ring checked:bg-selection ${focus}`}>
-          <View class="size-4 rounded-full border border-input items-center justify-center group-checked:border-ring">
-            <View class="size-2 rounded-full bg-primary opacity-0 group-checked:opacity-100" />
-          </View>
-          <Text class="text-sm text-foreground">{mode.label}</Text>
-        </Radio>)}
-      </RadioGroup>
-    </View>
-    <View class="gap-2">
-      <Text role="header" class="text-sm font-medium text-foreground">品牌色</Text>
-      <View class="rounded-(--radius-panel) border border-border bg-card p-3">
-        <RadioGroup class="grid gap-2"
-          style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${token("brand-option-min-width")}px, 1fr))` }}>
-          {brands.map(([brand, label]) => <Radio accessibilityLabel={`品牌色：${label}`}
-            checked={props.appearance.brand() === brand} onChange={() => void props.appearance.setBrand(brand)}
-            class={`group min-w-0 flex-row items-center gap-2 rounded-(--radius) border border-border px-2 py-1.5 hover:bg-accent active:bg-muted checked:ring-2 checked:ring-ring checked:bg-selection ${focus}`}>
-            <View class="size-4 rounded-full" style={{ backgroundColor: token(`brand-${brand}`) }} />
-            <Text class="flex-1 text-sm text-foreground">{label}</Text>
-            <View class="size-4 opacity-0 group-checked:opacity-100"><Icon name="check" small color="primary" /></View>
-          </Radio>)}
-        </RadioGroup>
+function ModeMenu(props: { value: AppearanceMode; onChange: (mode: AppearanceMode) => void }) {
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
+  const currentLabel = () => modes.find((m) => m.id === props.value)?.label ?? "跟随系统";
+
+  if (nativeMenu) {
+    const open = signal(false);
+    let anchor: ViewRef | undefined;
+    async function openMenu() {
+      if (open()) return;
+      open.set(true);
+      try {
+        const measured = await anchor?.measure();
+        const at = measured
+          ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+          : undefined;
+        await DesktopMenu.popup(
+          modes.map((mode) => ({
+            label: mode.label,
+            checked: mode.id === props.value,
+            onSelect: () => {
+              if (mode.id !== props.value) props.onChange(mode.id);
+            },
+          })),
+          at,
+        );
+      } finally {
+        open.set(false);
+      }
+    }
+    return (
+      <View ref={(node) => { anchor = node; }} class="shrink-0">
+        <BaseButton
+          accessibilityLabel="外观模式"
+          selected={open()}
+          onPress={() => void openMenu()}
+          class={`min-h-7 flex-row items-center gap-1.5 rounded-(--radius) px-2 py-0.5 active:bg-muted ${focus}`}
+        >
+          <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-text-size") }}>{currentLabel()}</Text>
+          <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>⌄</Text>
+        </BaseButton>
       </View>
-      <Text class="text-xs text-muted-foreground">深色外观会调亮品牌色，保持文字与控件清晰。</Text>
+    );
+  }
+
+  return (
+    <SettingSelect
+      label="外观模式"
+      inline
+      value={props.value}
+      items={modes.map((m) => ({ value: m.id, title: m.label }))}
+      onChange={(v) => props.onChange(v as AppearanceMode)}
+    />
+  );
+}
+
+/** Appearance controls share native mode menu and 7-color macOS-style accent dots. */
+export function AppearanceOptions(props: { appearance: ReturnType<typeof createAppearance> }) {
+  return (
+    <View class="flex-col gap-5">
+      <If when={!!props.appearance.error()}>
+        <Text class="text-sm text-destructive">{props.appearance.error()}</Text>
+      </If>
+      <SettingSection title="主题" description="深色外观会调亮主题色，保持文字与控件清晰。">
+        <SettingRow title="外观模式">
+          <ModeMenu value={props.appearance.mode()} onChange={(mode) => void props.appearance.setMode(mode)} />
+        </SettingRow>
+        <SettingRow divider title="主题色">
+          <RadioGroup class="flex-row items-center gap-1.5">
+            {brands.map(([brand, label]) => {
+              const selected = () => props.appearance.brand() === brand;
+              return (
+                <Radio
+                  accessibilityLabel={`品牌色：${label}`}
+                  tooltip={<Tooltip label={label} />}
+                  checked={selected()}
+                  onChange={() => void props.appearance.setBrand(brand)}
+                  class={`size-6 items-center justify-center rounded-full border-2 p-0.5 active:opacity-80 ${focus}`}
+                  style={{ borderColor: selected() ? token(`brand-${brand}`) : token("transparent") }}
+                >
+                  <View
+                    class="size-full rounded-full"
+                    style={{ backgroundColor: token(`brand-${brand}`) }}
+                  />
+                </Radio>
+              );
+            })}
+          </RadioGroup>
+        </SettingRow>
+      </SettingSection>
     </View>
-  </View>;
+  );
 }

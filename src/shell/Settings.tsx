@@ -5,7 +5,6 @@ import { PlaybackSettings } from "./PlaybackSettings";
 import { LyricsSettings } from "./LyricsSettings";
 import { ScrapeSettings } from "./ScrapeSettings";
 import { DownloadSettings } from "./DownloadSettings";
-import { AccountSettings } from "./AccountSettings";
 import { SyncSettings } from "./SyncSettings";
 import { StorageSettings } from "./StorageSettings";
 import { ShortcutSettings } from "./ShortcutSettings";
@@ -15,13 +14,13 @@ import { type createAppearance } from "../ui/theme";
 import { SidebarItem } from "../ui/Navigation";
 import { SearchField } from "../ui/SearchField";
 import { IconButton } from "../ui/IconButton";
-import type { IconName } from "../ui/Icon";
-import { Overlay } from "../ui/Surfaces";
+import { Icon, type IconName } from "../ui/Icon";
+import { Dialog } from "../ui/Surfaces";
 import { AppearanceOptions } from "../ui/AppearanceOptions";
-import { SidebarChrome, SidebarSearch, ShellFrame, ShellSidebar, ShellToolbar, WindowPanel } from "../ui/Chrome";
+import { ShellSidebar, WindowPanel } from "../ui/Chrome";
 
 const categories = [
-  { label: "账户", icon: "user" }, { label: "外观", icon: "palette" },
+  { label: "外观", icon: "palette" },
   { label: "播放", icon: "play" }, { label: "歌词", icon: "captions" },
   { label: "下载", icon: "download" }, { label: "存储", icon: "folder" },
   { label: "来源", icon: "radio" }, { label: "插件", icon: "plug" },
@@ -35,53 +34,60 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
   const plugins = createPlugins();
   const query = signal("");
   effect(()=>{if(props.categoryRequest){selected.set(props.initialCategory ?? "歌词");query.set("");}});
-  return <Overlay open={props.open} onClose={props.onClose}>
-    <ShellFrame>
-      <ShellSidebar>
-        <SidebarChrome />
-        <SidebarSearch>
-          <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="查找分类" sidebar />
-        </SidebarSearch>
-        <Scroll class="flex-1" contentClass="flex-col gap-(--navigation-row-gap) px-2 pb-2">
-          {categories.map((category) => <View class="flex-col"
-            style={{ display: category.label.includes(query()) ? "flex" : "none" }}>
-            <SidebarItem icon={category.icon} label={category.label}
-              selected={selected() === category.label} onPress={() => selected.set(category.label)} />
-          </View>)}
-        </Scroll>
-      </ShellSidebar>
-      <WindowPanel>
-        <ShellToolbar testID="settings-heading">
-          <IconButton icon="close" label="关闭设置" hint="关闭设置 · Esc" onPress={props.onClose} />
-        </ShellToolbar>
-        <Scroll class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) py-4">
-          {/* Hidden checked Radio rings paint at the zero-size origin; mount only the active panel. */}
-          <If when={selected() === "外观"}><View class="w-full max-w-2xl flex-col">
-            <AppearanceOptions appearance={props.appearance} />
-          </View></If>
-          <If when={!!settings.value()}>
-            <If when={selected() === "账户"}><View class="w-full max-w-2xl flex-col"><AccountSettings settings={settings} /></View></If>
-            <If when={selected() === "同步"}><View class="w-full max-w-2xl flex-col"><SyncSettings settings={settings} /></View></If>
-            <If when={selected() === "下载"}><View class="w-full max-w-2xl flex-col"><DownloadSettings initialDirectory={props.initialDownloadDirectory} settings={settings} /></View></If>
-            <If when={selected() === "歌词"}><View class="w-full max-w-2xl"><LyricsSettings settings={settings} /></View></If>
-            <View class="w-full max-w-2xl" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
-            <View class="w-full max-w-2xl flex-col" style={{ display: selected() === "存储" ? "flex" : "none" }}>
-              <StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} />
-              <ScrapeSettings settings={settings} plugins={plugins} />
-            </View>
-          </If>
-          <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
-          <View class="w-full max-w-2xl" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
-          <View class="w-full max-w-2xl" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
-          <View class="w-full max-w-5xl" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
-          <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
-          <If when={selected() === "快捷键" && !!settings.core()}><View class="w-full max-w-2xl"><ShortcutSettings core={settings.core()!} initialConflict={props.initialShortcutConflict} /></View></If>
-          <If when={selected() === "其他" && !!settings.core()}><OtherSettings core={settings.core()!} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} /></If>
-          <View class="flex-col" style={{ display: ["账户", "外观", "播放", "歌词", "下载", "存储", "来源", "插件", "开发者", "其他", "同步", "快捷键"].includes(selected()) ? "none" : "flex" }}>
-            <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
+  return <Dialog
+    open={props.open}
+    accessibilityLabel="设置"
+    onOpenChange={(event) => { if (!event.open) props.onClose(); }}
+    class="w-224 h-160 self-center my-auto overflow-hidden flex-row bg-background"
+    style={{ maxWidth: "92%", maxHeight: "88%" }}>
+    <ShellSidebar class="border-r border-sidebar-border">
+      <View class="shrink-0 px-3 pt-3 pb-2.5">
+        <SearchField label="设置分类" value={query()} onChange={(value) => query.set(value)} placeholder="搜索设置" sidebar />
+      </View>
+      <Scroll class="flex-1" contentClass="flex-col gap-(--navigation-row-gap) px-2.5 pb-3">
+        {categories.map((category) => <View class="flex-col"
+          style={{ display: category.label.includes(query()) ? "flex" : "none" }}>
+          <SidebarItem icon={category.icon} label={category.label} neutral
+            selected={selected() === category.label} onPress={() => selected.set(category.label)} />
+        </View>)}
+      </Scroll>
+    </ShellSidebar>
+    <WindowPanel>
+      <View testID="settings-heading"
+        class="shrink-0 h-13 flex-row items-center justify-between pl-5.5 pr-4">
+        <View class="flex-row items-center gap-1.5">
+          <Text class="text-sm text-muted-foreground">设置</Text>
+          <Icon name="right" class="size-3.5" color="muted-foreground" />
+          <Text role="header" class="text-sm font-medium text-foreground">{selected()}</Text>
+        </View>
+        <IconButton icon="close" label="关闭设置" hint="关闭设置 · Esc" onPress={props.onClose} />
+      </View>
+      <Scroll class="flex-1" contentClass="flex-col px-4 pt-1 pb-8">
+        {/* Hidden checked Radio rings paint at the zero-size origin; mount only the active panel. */}
+        <If when={selected() === "外观"}><View class="w-full flex-col">
+          <AppearanceOptions appearance={props.appearance} />
+        </View></If>
+        <If when={!!settings.value()}>
+          <If when={selected() === "同步"}><View class="w-full flex-col"><SyncSettings settings={settings} /></View></If>
+          <If when={selected() === "下载"}><View class="w-full flex-col"><DownloadSettings initialDirectory={props.initialDownloadDirectory} settings={settings} /></View></If>
+          <If when={selected() === "歌词"}><View class="w-full flex-col"><LyricsSettings settings={settings} /></View></If>
+          <View class="w-full flex-col" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
+          <View class="w-full flex-col gap-5" style={{ display: selected() === "存储" ? "flex" : "none" }}>
+            <StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} />
+            <ScrapeSettings settings={settings} plugins={plugins} />
           </View>
-        </Scroll>
-      </WindowPanel>
-    </ShellFrame>
-  </Overlay>;
+        </If>
+        <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
+        <View class="w-full flex-col" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
+        <View class="w-full flex-col" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
+        <View class="w-full flex-col" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
+        <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
+        <If when={selected() === "快捷键" && !!settings.core()}><View class="w-full flex-col"><ShortcutSettings core={settings.core()!} initialConflict={props.initialShortcutConflict} /></View></If>
+        <If when={selected() === "其他" && !!settings.core()}><View class="w-full flex-col"><OtherSettings core={settings.core()!} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} /></View></If>
+        <View class="w-full flex-col" style={{ display: ["外观", "播放", "歌词", "下载", "存储", "来源", "插件", "开发者", "其他", "同步", "快捷键"].includes(selected()) ? "none" : "flex" }}>
+          <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
+        </View>
+      </Scroll>
+    </WindowPanel>
+  </Dialog>;
 }

@@ -32,7 +32,7 @@ export function DetailAction(props: {
   return <BaseButton accessibilityLabel={props.label} disabled={props.disabled} onPress={props.onPress}
     class={`flex-row items-center justify-center gap-2 min-h-9 px-3.5 py-2 disabled:opacity-40 ${focus}
       ${props.pill ? "rounded-full" : "rounded-(--radius)"}
-      ${props.primary?"bg-primary hover:bg-primary/90 active:bg-primary/80":"bg-secondary hover:bg-accent active:bg-muted"}`}>
+      ${props.primary?"bg-primary active:bg-primary/80":"bg-secondary active:bg-muted"}`}>
     <Icon name={props.icon} small color={props.primary?"primary-foreground":"foreground"} />
     <Text class={`text-(--detail-description-size) font-medium ${props.primary?"text-primary-foreground":"text-foreground"}`}>{props.label}</Text>
   </BaseButton>;

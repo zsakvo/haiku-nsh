@@ -25,24 +25,69 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
   const liked = signal(new Set(props.core.collections.likedKeys() as string[]));
   const playlists = signal(props.core.collections.list() as Collection[]);
   let scroll: ListRef | undefined;
+  let snapTimer: ReturnType<typeof setTimeout> | undefined;
+  let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastOffset = 0;
+  let snapping = false;
+  cleanup(() => { clearTimeout(snapTimer); clearTimeout(releaseTimer); });
   cleanup(props.core.collections.onLiked(keys => liked.set(new Set(keys as string[]))));
   cleanup(props.core.collections.onChange(() => playlists.set(props.core.collections.list() as Collection[])));
   const pages = () => Array.from({ length: Math.ceil(props.tracks.length / pageSize) },
     (_, index) => props.tracks.slice(index * pageSize, (index + 1) * pageSize));
   const lastPage = () => Math.max(0, pages().length - 1);
   const height = () => token("home-track-row-height") * rowsPerColumn;
+  function scrollToPage(next: number, animated: boolean) {
+    const clamped = Math.max(0, Math.min(lastPage(), next));
+    page.set(clamped);
+    const w = width();
+    if (!w) return;
+    clearTimeout(snapTimer);
+    clearTimeout(releaseTimer);
+    snapping = animated;
+    scroll?.scrollToOffset({ offset: clamped * w, animated });
+    if (animated) releaseTimer = setTimeout(() => { snapping = false; }, 320);
+  }
+  function snapToNearest(offsetX: number) {
+    const w = width();
+    if (!w || pages().length <= 1) return;
+    const current = page();
+    const raw = offsetX / w;
+    const delta = raw - current;
+    const candidate = Math.abs(delta) >= 0.8
+      ? Math.round(raw)
+      : delta > 0.18 ? current + 1
+      : delta < -0.18 ? current - 1
+      : current;
+    const next = Math.max(0, Math.min(lastPage(), candidate));
+    const target = next * w;
+    page.set(next);
+    if (Math.abs(offsetX - target) > 1) {
+      scrollToPage(next, !reduceMotion());
+    }
+  }
+  function scheduleSnap(offsetX: number) {
+    lastOffset = offsetX;
+    if (snapping) return;
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(() => snapToNearest(lastOffset), 140);
+  }
   effect(() => {
     props.tracks;
+    clearTimeout(snapTimer);
+    clearTimeout(releaseTimer);
+    snapping = false;
+    lastOffset = 0;
     page.set(0);
     scroll?.scrollToOffset({ offset: 0, animated: false });
   });
   function move(delta: number) {
-    const next = Math.max(0, Math.min(lastPage(), page() + delta));
-    page.set(next);
-    scroll?.scrollToOffset({ offset: next * width(), animated: !reduceMotion() });
+    scrollToPage(page() + delta, !reduceMotion());
   }
   function resize(next: number) {
     if (next <= 0 || next === width()) return;
+    clearTimeout(snapTimer);
+    clearTimeout(releaseTimer);
+    snapping = false;
     width.set(next);
     scroll?.scrollToOffset({ offset: page() * next, animated: false });
   }
@@ -111,13 +156,20 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
       style={{ height: height(), marginLeft: -token("content-inset-left"), marginRight: -token("content-inset-right") }}
       onMouseEnter={() => hovered.set(true)} onMouseLeave={() => hovered.set(false)}>
       <List ref={node => { scroll = node; }} testID="home-tracks-scroll" horizontal pagingEnabled
+        snapToInterval={width() || undefined} snapToAlignment="start" decelerationRate="fast" disableIntervalMomentum
         bounces={false} scrollbar={{ horizontal: { class: "hidden pointer-events-none", thumbClass: "hidden" } }}
         class="flex-1 min-w-0 ml-(--content-inset-left) mr-(--content-inset-right)"
         each={pages()} keyExtractor={items => items.map(trackKey).join(",")}
         estimatedItemSize={Math.max(1, width())}
         onLayout={event => resize(event.bounds.size.width)}
+        onScroll={event => scheduleSnap(event.offset.x)}
+        onMomentumEnd={event => {
+          clearTimeout(snapTimer);
+          if (!snapping) snapToNearest(event.offset.x);
+        }}
         onScrollEnd={event => {
-          if (width()) page.set(Math.max(0, Math.min(lastPage(), Math.round(event.offset.x / width()))));
+          clearTimeout(snapTimer);
+          if (!snapping) snapToNearest(event.offset.x);
         }}>
         {items => <View class="flex-row shrink-0 gap-6"
           style={{ width: Math.max(1, width()), height: height() }}>
@@ -138,14 +190,14 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
         <View class={`absolute left-1 top-0 bottom-0 w-4 items-center justify-center focus-within:opacity-100 ${arrowVisibility()}`}>
           <BaseButton accessibilityLabel="上一组歌曲" testID="home-tracks-previous" disabled={page() === 0}
             onPress={() => move(-1)} tooltip={<Tooltip label="上一组歌曲" />}
-            class={`h-12 w-full items-center justify-center rounded-(--radius) hover:bg-accent active:bg-muted disabled:opacity-25 ${focus}`}>
+            class={`h-12 w-full items-center justify-center rounded-(--radius) active:bg-muted disabled:opacity-25 ${focus}`}>
             <Icon name="left" class="size-6 shrink-0" color="muted-foreground" />
           </BaseButton>
         </View>
         <View class={`absolute right-5 top-0 bottom-0 w-5 items-center justify-center focus-within:opacity-100 ${arrowVisibility()}`}>
           <BaseButton accessibilityLabel="下一组歌曲" testID="home-tracks-next" disabled={page() === lastPage()}
             onPress={() => move(1)} tooltip={<Tooltip label="下一组歌曲" />}
-            class={`h-12 w-full items-center justify-center rounded-(--radius) hover:bg-accent active:bg-muted disabled:opacity-25 ${focus}`}>
+            class={`h-12 w-full items-center justify-center rounded-(--radius) active:bg-muted disabled:opacity-25 ${focus}`}>
             <Icon name="right" class="size-6 shrink-0" color="muted-foreground" />
           </BaseButton>
         </View>
@@ -214,27 +266,27 @@ function HomeTrackCard(props: {
     <View class={`flex-row items-center ${visibility}`}>
       <BaseButton accessibilityLabel={`下载${props.track.title}`} onPress={props.download}
         tooltip={<Tooltip label="下载" />}
-        class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-        <Icon name="download" small color="muted-foreground" />
+        class={`size-7 rounded-(--radius) items-center justify-center active:bg-muted ${focus}`}>
+        <Icon name="harmonyosDownload" small color="muted-foreground" />
       </BaseButton>
       <BaseButton accessibilityLabel={`${props.liked ? "取消喜欢" : "喜欢"}${props.track.title}`} onPress={props.like}
         tooltip={<Tooltip label={props.liked ? "取消喜欢" : "喜欢"} />}
-        class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-        <If when={props.liked}><Text class="text-base text-primary">♥</Text></If>
-        <If when={!props.liked}><Icon name="heart" small color="muted-foreground" /></If>
+        class={`size-7 rounded-(--radius) items-center justify-center active:bg-muted ${focus}`}>
+        <Icon name={props.liked ? "harmonyosHeartFill" : "harmonyosHeart"} small
+          color={props.liked ? "primary" : "muted-foreground"} />
       </BaseButton>
       {nativeMenu
         ? <View ref={node => { moreRef = node; }}>
             <BaseButton accessibilityLabel={`更多${props.track.title}的操作`} selected={menuOpen()}
               onPress={() => void openMoreMenu()} tooltip={<Tooltip label="更多操作" />}
-              class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted selected:bg-accent ${focus}`}>
-              <Text class="text-base text-muted-foreground">…</Text>
+              class={`size-7 rounded-(--radius) items-center justify-center active:bg-muted selected:bg-accent ${focus}`}>
+              <Icon name="harmonyosDotGrid1x2" small color="muted-foreground" />
             </BaseButton>
           </View>
         : <Menu trigger={<BaseButton accessibilityLabel={`更多${props.track.title}的操作`} onPress={() => {}}
             tooltip={<Tooltip label="更多操作" />}
-            class={`size-7 rounded-(--radius) items-center justify-center hover:bg-accent active:bg-muted ${focus}`}>
-            <Text class="text-base text-muted-foreground">…</Text>
+            class={`size-7 rounded-(--radius) items-center justify-center active:bg-muted ${focus}`}>
+            <Icon name="harmonyosDotGrid1x2" small color="muted-foreground" />
           </BaseButton>}>{props.commands()}</Menu>}
     </View>
   </View>;

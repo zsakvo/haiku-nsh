@@ -41,7 +41,7 @@ function FeedCard(props: { title: string; cover?: string; track?: HomeTrack; onP
     <View class="w-full aspect-square rounded-(--radius) bg-muted overflow-hidden items-center justify-center">
       <If when={!!props.cover}><Image src={props.cover!} class="absolute inset-0" style={{ objectFit: "cover" }} /></If>
       <If when={!props.cover}><Icon name="music" color="muted-foreground" /></If>
-      <If when={!!props.track}><View class="absolute inset-0 items-center justify-center bg-cover-shade opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
+      <If when={!!props.track}><View class="absolute inset-0 items-center justify-center bg-cover-shade opacity-0 group-focus-visible:opacity-100">
         <Icon name="play" color="cover-foreground" />
       </View></If>
     </View>

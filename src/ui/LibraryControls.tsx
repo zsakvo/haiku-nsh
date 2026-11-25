@@ -8,7 +8,7 @@ export function ToggleGroup(props: {
 }) {
   return <BaseToggleGroup class="flex-row gap-1 rounded-(--radius) bg-muted p-1">
     {props.items.map((item) => <Toggle pressed={props.value === item.id} onChange={() => props.onChange(item.id)}
-      class={`min-h-7 rounded-(--radius-inset) px-3 py-1 hover:bg-accent active:bg-muted aria-pressed:bg-card ${focus}`}>
+      class={`min-h-7 rounded-(--radius-inset) px-3 py-1 active:bg-muted aria-pressed:bg-card ${focus}`}>
       <Text class="text-sm text-foreground">{item.label}</Text>
     </Toggle>)}
   </BaseToggleGroup>;

@@ -276,7 +276,7 @@ pub(crate) fn controls() -> (AnyElement, AnyElement) {
                     .child(nsh_base::button().flex_1().min_w_0().h_full().flex_row().items_center().gap_3().px_2()
                         .accessibility_label(move || Some(track.with(|t| t.as_ref().map(|t| format!("播放 {}", t.title)).unwrap_or_default()).into()))
                         .selected(active)
-                        .app_class("rounded-(--radius) hover:opacity-80 active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
+                        .app_class("rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
                         .on_press(move || send(&jump, Command::Jump(at.index() as i32)))
                         .child(view().size_8().flex_shrink_0().rounded(move || theme().radius).overflow_hidden()
                             .items_center().justify_center().bg(move || theme().muted)

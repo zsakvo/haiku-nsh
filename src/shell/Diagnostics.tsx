@@ -2,6 +2,7 @@ import { cleanup, Clipboard, List, resource, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
 import { Button } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
+import { SettingRow, SettingSection } from "../ui/SettingsControls";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { localDateTime } from "../ui/dateTime";
 import { AboutContent } from "./About";
@@ -70,10 +71,13 @@ export function LogsView(props: { core: Core }) {
 /** Logs and software identification live in Settings → Other. */
 export function OtherSettings(props: { core: Core; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import" }) {
   const logs = signal(props.initialLogs ?? false);
-  return <View class="gap-5">
-    <Text role="header" class="text-xl font-semibold text-foreground">其他</Text>
+  return <View class="flex-col gap-5">
     <BackupSettings core={props.core} fixturePath={props.backupPath} initialDialog={props.initialBackupDialog} />
-    <Button label="日志查看器…" onPress={() => logs.set(true)} />
+    <SettingSection title="诊断">
+      <SettingRow title="日志查看器" description="查看、筛选与导出应用及插件日志。">
+        <Button label="日志查看器…" size="sm" onPress={() => logs.set(true)} />
+      </SettingRow>
+    </SettingSection>
     <Dialog open={logs()} onOpenChange={(e) => logs.set(e.open)}
       class="w-240 max-w-full self-center mt-24 p-5 gap-4">
       <LogsView core={props.core} />
@@ -81,7 +85,7 @@ export function OtherSettings(props: { core: Core; initialLogs?: boolean; backup
         <Button label="关闭日志查看器" onPress={() => logs.set(false)} />
       </View>
     </Dialog>
-    <AboutContent />
+    <AboutContent grouped />
   </View>;
 }
 /** Expansion state belongs to notice IDs, independently of recycled list cells. */

@@ -8,6 +8,10 @@ const heart = "asset:/ui/icons/heart.svg";
 const clock = "asset:/ui/icons/clock.svg";
 const stats = "asset:/ui/icons/stats-up-square.svg";
 const download = "asset:/ui/icons/download.svg";
+const harmonyosDownload = "asset:/ui/icons/harmonyos-download.svg";
+const harmonyosHeart = "asset:/ui/icons/harmonyos-heart.svg";
+const harmonyosHeartFill = "asset:/ui/icons/harmonyos-heart-fill.svg";
+const harmonyosDotGrid1x2 = "asset:/ui/icons/harmonyos-dot-grid-1x2.svg";
 const settings = "asset:/ui/icons/settings.svg";
 const left = "asset:/ui/icons/nav-arrow-left.svg";
 const right = "asset:/ui/icons/nav-arrow-right.svg";
@@ -29,7 +33,8 @@ const sync = "asset:/ui/icons/refresh-double.svg";
 const keyboard = "asset:/ui/icons/key-command.svg";
 const code = "asset:/ui/icons/code-brackets.svg";
 const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, down, close, plus, check, palette,
-  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code };
+  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code,
+  harmonyosDownload, harmonyosHeart, harmonyosHeartFill, harmonyosDotGrid1x2 };
 export type IconName = keyof typeof icons;
 export function Icon(props: {
   name: IconName;

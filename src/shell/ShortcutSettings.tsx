@@ -1,6 +1,7 @@
 import { cleanup, keymap, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
 import { Button } from "../ui/Button";
+import { SettingRow, SettingSection } from "../ui/SettingsControls";
 import { createShortcuts, nshChord } from "../state/shortcuts";
 
 /** A recorder has its own owner, so every temporary key binding ends on cancel or completion. */
@@ -33,24 +34,29 @@ export function ShortcutSettings(props: { core: Core; initialConflict?: string }
     const target = recording(); if (!target) return;
     void act(() => state.service.apply(state.value().bindings.map((b) => `${b.scope}:${b.id}` === target ? { ...b, chord } : b)));
   }
-  return <View testID="shortcut-settings" class="gap-4">
-    <View class="flex-row items-center gap-3">
-      <Text role="header" class="flex-1 text-xl font-semibold text-foreground">快捷键</Text>
-      <Button testID="shortcut-reset-all" label="全部恢复默认" size="sm" disabled={busy()} onPress={() => void act(() => state.service.resetAll())} />
-    </View>
+  return <View testID="shortcut-settings" class="flex-col gap-5">
     <If when={!!error()}><Text testID="shortcut-error" class="text-sm text-destructive">{error()}</Text></If>
     <If when={!!recording()}><ShortcutRecorder onRecord={record} onCancel={() => recording.set(null)} /></If>
-    <Each of={state.value().supported ? ["app", "global"] : ["app"]} key={(scope) => scope}>{(scope) => <View class="gap-2">
-      <Text role="header" class="text-base font-semibold text-foreground">{scope() === "app" ? "应用内" : "全局"}</Text>
-      <Text class="text-xs text-muted-foreground">{scope() === "app" ? "主窗口内生效。播放快捷键在文本输入时停用。" : "其他应用在前台时也生效。普通键需要 Cmd、Ctrl 或 Option；F1–F20 可单独使用。"}</Text>
-      <Each of={state.value().bindings.filter((b) => b.scope === scope())} key={(b) => b.id}>{(binding) => <View class="min-h-8 flex-row items-center gap-3 border-b border-border py-1">
-        <Text class="flex-1 text-sm text-foreground">{state.value().labels[binding().id]}</Text>
-        <Button testID={`shortcut-edit-${scope()}-${binding().id}`} size="sm" class="min-w-32"
-          label={recording() === `${scope()}:${binding().id}` ? "按下快捷键…" : binding().chord ? keymap.label(nshChord(binding().chord)) : "未绑定"}
-          disabled={busy()} onPress={() => { error.set(""); recording.set(`${scope()}:${binding().id}`); }} />
-        <Button testID={`shortcut-reset-${scope()}-${binding().id}`} label="恢复默认" size="sm" variant="ghost" disabled={busy()}
-          onPress={() => void act(() => state.service.resetOne(`${scope()}:${binding().id}`))} />
-      </View>}</Each>
-    </View>}</Each>
+    <Each of={state.value().supported ? ["app", "global"] : ["app"]} key={(scope) => scope}>{(scope, scopeIndex) =>
+      <SettingSection
+        title={scope() === "app" ? "应用内" : "全局"}
+        description={scope() === "app"
+          ? "主窗口内生效。播放快捷键在文本输入时停用。"
+          : "其他应用在前台时也生效。普通键需要 Cmd、Ctrl 或 Option；F1–F20 可单独使用。"}
+        action={scopeIndex() === 0
+          ? <Button testID="shortcut-reset-all" label="全部恢复默认" size="sm" variant="ghost" disabled={busy()}
+              onPress={() => void act(() => state.service.resetAll())} />
+          : undefined}>
+        <Each of={state.value().bindings.filter((b) => b.scope === scope())} key={(b) => b.id}>{(binding, index) =>
+          <SettingRow divider={index() > 0} title={state.value().labels[binding().id]}>
+            <Button testID={`shortcut-edit-${scope()}-${binding().id}`} size="sm" class="min-w-32"
+              label={recording() === `${scope()}:${binding().id}` ? "按下快捷键…" : binding().chord ? keymap.label(nshChord(binding().chord)) : "未绑定"}
+              disabled={busy()} onPress={() => { error.set(""); recording.set(`${scope()}:${binding().id}`); }} />
+            <Button testID={`shortcut-reset-${scope()}-${binding().id}`} label="恢复默认" size="sm" variant="ghost" disabled={busy()}
+              onPress={() => void act(() => state.service.resetOne(`${scope()}:${binding().id}`))} />
+          </SettingRow>
+        }</Each>
+      </SettingSection>
+    }</Each>
   </View>;
 }

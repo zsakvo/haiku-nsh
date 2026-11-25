@@ -5,7 +5,16 @@ import { Button, focus } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Field } from "../ui/LibraryControls";
 import { Dialog, Menu, MenuItem, popupSurface } from "../ui/Surfaces";
-import { SettingSelect, SettingSwitch } from "../ui/SettingsControls";
+import {
+  SettingCardBlock,
+  SettingDivider,
+  SettingRow,
+  SettingSection,
+  SettingSelect,
+  SettingSelectRow,
+  SettingSwitch,
+  SettingSwitchRow,
+} from "../ui/SettingsControls";
 import type { PluginsState, SourceRecord } from "../state/plugins";
 
 export function SourcesSettings(props: { state: PluginsState; initialLogin?: string }) {
@@ -29,19 +38,13 @@ export function SourcesSettings(props: { state: PluginsState; initialLogin?: str
     [ids[from], ids[to]] = [ids[to], ids[from]];
     await props.state.run(c => c.sources.reorder(ids));
   }
-  return <View class="gap-4" testID="sources-settings">
-    <Text role="header" class="text-lg font-semibold text-foreground">来源</Text>
-    <Text class="text-sm text-muted-foreground">连接音乐库或登录音乐平台，管理账号与来源顺序。</Text>
-    <Each of={props.state.value().sources} key={s => s.sourceId}>{s => <View
-      class="flex-row items-center gap-4 border-b border-border py-3">
-      <View class="flex-1 min-w-0 gap-1">
-        <Text class="text-sm font-medium text-foreground">{s().displayName || s().pluginId}</Text>
-        <Text class="text-xs text-muted-foreground">{subtitle(s())}</Text>
-      </View>
-      <View class="shrink-0 items-end gap-2">
-        <SettingSwitch label="启用来源" hideLabel checked={s().enabled}
-          onChange={enabled => void props.state.run(c => c.sources.setEnabled(s().sourceId, enabled))} />
-        <View class="flex-row items-center justify-end gap-2">
+  return <View class="flex-col gap-5" testID="sources-settings">
+    <SettingSection title="音乐来源" description="连接音乐库或登录音乐平台，管理账号与来源顺序。"
+      action={<Button label="添加新来源…" size="sm" variant="ghost" onPress={() => { connection.set(undefined); adding.set(true); }} />}>
+      <Each of={props.state.value().sources} key={s => s.sourceId}>{(s, index) =>
+        <SettingRow divider={index() > 0}
+          title={s().displayName || s().pluginId}
+          description={subtitle(s())}>
           <If when={isLibrary(s().pluginId)}>
             <Button label="编辑连接…" size="sm" onPress={() => {
               connection.set(s()); plugin.set(s().pluginId); adding.set(true);
@@ -60,13 +63,16 @@ export function SourcesSettings(props: { state: PluginsState; initialLogin?: str
             <MenuItem onSelect={() => void move(s().sourceId, 1)}><Text>下移</Text></MenuItem>
             <MenuItem onSelect={() => removing.set(s().sourceId)}><Text>移除…</Text></MenuItem>
           </Menu>
-        </View>
-      </View>
-    </View>}</Each>
-    <If when={props.state.value().sources.length === 0}>
-      <Text class="text-sm text-muted-foreground">尚未添加来源。先连接一个音乐库。</Text>
-    </If>
-    <View class="flex-row"><Button label="添加新来源…" onPress={() => { connection.set(undefined); adding.set(true); }} /></View>
+          <SettingSwitch label="启用来源" hideLabel checked={s().enabled}
+            onChange={enabled => void props.state.run(c => c.sources.setEnabled(s().sourceId, enabled))} />
+        </SettingRow>
+      }</Each>
+      <If when={props.state.value().sources.length === 0}>
+        <SettingCardBlock>
+          <Text class="text-sm text-muted-foreground">尚未添加来源。先连接一个音乐库。</Text>
+        </SettingCardBlock>
+      </If>
+    </SettingSection>
     <Dialog open={adding()} onOpenChange={e => adding.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
       <If when={adding()}><SourceLogin state={props.state} initialPlugin={plugin()} initialSource={connection()}
         onClose={() => adding.set(false)} /></If>
@@ -238,42 +244,45 @@ export function PluginsSettings(props: { state: PluginsState }) {
       if (path) await c.plugins.importPackage(path);
     });
   }
-  return <View class="gap-4" testID="plugins-settings">
-    <View class="flex-row items-center justify-between">
-      <Text role="header" class="text-lg font-semibold text-foreground">插件</Text>
-      <Menu trigger={<Button label="导入…" onPress={() => {}} />}>
-        <MenuItem onSelect={() => void pick("zip")}><Text>ZIP 文件…</Text></MenuItem>
-        <MenuItem onSelect={() => void pick("directory")}><Text>本地目录…</Text></MenuItem>
-        <MenuItem onSelect={() => void pick("typescript")}><Text>TypeScript 文件…</Text></MenuItem>
-        <MenuItem onSelect={() => importing.set(true)}><Text>HTTPS URL…</Text></MenuItem>
-      </Menu>
-    </View>
-    <Each of={props.state.value().packages} key={p => p.id}>{p => <View
-      class="flex-row items-center justify-between gap-4 border-b border-border py-3">
-      <Popover class="flex-1 min-w-0" popupClass={`${popupSurface} w-80 gap-3 p-4`}
-        align="start" trigger={<BaseButton accessibilityLabel={`${p().name} 详情`}
-          class={`w-full min-w-0 flex-row items-center gap-3 rounded-(--radius) p-2 hover:bg-accent active:bg-muted ${focus}`}>
-          <View class="size-9 shrink-0 items-center justify-center rounded-(--radius) bg-muted">
-            <If when={!!p().logo}><Image src={p().logo!} class="size-9 rounded-(--radius)" /></If>
-            <If when={!p().logo}><Icon name="plug" color="muted-foreground" /></If>
-          </View>
-          <View class="flex-1 min-w-0 gap-1">
-            <Text class="text-sm font-medium text-foreground">{p().name}</Text>
+  return <View class="flex-col gap-5" testID="plugins-settings">
+    <SettingSection title="已安装插件"
+      action={
+        <Menu trigger={<Button label="导入…" size="sm" variant="ghost" onPress={() => {}} />}>
+          <MenuItem onSelect={() => void pick("zip")}><Text>ZIP 文件…</Text></MenuItem>
+          <MenuItem onSelect={() => void pick("directory")}><Text>本地目录…</Text></MenuItem>
+          <MenuItem onSelect={() => void pick("typescript")}><Text>TypeScript 文件…</Text></MenuItem>
+          <MenuItem onSelect={() => importing.set(true)}><Text>HTTPS URL…</Text></MenuItem>
+        </Menu>
+      }>
+      <Each of={props.state.value().packages} key={p => p.id}>{(p, index) => <>
+        <If when={index() > 0}><SettingDivider /></If>
+        <View class="flex-row items-center justify-between gap-4 px-3 py-2">
+          <Popover class="flex-1 min-w-0" popupClass={`${popupSurface} w-80 gap-3 p-4`}
+            align="start" trigger={<BaseButton accessibilityLabel={`${p().name} 详情`}
+              class={`w-full min-w-0 flex-row items-center gap-3 rounded-(--radius) py-1 active:bg-muted ${focus}`}>
+              <View class="size-9 shrink-0 items-center justify-center rounded-(--radius) bg-card border border-border">
+                <If when={!!p().logo}><Image src={p().logo!} class="size-9 rounded-(--radius)" /></If>
+                <If when={!p().logo}><Icon name="plug" color="muted-foreground" /></If>
+              </View>
+              <View class="flex-1 min-w-0 gap-0.5">
+                <Text class="text-sm text-foreground">{p().name}</Text>
+                <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
+              </View>
+            </BaseButton>}>
+            <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
             <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
+            <Text class="text-xs text-foreground">{p().capabilities.join("、")}</Text>
+            <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
+            <Button label="删除插件…" variant="destructive"
+              disabled={p().builtin || uses(p().id).length > 0} onPress={() => removing.set(p().id)} />
+          </Popover>
+          <View class="shrink-0 items-end">
+            <SettingSwitch label={`启用${p().name}`} hideLabel checked={p().enabled}
+              onChange={enabled => void props.state.run(c => c.plugins.setPackageEnabled(p().id, enabled))} />
           </View>
-        </BaseButton>}>
-        <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
-        <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
-        <Text class="text-xs text-foreground">{p().capabilities.join("、")}</Text>
-        <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
-        <Button label="删除插件…" variant="destructive"
-          disabled={p().builtin || uses(p().id).length > 0} onPress={() => removing.set(p().id)} />
-      </Popover>
-      <View class="w-9 shrink-0 items-end">
-        <SettingSwitch label={`启用${p().name}`} hideLabel checked={p().enabled}
-          onChange={enabled => void props.state.run(c => c.plugins.setPackageEnabled(p().id, enabled))} />
-      </View>
-    </View>}</Each>
+        </View>
+      </>}</Each>
+    </SettingSection>
     <Dialog open={importing()} onOpenChange={e => importing.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
       <Text role="header" class="text-lg font-semibold text-foreground">导入插件</Text>
       <Field label="文件、目录或 HTTPS URL" value={location()} onChange={value => location.set(value)} />
@@ -301,7 +310,7 @@ function JsonTree(props: { value: unknown; name?: string }) {
   return <View class="gap-1 items-start">
     <If when={!!entries()}>
       <BaseButton accessibilityLabel={`${expanded() ? "收起" : "展开"}${props.name || "结果"}`}
-        class={`min-h-7 flex-row items-center gap-1 rounded-(--radius) hover:bg-accent ${focus}`}
+        class={`min-h-7 flex-row items-center gap-1 rounded-(--radius) ${focus}`}
         onPress={() => expanded.set(!expanded())}>
         <Text class="w-4 text-xs text-muted-foreground">{expanded() ? "▾" : "▸"}</Text>
         <Text class="text-xs text-foreground">{props.name || "结果"}</Text>
@@ -368,68 +377,77 @@ export function DeveloperSettings(props: { state: PluginsState; initialResult?: 
       watching.set(location()); watchStatus.set("正在监听文件变化");
     });
   }
-  return <View class="gap-4" testID="developer-settings">
-    <Text role="header" class="text-lg font-semibold text-foreground">开发者</Text>
-    <View class="flex-row items-start gap-6 min-w-0">
-    <View class="flex-1 min-w-0 gap-4">
-    <Field label="本地插件目录" value={location()} onChange={value => location.set(value)} />
-    <View class="flex-row"><Button label="加载或重新加载" loading={props.state.busy()}
-      onPress={() => void load()} /></View>
-    <If when={!!watching()}><View class="flex-row items-center gap-2">
-      <Text class="flex-1 text-xs text-muted-foreground">{watchStatus()}：{watching()}</Text>
-      <Button label="停止监听" size="sm" onPress={() => {
-        stopWatch?.(); watching.set(""); watchStatus.set("");
-      }} />
-    </View></If>
-    <SettingSelect label="实例" value={activeSource()} items={props.state.value().sources.map(s => ({
-      value: s.sourceId, title: s.displayName || s.sourceId,
-    }))} onChange={value => source.set(value)} />
-    <SettingSelect label="能力" value={capability()} items={descriptor()?.capabilities.map(value => ({
-      value, title: value,
-    })) ?? []} onChange={value => capability.set(value)} />
-    <SettingSwitch label="原始 JSON" checked={raw()} onChange={value => raw.set(value)} />
-    <If when={raw()}><Field label="参数（JSON 数组）" value={args()}
-      onChange={value => args.set(value)} /></If>
-    <If when={!raw()}><View class="gap-3" testID="plugin-parameter-form">
-      <Each of={fields()} key={field => field.key}>{field => <Field label={field().label}
-        value={values()[field().key] ?? field().default}
-        onChange={value => values.set({ ...values(), [field().key]: value })} />}</Each>
-      <If when={fields().length === 0}><Text class="text-xs text-muted-foreground">此能力无需参数。</Text></If>
-    </View></If>
-    <View class="flex-row flex-wrap gap-2">
-      <Button label="调用" variant="primary" disabled={!activeSource()} loading={props.state.busy()}
-        onPress={() => void props.state.run(async c => {
-          const input = argumentsForCall();
-          result.set(await c.plugins.invoke(activeSource(), capability(), input.args, input.context));
-        })} />
-      <Button label="运行契约测试" disabled={!plugin()} loading={props.state.busy()}
-        onPress={() => void props.state.run(async c => result.set(await c.plugins.testContract(plugin()!)))} />
-      <Button label="查看存储" disabled={!activeSource()}
-        onPress={() => void props.state.run(async c => result.set(await c.plugins.storage(activeSource())))} />
+  return <View class="flex-row items-start gap-5 min-w-0" testID="developer-settings">
+    <View class="flex-1 min-w-0 flex-col gap-5">
+      <SettingSection title="本地插件调试">
+        <SettingCardBlock>
+          <Field label="本地插件目录" value={location()} onChange={value => location.set(value)} />
+          <View class="flex-row"><Button label="加载或重新加载" size="sm" loading={props.state.busy()}
+            onPress={() => void load()} /></View>
+          <If when={!!watching()}><View class="flex-row items-center gap-2">
+            <Text class="flex-1 text-xs text-muted-foreground">{watchStatus()}：{watching()}</Text>
+            <Button label="停止监听" size="sm" onPress={() => {
+              stopWatch?.(); watching.set(""); watchStatus.set("");
+            }} />
+          </View></If>
+        </SettingCardBlock>
+      </SettingSection>
+      <SettingSection title="能力调用">
+        <SettingSelectRow label="实例" value={activeSource()} items={props.state.value().sources.map(s => ({
+          value: s.sourceId, title: s.displayName || s.sourceId,
+        }))} onChange={value => source.set(value)} />
+        <SettingSelectRow divider label="能力" value={capability()} items={descriptor()?.capabilities.map(value => ({
+          value, title: value,
+        })) ?? []} onChange={value => capability.set(value)} />
+        <SettingSwitchRow divider label="原始 JSON" checked={raw()} onChange={value => raw.set(value)} />
+        <SettingCardBlock divider>
+          <If when={raw()}><Field label="参数（JSON 数组）" value={args()}
+            onChange={value => args.set(value)} /></If>
+          <If when={!raw()}><View class="gap-3" testID="plugin-parameter-form">
+            <Each of={fields()} key={field => field.key}>{field => <Field label={field().label}
+              value={values()[field().key] ?? field().default}
+              onChange={value => values.set({ ...values(), [field().key]: value })} />}</Each>
+            <If when={fields().length === 0}><Text class="text-xs text-muted-foreground">此能力无需参数。</Text></If>
+          </View></If>
+          <View class="flex-row flex-wrap gap-2">
+            <Button label="调用" variant="primary" size="sm" disabled={!activeSource()} loading={props.state.busy()}
+              onPress={() => void props.state.run(async c => {
+                const input = argumentsForCall();
+                result.set(await c.plugins.invoke(activeSource(), capability(), input.args, input.context));
+              })} />
+            <Button label="运行契约测试" size="sm" disabled={!plugin()} loading={props.state.busy()}
+              onPress={() => void props.state.run(async c => result.set(await c.plugins.testContract(plugin()!)))} />
+            <Button label="查看存储" size="sm" disabled={!activeSource()}
+              onPress={() => void props.state.run(async c => result.set(await c.plugins.storage(activeSource())))} />
+            <Button label="清除 KV" size="sm" disabled={!activeSource()}
+              onPress={() => void props.state.run(c => c.plugins.clearStorage(activeSource()))} />
+            <Button label="清除凭据" size="sm" disabled={!activeSource()}
+              onPress={() => void props.state.run(c => c.sources.logout(activeSource()))} />
+          </View>
+        </SettingCardBlock>
+      </SettingSection>
     </View>
-    <View class="flex-row flex-wrap gap-2">
-      <Button label="清除 KV" disabled={!activeSource()}
-        onPress={() => void props.state.run(c => c.plugins.clearStorage(activeSource()))} />
-      <Button label="清除凭据" disabled={!activeSource()}
-        onPress={() => void props.state.run(c => c.sources.logout(activeSource()))} />
-    </View>
-    </View>
-    <View class="flex-1 min-w-0 gap-4">
-    <If when={result() !== null}><View class="gap-2" testID="plugin-call-result">
-      <Text class="text-sm font-medium text-foreground">返回结果</Text>
-      <Scroll class="h-64 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
-        <JsonTree value={result()} />
-      </Scroll>
-    </View></If>
-    <Text role="header" class="text-sm font-medium text-foreground">日志与 HTTP 追踪</Text>
-    <List each={props.state.events()} class="h-40 min-h-0" testID="plugin-events"
-      keyExtractor={(_, index) => String(index)}
-      empty={<Text class="text-xs text-muted-foreground">尚无日志或 HTTP 追踪。调用能力后显示。</Text>}>
-      {event => <View class="border-b border-border py-2">
-        <Text class="text-xs text-muted-foreground" style={{ numberOfLines: 3 }}>{eventLine(event())}</Text>
-      </View>}
-    </List>
-    </View>
+    <View class="flex-1 min-w-0 flex-col gap-5">
+      <If when={result() !== null}>
+        <SettingSection title="返回结果" testID="plugin-call-result">
+          <SettingCardBlock>
+            <Scroll class="h-64 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
+              <JsonTree value={result()} />
+            </Scroll>
+          </SettingCardBlock>
+        </SettingSection>
+      </If>
+      <SettingSection title="日志与 HTTP 追踪">
+        <SettingCardBlock>
+          <List each={props.state.events()} class="h-48 min-h-0" testID="plugin-events"
+            keyExtractor={(_, index) => String(index)}
+            empty={<Text class="text-xs text-muted-foreground">尚无日志或 HTTP 追踪。调用能力后显示。</Text>}>
+            {event => <View class="border-b border-settings-divider py-2">
+              <Text class="text-xs text-muted-foreground" style={{ numberOfLines: 3 }}>{eventLine(event())}</Text>
+            </View>}
+          </List>
+        </SettingCardBlock>
+      </SettingSection>
     </View>
   </View>;
 }

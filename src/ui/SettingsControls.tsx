@@ -1,31 +1,219 @@
-import { Text, View } from "nsh";
+import { Text, token, View, type JSX } from "nsh";
 import { Select as BaseSelect, Slider as BaseSlider, Switch as BaseSwitch } from "nsh/base";
 import { focus } from "./Button";
 import { popupItem, popupSurface } from "./Surfaces";
-export function SettingSwitch(props: { label: string; hideLabel?: boolean; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <BaseSwitch checked={props.checked} onChange={(e) => props.onChange(e.checked)}
-    accessibilityLabel={props.label} class={`min-h-8 flex-row items-center gap-3 ${focus}`}
-    trackClass="w-9 rounded-full bg-muted p-0.5 checked:bg-primary disabled:opacity-40"
-    thumbClass="size-4 rounded-full bg-background checked:translate-x-4">
-    <If when={!props.hideLabel}><Text class="text-sm text-foreground">{props.label}</Text></If>
-  </BaseSwitch>;
+
+export function SettingSection(props: {
+  title?: string;
+  description?: string;
+  action?: JSX.Element;
+  children?: JSX.Element;
+  testID?: string;
+}) {
+  return (
+    <View testID={props.testID} class="flex-col gap-1.5">
+      <If when={!!props.title || !!props.action}>
+        <View class="flex-row items-center justify-between gap-3 px-1.5">
+          <If when={!!props.title}>
+            <Text role="header" class="font-medium text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>
+              {props.title}
+            </Text>
+          </If>
+          <If when={!props.title}><View /></If>
+          {props.action}
+        </View>
+      </If>
+      <View class="flex-col overflow-hidden rounded-(--radius-panel) bg-settings-card">
+        {props.children}
+      </View>
+      <If when={!!props.description}>
+        <Text class="px-1.5 text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>{props.description}</Text>
+      </If>
+    </View>
+  );
 }
-export function SettingSlider(props: { label: string; value: number; min: number; max: number; step?: number; disabled?: boolean; onChange: (value: number) => void; testID?: string }) {
-  return <View class="min-w-0 gap-1">
-    <View class="flex-row justify-between gap-3"><Text class="text-xs text-muted-foreground">{props.label}</Text><Text class="text-xs text-foreground">{props.value.toFixed(1)}</Text></View>
-    <BaseSlider testID={props.testID} accessibilityLabel={props.label} value={props.value} min={props.min} max={props.max} step={props.step ?? 0.5}
-      disabled={props.disabled} onChange={(e) => { if (typeof e.value === "number") props.onChange(e.value); }}
-      class="w-full disabled:opacity-40" trackClass="h-6 justify-center" indicatorClass="h-1 rounded-full bg-muted"
-      rangeClass="rounded-full bg-foreground" thumbClass={`size-3 rounded-full border border-border bg-card hover:bg-accent active:bg-muted ${focus}`} />
-  </View>;
+
+export function SettingDivider() {
+  return <View class="mx-3 h-px bg-settings-divider" />;
 }
-export function SettingSelect(props: { label: string; value: string; items: { value: string; title: string }[]; onChange: (value: string) => void }) {
-  return <View class="flex-row items-center justify-between gap-4">
-    <Text class="text-sm text-foreground">{props.label}</Text>
-    <BaseSelect accessibilityLabel={props.label} value={props.value} items={props.items} onChange={(e) => { if (e.value !== null) props.onChange(e.value); }}
-      class="min-w-40" popupClass={`${popupSurface} p-1`} listClass="max-h-64" itemClass={popupItem}
-      trigger={<View class={`min-h-8 flex-row items-center justify-between gap-3 rounded-(--radius) border border-input bg-card px-3 py-1.5 hover:bg-accent ${focus}`}>
-        <Text class="text-sm text-foreground">{props.items.find((i) => i.value === props.value)?.title ?? "自定义"}</Text><Text class="text-xs text-muted-foreground">⌄</Text>
-      </View>} />
-  </View>;
+
+export function SettingRow(props: {
+  title: string;
+  description?: string;
+  children?: JSX.Element;
+  divider?: boolean;
+  testID?: string;
+}) {
+  return (
+    <>
+      <If when={!!props.divider}><SettingDivider /></If>
+      <View testID={props.testID} class="min-h-10 flex-row items-center justify-between gap-4 px-3 py-2">
+        <View class="min-w-0 flex-1 flex-col gap-0.5">
+          <Text class="text-foreground" style={{ fontSize: token("sidebar-text-size") }}>{props.title}</Text>
+          <If when={!!props.description}>
+            <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>{props.description}</Text>
+          </If>
+        </View>
+        <View class="shrink-0 flex-row items-center gap-2">{props.children}</View>
+      </View>
+    </>
+  );
+}
+
+export function SettingCardBlock(props: {
+  children?: JSX.Element;
+  divider?: boolean;
+  class?: string;
+  testID?: string;
+}) {
+  return (
+    <>
+      <If when={!!props.divider}><SettingDivider /></If>
+      <View testID={props.testID} class={`flex-col gap-2.5 px-3 py-2.5 ${props.class ?? ""}`}>
+        {props.children}
+      </View>
+    </>
+  );
+}
+
+export function SettingSwitch(props: {
+  label: string;
+  hideLabel?: boolean;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <BaseSwitch
+      checked={props.checked}
+      onChange={(e) => props.onChange(e.checked)}
+      accessibilityLabel={props.label}
+      class={`min-h-7 flex-row items-center gap-3 ${focus}`}
+      trackClass="h-6 w-10 justify-center rounded-full bg-settings-switch-track p-0.5 checked:bg-primary disabled:opacity-40"
+      thumbClass="size-5 rounded-full bg-settings-switch-thumb checked:translate-x-4"
+    >
+      <If when={!props.hideLabel}>
+        <Text class="text-sm text-foreground">{props.label}</Text>
+      </If>
+    </BaseSwitch>
+  );
+}
+
+export function SettingSwitchRow(props: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  divider?: boolean;
+}) {
+  return (
+    <SettingRow title={props.label} description={props.description} divider={props.divider}>
+      <SettingSwitch label={props.label} hideLabel checked={props.checked} onChange={props.onChange} />
+    </SettingRow>
+  );
+}
+
+export function SettingSlider(props: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+  testID?: string;
+}) {
+  return (
+    <View class="min-w-0 gap-1">
+      <View class="flex-row justify-between gap-3">
+        <Text class="text-xs text-muted-foreground">{props.label}</Text>
+        <Text class="text-xs text-foreground">{props.value.toFixed(1)}</Text>
+      </View>
+      <BaseSlider
+        testID={props.testID}
+        accessibilityLabel={props.label}
+        value={props.value}
+        min={props.min}
+        max={props.max}
+        step={props.step ?? 0.5}
+        disabled={props.disabled}
+        onChange={(e) => {
+          if (typeof e.value === "number") props.onChange(e.value);
+        }}
+        class="w-full disabled:opacity-40"
+        trackClass="h-6 justify-center"
+        indicatorClass="h-1 rounded-full bg-settings-switch-track"
+        rangeClass="rounded-full bg-foreground"
+        thumbClass={`size-3 rounded-full border border-border bg-card active:bg-muted ${focus}`}
+      />
+    </View>
+  );
+}
+
+export function SettingSelect(props: {
+  label: string;
+  value: string;
+  items: { value: string; title: string }[];
+  onChange: (value: string) => void;
+  inline?: boolean;
+}) {
+  const currentTitle = () => props.items.find((i) => i.value === props.value)?.title ?? "自定义";
+  if (props.inline) {
+    return (
+      <BaseSelect
+        accessibilityLabel={props.label}
+        value={props.value}
+        items={props.items}
+        onChange={(e) => {
+          if (e.value !== null) props.onChange(e.value);
+        }}
+        popupClass={`${popupSurface} min-w-40 p-1`}
+        listClass="max-h-64"
+        itemClass={popupItem}
+        trigger={
+          <View class={`min-h-7 flex-row items-center gap-1.5 rounded-(--radius) px-2 py-0.5 active:bg-muted ${focus}`}>
+            <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-text-size") }}>{currentTitle()}</Text>
+            <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>⌄</Text>
+          </View>
+        }
+      />
+    );
+  }
+  return (
+    <View class="flex-row items-center justify-between gap-4">
+      <Text class="text-sm text-foreground">{props.label}</Text>
+      <BaseSelect
+        accessibilityLabel={props.label}
+        value={props.value}
+        items={props.items}
+        onChange={(e) => {
+          if (e.value !== null) props.onChange(e.value);
+        }}
+        class="min-w-40"
+        popupClass={`${popupSurface} p-1`}
+        listClass="max-h-64"
+        itemClass={popupItem}
+        trigger={
+          <View class={`min-h-8 flex-row items-center justify-between gap-3 rounded-(--radius) border border-input bg-card px-3 py-1.5 ${focus}`}>
+            <Text class="text-sm text-foreground">{currentTitle()}</Text>
+            <Text class="text-xs text-muted-foreground">⌄</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+export function SettingSelectRow(props: {
+  label: string;
+  description?: string;
+  value: string;
+  items: { value: string; title: string }[];
+  onChange: (value: string) => void;
+  divider?: boolean;
+}) {
+  return (
+    <SettingRow title={props.label} description={props.description} divider={props.divider}>
+      <SettingSelect label={props.label} value={props.value} items={props.items} onChange={props.onChange} inline />
+    </SettingRow>
+  );
 }

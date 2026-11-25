@@ -324,7 +324,7 @@ pub(crate) fn lyrics_view(p: Rc<Presentation>) -> impl IntoElement {
                     .disabled(move ||!lyrics.with(|l| l.synced))
 
                     .px_3().py(px(10.)).justify_center().gap(px(6.))
-                    .app_class("rounded-(--radius) hover:bg-now-playing-surface active:opacity-80 focus-visible:outline-2 focus-visible:outline-lyric-active")
+                    .app_class("rounded-(--radius) active:opacity-80 focus-visible:outline-2 focus-visible:outline-lyric-active")
                     .opacity(move || {
                         if !lyrics.with(|l| l.synced) { return 1_f32; }
                         match current.get() {

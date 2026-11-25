@@ -4,13 +4,14 @@ import base from "./haiku.json";
 
 export type AppearanceMode = "system" | "light" | "dark";
 export const brands = [
-  ["red", "红"], ["orange", "橙"], ["amber", "琥珀"], ["yellow", "黄"],
-  ["lime", "青柠"], ["green", "绿"], ["emerald", "翡翠"], ["teal", "青绿"],
-  ["cyan", "青"], ["sky", "天蓝"], ["blue", "蓝"], ["indigo", "靛蓝"],
-  ["violet", "紫罗兰"], ["purple", "紫"], ["fuchsia", "品红"],
-  ["pink", "粉"], ["rose", "玫瑰"],
+  ["blue", "蓝"], ["purple", "紫"], ["pink", "粉"], ["red", "红"],
+  ["orange", "橙"], ["amber", "黄"], ["green", "绿"],
 ] as const;
 export type Brand = typeof brands[number][0];
+const brandIds = new Set<string>(brands.map(([id]) => id));
+function normalizeBrand(value: string): Brand {
+  return (brandIds.has(value) ? value : "orange") as Brand;
+}
 export const modes = [
   { id: "system", label: "跟随系统" }, { id: "light", label: "浅色" }, { id: "dark", label: "深色" },
 ] as const;
@@ -28,8 +29,9 @@ function foreground(color: string): string {
   return r * .2126 + g * .7152 + b * .0722 > .179 ? "#000000" : "#ffffff";
 }
 /** Color arithmetic belongs with the theme definitions, never in components. */
-export function brandTheme(brand: Brand) {
-  const original = base.cssVars.light[`brand-${brand}`];
+export function brandTheme(brand: Brand | string) {
+  const lightVars = base.cssVars.light as Record<string, string>;
+  const original = lightVars[`brand-${brand}`] ?? base.cssVars.light["brand-orange"];
   function palette(dark: boolean) {
     const source = dark ? base.cssVars.dark : base.cssVars.light;
     const primary = dark ? mix(original, "#ffffff", .48) : original;
@@ -53,8 +55,8 @@ export function createAppearance(initialMode?: AppearanceMode) {
   let stop: (() => void) | undefined;
   cleanup(() => stop?.());
   function mirror(value: unknown) {
-    const s = value as { themeMode: AppearanceMode; brandColor: Brand };
-    mode.set(s.themeMode); brand.set(s.brandColor);
+    const s = value as { themeMode: AppearanceMode; brandColor: string };
+    mode.set(s.themeMode); brand.set(normalizeBrand(s.brandColor));
   }
   effect(() => { let alive = true;
     Core.open().then(async (c) => { if (!alive) return;
@@ -65,9 +67,11 @@ export function createAppearance(initialMode?: AppearanceMode) {
     }).catch((e) => error.set(String(e)));
     return () => { alive = false; };
   });
-  async function update(patch: unknown) {
+  async function update(patch: Partial<{ themeMode: AppearanceMode; brandColor: Brand }>) {
+    if (patch.themeMode) mode.set(patch.themeMode);
+    if (patch.brandColor) brand.set(patch.brandColor);
     try { const c = core ?? await Core.open(); await c.settings.update(patch); error.set(""); }
-    catch (e) {error.set(`无法保存外观：${String(e)}`);}
+    catch (e) { error.set(`无法保存外观：${String(e)}`); }
   }
   effect(() => setColorScheme(mode()));
   effect(() => {

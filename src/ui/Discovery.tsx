@@ -30,7 +30,7 @@ export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:
   return <BaseButton accessibilityLabel={props.title} onPress={props.onPress}
     class={`shrink-0 gap-2 items-start rounded-(--radius-panel) ${props.listening
       ?"w-(--listening-cover-size)"
-      :"w-28 hover:bg-accent active:bg-muted"} ${focus}`}>
+      :"w-28 active:bg-muted"} ${focus}`}>
     <View class={`${coverClass()} rounded-(--radius) bg-muted overflow-hidden items-center justify-center`}>
       <If when={!!props.cover}><Image src={props.cover} class={coverClass()} style={{objectFit:"cover"}} /></If><If when={!props.cover}><Text class="text-muted-foreground">♪</Text></If>
     </View><If when={!props.hideTitle}><Text class={`w-full text-sm ${props.listening?"text-muted-foreground":"text-foreground"}`}
@@ -88,7 +88,7 @@ export function RecommendationCard(props:{
       tooltip={<Tooltip label={props.busy?"正在加载播放列表…":`播放${props.title}`} />}
       focusVisibleStyle={{opacity:1,pointerEvents:"auto"}}
       style={{pointerEvents:hovered()?"auto":"none"}}
-      class={`absolute bottom-1.5 right-1.5 size-(--recommendation-play-size) rounded-full items-center justify-center bg-cover-play-background hover:bg-cover-play-hover active:bg-cover-play-active disabled:opacity-40 focus-visible:opacity-100 ${fade} ${visibility()} ${focus}`}>
+      class={`absolute bottom-1.5 right-1.5 size-(--recommendation-play-size) rounded-full items-center justify-center bg-cover-play-background active:bg-cover-play-active disabled:opacity-40 focus-visible:opacity-100 ${fade} ${visibility()} ${focus}`}>
       <Icon name={props.busy?"sync":"play"} color="cover-foreground" />
     </BaseButton>
   </View>;

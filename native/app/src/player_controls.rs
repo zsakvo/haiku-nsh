@@ -57,10 +57,10 @@ pub(crate) fn compact_surface_control(
     icon_name: &'static str,
     dark: Prop<bool>,
 ) -> ButtonElement {
-    sized_surface_control(label, icon_name, false, dark, true, 32., 16.)
+    sized_surface_control(label, icon_name, false, dark, 32., 16.)
 }
 pub(crate) fn small_control(label: &'static str, icon_name: &'static str) -> ButtonElement {
-    sized_surface_control(label, icon_name, false, false.into(), false, 30., 18.)
+    sized_surface_control(label, icon_name, false, false.into(), 30., 18.)
 }
 pub(crate) fn surface_control(
     label: impl IntoReactive<SharedString>,
@@ -73,7 +73,6 @@ pub(crate) fn surface_control(
         icon_name,
         primary,
         dark,
-        false,
         if primary { 36. } else { 32. },
         20.,
     )
@@ -83,7 +82,6 @@ fn sized_surface_control(
     icon_name: &'static str,
     primary: bool,
     dark: Prop<bool>,
-    compact: bool,
     size: f32,
     icon_size: f32,
 ) -> ButtonElement {
@@ -99,19 +97,6 @@ fn sized_surface_control(
                 theme().primary
             } else {
                 theme().color("transparent").unwrap()
-            }
-        })
-        .hover(move |s| {
-            if compact {
-                s.bg(move || {
-                    if dark.get() {
-                        theme().color("now-playing-surface").unwrap()
-                    } else {
-                        theme().color("dock-control-hover").unwrap()
-                    }
-                })
-            } else {
-                s.opacity(0.8)
             }
         })
         .active(|s| s.opacity(0.65))
@@ -155,7 +140,6 @@ pub(crate) fn now_playing_control(
         .rounded(px(if metadata { 6. } else { 7. }))
         .items_center()
         .justify_center()
-        .hover(move |s| s.bg(move || theme().color("now-playing-surface").unwrap()))
         .active(|s| s.opacity(0.65))
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .child(
@@ -183,7 +167,6 @@ pub(crate) fn now_playing_transport(playing: Memo<bool>) -> ButtonElement {
         .rounded(px(7.))
         .items_center()
         .justify_center()
-        .hover(|s| s.bg(move || theme().color("now-playing-surface").unwrap()))
         .active(|s| s.opacity(0.65))
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .child(
