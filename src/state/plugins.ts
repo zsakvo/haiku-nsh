@@ -21,7 +21,7 @@ export interface PluginDescriptor {
 }
 export interface SourceRecord {
   sourceId: string; pluginId: string; displayName?: string; enabled: boolean;
-  needsLogin?: boolean; user?: { name: string }; connection?: Record<string, string>;
+  needsLogin?: boolean; user?: { id?: string; name: string; avatar?: string }; connection?: Record<string, string>;
 }
 export interface PluginSnapshot {
   packages: PluginDescriptor[]; sources: SourceRecord[]; errors: Record<string, unknown>;

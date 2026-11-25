@@ -283,6 +283,37 @@ impl Host {
     pub fn records(&self) -> Vec<SourceRecord> {
         self.registry.lock().unwrap().sources.clone()
     }
+    /// Presentation metadata (needs_login, user, redacted_connection) even when the source is disabled.
+    pub fn source_presentation(
+        &self,
+        record: &SourceRecord,
+    ) -> (bool, Option<Value>, Option<BTreeMap<String, String>>) {
+        if let Ok(source) = self.source(&record.source_id) {
+            return (
+                source.needs_login(),
+                source.user(),
+                source.redacted_connection(),
+            );
+        }
+        let credentials: source::Credentials = json_file::read(
+            &self
+                .root
+                .join("sources")
+                .join(&record.source_id)
+                .join("credential.json"),
+        )
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+        let descriptor = self.package(&record.plugin_id).ok().map(|p| p.descriptor);
+        let needs_login = match &descriptor {
+            Some(d) if d.kind == "library" => credentials.connection.is_none(),
+            Some(d) => !d.auth_methods.is_empty() && credentials.credential.is_null(),
+            None => credentials.connection.is_none() && credentials.credential.is_null(),
+        };
+        let connection = source::redact_connection(descriptor.as_ref(), credentials.connection);
+        (needs_login, credentials.user, connection)
+    }
     /// KV writes are immediate; persist each current credential snapshot before export.
     pub fn flush(&self) -> Result<()> {
         for source in self.sources.lock().unwrap().values() { source.persist_credentials()?; }
@@ -643,6 +674,64 @@ impl Host {
             ));
         }
         std::fs::remove_dir_all(package.path)?;
+        Ok(())
+    }
+    /// Export an installed package directory as a re-importable ZIP archive.
+    pub fn export_package(&self, id: &str, dest: &Path) -> Result<()> {
+        use std::io::Write;
+        let package = self.package(id)?;
+        let parent = dest
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        std::fs::create_dir_all(parent)?;
+        let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+        {
+            let mut archive = zip::ZipWriter::new(temp.as_file_mut());
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            fn write_dir(
+                root: &Path,
+                dir: &Path,
+                archive: &mut zip::ZipWriter<&mut std::fs::File>,
+                options: zip::write::SimpleFileOptions,
+            ) -> Result<()> {
+                let mut entries = std::fs::read_dir(dir)?
+                    .collect::<std::io::Result<Vec<_>>>()?;
+                entries.sort_by_key(|entry| entry.file_name());
+                for entry in entries {
+                    let name = entry.file_name();
+                    if name.to_string_lossy().starts_with('.') {
+                        continue;
+                    }
+                    let ty = entry.file_type()?;
+                    if ty.is_symlink() {
+                        continue;
+                    }
+                    let path = entry.path();
+                    if ty.is_dir() {
+                        write_dir(root, &path, archive, options)?;
+                    } else if ty.is_file() {
+                        let rel = path.strip_prefix(root).unwrap();
+                        if rel == Path::new("descriptor.json") {
+                            continue;
+                        }
+                        let entry_name = rel.to_string_lossy().replace('\\', "/");
+                        archive
+                            .start_file(entry_name, options)
+                            .map_err(|e| PluginError::new("INVALID_PACKAGE", e.to_string()))?;
+                        archive.write_all(&std::fs::read(&path)?)?;
+                    }
+                }
+                Ok(())
+            }
+            write_dir(&package.path, &package.path, &mut archive, options)?;
+            archive
+                .finish()
+                .map_err(|e| PluginError::new("INVALID_PACKAGE", e.to_string()))?;
+        }
+        temp.as_file().sync_all()?;
+        temp.persist(dest).map_err(|e| e.error)?;
         Ok(())
     }
     pub async fn connect(

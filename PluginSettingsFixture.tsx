@@ -18,7 +18,7 @@ function Fixture() {
   cleanup(() => { stop?.(); void ready()?.plugins.stopFixtures(); });
   return <View class="flex-1">
     <If when={!!ready()}>
-      <Settings open onClose={() => {}} appearance={appearance} initialCategory="来源" />
+      <Settings open onClose={() => {}} appearance={appearance} initialCategory="插件" />
       {/* Test controls stay above the settings surface (z-10), so presses reach them. */}
       <View class="absolute bottom-0 z-20 flex-row gap-2">
         <Text testID="fixture-url">{url()}</Text>

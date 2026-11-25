@@ -1,5 +1,5 @@
 import { createPlugins } from "../state/plugins";
-import { SourcesSettings, PluginsSettings, DeveloperSettings } from "./PluginSettings";
+import { PluginsSettings, DeveloperSettings } from "./PluginSettings";
 import { createSettings } from "../state/settings";
 import { PlaybackSettings } from "./PlaybackSettings";
 import { LyricsSettings } from "./LyricsSettings";
@@ -23,17 +23,22 @@ const categories = [
   { label: "外观", icon: "palette" },
   { label: "播放", icon: "play" }, { label: "歌词", icon: "captions" },
   { label: "下载", icon: "download" }, { label: "存储", icon: "folder" },
-  { label: "来源", icon: "radio" }, { label: "插件", icon: "plug" },
+  { label: "插件", icon: "plug" },
   { label: "同步", icon: "sync" }, { label: "快捷键", icon: "keyboard" },
   { label: "其他", icon: "settings" }, { label: "开发者", icon: "code" },
 ] as const satisfies readonly { label: string; icon: IconName }[];
 
+function normalizeCategory(category?: string, fallback = "外观") {
+  const next = category ?? fallback;
+  return next === "来源" ? "插件" : next;
+}
+
 export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; categoryRequest?: number; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
-  const selected = signal(props.initialCategory ?? "外观");
+  const selected = signal(normalizeCategory(props.initialCategory));
   const settings = createSettings();
   const plugins = createPlugins();
   const query = signal("");
-  effect(()=>{if(props.categoryRequest){selected.set(props.initialCategory ?? "歌词");query.set("");}});
+  effect(()=>{if(props.categoryRequest){selected.set(normalizeCategory(props.initialCategory, "歌词"));query.set("");}});
   return <Dialog
     open={props.open}
     accessibilityLabel="设置"
@@ -78,13 +83,12 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           </View>
         </If>
         <If when={!!settings.error()}><Text class="text-sm text-destructive">{settings.error()}</Text></If>
-        <View class="w-full flex-col" style={{ display: selected() === "来源" ? "flex" : "none" }}><SourcesSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
-        <View class="w-full flex-col" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} /></View>
+        <View class="w-full flex-col" style={{ display: selected() === "插件" ? "flex" : "none" }}><PluginsSettings state={plugins} initialLogin={props.initialPluginLogin} /></View>
         <View class="w-full flex-col" style={{ display: selected() === "开发者" ? "flex" : "none" }}><DeveloperSettings state={plugins} initialResult={props.initialPluginResult} /></View>
         <If when={!!plugins.error() || !!plugins.core.error()}><Text class="text-sm text-destructive">{plugins.error() || String(plugins.core.error())}</Text></If>
         <If when={selected() === "快捷键" && !!settings.core()}><View class="w-full flex-col"><ShortcutSettings core={settings.core()!} initialConflict={props.initialShortcutConflict} /></View></If>
         <If when={selected() === "其他" && !!settings.core()}><View class="w-full flex-col"><OtherSettings core={settings.core()!} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} /></View></If>
-        <View class="w-full flex-col" style={{ display: ["外观", "播放", "歌词", "下载", "存储", "来源", "插件", "开发者", "其他", "同步", "快捷键"].includes(selected()) ? "none" : "flex" }}>
+        <View class="w-full flex-col" style={{ display: ["外观", "播放", "歌词", "下载", "存储", "插件", "开发者", "其他", "同步", "快捷键"].includes(selected()) ? "none" : "flex" }}>
           <Text class="text-sm text-muted-foreground">此分类将在对应功能接入后提供。</Text>
         </View>
       </Scroll>

@@ -157,11 +157,10 @@ impl PluginService {
                 .into_iter()
                 .map(|r| {
                     let mut value = serde_json::to_value(&r).unwrap();
-                    if let Ok(source) = host.source(&r.source_id) {
-                        value["needsLogin"] = json!(source.needs_login());
-                        value["user"] = json!(source.user());
-                        value["connection"] = json!(source.redacted_connection());
-                    }
+                    let (needs_login, user, connection) = host.source_presentation(&r);
+                    value["needsLogin"] = json!(needs_login);
+                    value["user"] = json!(user);
+                    value["connection"] = json!(connection);
                     value
                 })
                 .collect::<Vec<_>>();
@@ -859,12 +858,17 @@ impl PluginService {
             .map_err(|e| e.to_string())??;
         Self::changed(&this).await
     }
-    /// Log out; local credentials are cleared even if remote logout fails.
+    /// Log out; local credentials are cleared even if remote logout fails or the source is disabled.
     pub async fn logout(this: Instance<Self>, source: String) -> Result<JsonValue, String> {
         let host = Self::host(&this);
-        let result = background(async move { host.source(&source)?.logout().await })
-            .await
-            .map_err(|e| e.to_string())?;
+        let result = background(async move {
+            match host.source(&source) {
+                Ok(active) => active.logout().await,
+                Err(_) => host.remove_source(&source).await,
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())?;
         let snapshot = Self::changed(&this).await?;
         result.map_err(|e| e.to_string())?;
         Ok(snapshot)
@@ -900,6 +904,45 @@ impl PluginService {
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
         Ok(paths.first().map(|p| p.to_string_lossy().into_owned()))
+    }
+    /// Choose a destination ZIP path for exporting an installed plugin package.
+    pub async fn pick_export(plugin: String) -> Result<Option<String>, String> {
+        use nsh_core::file_dialog::{FileFilter, SaveDialog};
+        let safe = plugin
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+        let name = if safe.is_empty() {
+            "plugin.zip".into()
+        } else {
+            format!("{safe}.zip")
+        };
+        pick_save_path(
+            SaveDialog::new()
+                .file_name(name)
+                .filter(FileFilter::new("插件 ZIP", ["zip"])),
+        )
+        .await
+        .map(|p| p.map(|p| p.to_string_lossy().into_owned()))
+        .map_err(|e| e.to_string())
+    }
+    /// Export an installed plugin package to a ZIP archive at the chosen path.
+    pub async fn export_package(
+        this: Instance<Self>,
+        plugin: String,
+        path: String,
+    ) -> Result<(), String> {
+        let host = Self::host(&this);
+        let dest = std::path::PathBuf::from(path);
+        background(async move { host.export_package(&plugin, &dest).map_err(|e| e.to_string()) })
+            .await
+            .map_err(|e| e.to_string())?
     }
     /// Poll a local package every 500ms and hot reload changes transactionally, preserving KV.
     /// Stop cancels future reloads; an already running install finishes its transaction.

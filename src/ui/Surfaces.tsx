@@ -50,38 +50,55 @@ export function MenuItem(props: MenuItemProps) {
 export type ActionMenuItem = {
   label: string;
   disabled?: boolean;
+  separatorBefore?: boolean;
   onSelect: () => void;
 };
 /** Hover-free overflow menu button: native NSMenu on macOS, custom Menu on other platforms. */
 export function ActionMenu(props: {
   label: string;
   accessibilityLabel?: string;
+  testID?: string;
+  compact?: boolean;
   items: ActionMenuItem[];
 }) {
   const nativeMenu = platform.os === "macos" && desktopAvailable;
-  const triggerClass = `size-8 items-center justify-center rounded-(--radius) active:opacity-60 ${focus}`;
+  const triggerClass = props.compact
+    ? `size-5 items-center justify-center rounded-full active:bg-muted selected:bg-muted ${focus}`
+    : `size-8 items-center justify-center rounded-(--radius) active:opacity-60 selected:bg-muted ${focus}`;
   const triggerContent = () => props.label === "…"
-    ? <Icon name="harmonyosDotGrid1x2" small color="foreground" />
+    ? <Icon name="harmonyosDotGrid1x2" class={props.compact ? "size-3.5" : "size-4"} color={props.compact ? "muted-foreground" : "foreground"} />
     : <Text class="text-sm text-foreground">{props.label}</Text>;
   if (nativeMenu) {
+    const open = signal(false);
     let anchor: ViewRef | undefined;
     async function openMenu() {
-      const measured = await anchor?.measure();
-      const at = measured
-        ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
-        : undefined;
-      await DesktopMenu.popup(
-        props.items.map((item) => ({
-          label: item.label,
-          disabled: item.disabled,
-          onSelect: item.onSelect,
-        })),
-        at,
-      );
+      if (open()) return;
+      open.set(true);
+      try {
+        const measured = await anchor?.measure();
+        const at = measured
+          ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+          : undefined;
+        await DesktopMenu.popup(
+          props.items.flatMap((item) => [
+            ...(item.separatorBefore ? [{ type: "separator" as const }] : []),
+            {
+              label: item.label,
+              disabled: item.disabled,
+              onSelect: item.onSelect,
+            },
+          ]),
+          at,
+        );
+      } finally {
+        open.set(false);
+      }
     }
     return <View ref={(node) => { anchor = node; }} class="shrink-0">
       <BaseButton
+        testID={props.testID}
         accessibilityLabel={props.accessibilityLabel ?? props.label}
+        selected={open()}
         onPress={() => void openMenu()}
         class={triggerClass}
       >
@@ -91,6 +108,7 @@ export function ActionMenu(props: {
   }
   return <Menu trigger={
     <BaseButton
+      testID={props.testID}
       accessibilityLabel={props.accessibilityLabel ?? props.label}
       onPress={() => {}}
       class={triggerClass}

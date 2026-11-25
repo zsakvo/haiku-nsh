@@ -1,103 +1,22 @@
-import { cleanup, effect, Image, List, Scroll, signal, Text, View } from "nsh";
+import { cleanup, effect, Image, List, platform, Scroll, signal, Text, token, View, type ViewRef } from "nsh";
 import { PluginService } from "haiku/native";
 import { Button as BaseButton, Popover } from "nsh/base";
+import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
 import { Button, focus } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Field } from "../ui/LibraryControls";
-import { Dialog, Menu, MenuItem, popupSurface } from "../ui/Surfaces";
+import { ActionMenu, Dialog, Menu, MenuItem, popupSurface } from "../ui/Surfaces";
 import {
   SettingCardBlock,
   SettingDivider,
-  SettingRow,
   SettingSection,
   SettingSelect,
   SettingSelectRow,
-  SettingSwitch,
   SettingSwitchRow,
 } from "../ui/SettingsControls";
-import type { PluginsState, SourceRecord } from "../state/plugins";
+import type { PluginDescriptor, PluginsState, SourceRecord } from "../state/plugins";
 
-export function SourcesSettings(props: { state: PluginsState; initialLogin?: string }) {
-  const adding = signal(!!props.initialLogin);
-  const plugin = signal(props.initialLogin ?? "subsonic.music");
-  const editing = signal<string | null>(null), name = signal("");
-  const removing = signal<string | null>(null);
-  const connection = signal<SourceRecord | undefined>(undefined);
-  const isLibrary = (id: string) => props.state.value().packages.find(p => p.id === id)?.kind === "library";
-  function subtitle(source: SourceRecord) {
-    if (!isLibrary(source.pluginId)) return source.needsLogin ? "需要重新登录" : source.user?.name || "未登录";
-    const address = source.connection?.baseUrl || "";
-    let host = address;
-    try { host = new URL(address.includes("://") ? address : `https://${address}`).host; } catch {}
-    return [host, source.connection?.username].filter(Boolean).join(" · ") || "尚未配置连接";
-  }
-  async function move(id: string, delta: number) {
-    const ids = props.state.value().sources.map(s => s.sourceId);
-    const from = ids.indexOf(id), to = from + delta;
-    if (to < 0 || to >= ids.length) return;
-    [ids[from], ids[to]] = [ids[to], ids[from]];
-    await props.state.run(c => c.sources.reorder(ids));
-  }
-  return <View class="flex-col gap-5" testID="sources-settings">
-    <SettingSection title="音乐来源" description="连接音乐库或登录音乐平台，管理账号与来源顺序。"
-      action={<Button label="添加新来源…" size="sm" variant="ghost" onPress={() => { connection.set(undefined); adding.set(true); }} />}>
-      <Each of={props.state.value().sources} key={s => s.sourceId}>{(s, index) =>
-        <SettingRow divider={index() > 0}
-          title={s().displayName || s().pluginId}
-          description={subtitle(s())}>
-          <If when={isLibrary(s().pluginId)}>
-            <Button label="编辑连接…" size="sm" onPress={() => {
-              connection.set(s()); plugin.set(s().pluginId); adding.set(true);
-            }} />
-          </If>
-          <If when={!isLibrary(s().pluginId)}>
-            <Button label="登录…" size="sm" onPress={() => {
-              connection.set(undefined); plugin.set(s().pluginId); adding.set(true);
-            }} />
-            <Button label="登出" size="sm" disabled={props.state.busy()}
-              onPress={() => void props.state.run(c => c.sources.logout(s().sourceId))} />
-          </If>
-          <Menu trigger={<Button label="更多…" size="sm" onPress={() => {}} />}>
-            <MenuItem onSelect={() => { editing.set(s().sourceId); name.set(s().displayName || s().pluginId); }}><Text>重命名…</Text></MenuItem>
-            <MenuItem onSelect={() => void move(s().sourceId, -1)}><Text>上移</Text></MenuItem>
-            <MenuItem onSelect={() => void move(s().sourceId, 1)}><Text>下移</Text></MenuItem>
-            <MenuItem onSelect={() => removing.set(s().sourceId)}><Text>移除…</Text></MenuItem>
-          </Menu>
-          <SettingSwitch label="启用来源" hideLabel checked={s().enabled}
-            onChange={enabled => void props.state.run(c => c.sources.setEnabled(s().sourceId, enabled))} />
-        </SettingRow>
-      }</Each>
-      <If when={props.state.value().sources.length === 0}>
-        <SettingCardBlock>
-          <Text class="text-sm text-muted-foreground">尚未添加来源。先连接一个音乐库。</Text>
-        </SettingCardBlock>
-      </If>
-    </SettingSection>
-    <Dialog open={adding()} onOpenChange={e => adding.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
-      <If when={adding()}><SourceLogin state={props.state} initialPlugin={plugin()} initialSource={connection()}
-        onClose={() => adding.set(false)} /></If>
-    </Dialog>
-    <Dialog open={!!editing()} onOpenChange={e => { if (!e.open) editing.set(null); }} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
-      <Text role="header" class="text-lg font-semibold text-foreground">重命名来源</Text>
-      <Field label="来源名称" value={name()} onChange={value => name.set(value)} />
-      <Button label="保存" onPress={() => void props.state.run(async c => {
-        await c.sources.rename(editing()!, name()); editing.set(null);
-      })} />
-    </Dialog>
-    <Dialog open={!!removing()} onOpenChange={e => { if (!e.open) removing.set(null); }} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
-      <Text role="header" class="text-lg font-semibold text-foreground">移除来源？</Text>
-      <Text class="text-sm text-muted-foreground">此来源的凭据和插件存储将被删除。</Text>
-      <View class="flex-row justify-end gap-2">
-        <Button label="取消" onPress={() => removing.set(null)} />
-        <Button label="移除" variant="destructive" onPress={() => void props.state.run(async c => {
-          await c.sources.remove(removing()!); removing.set(null);
-        })} />
-      </View>
-    </Dialog>
-  </View>;
-}
-
-export function SourceLogin(props: { state: PluginsState; initialPlugin: string; initialSource?: SourceRecord; initialMethod?: string; onClose: () => void }) {
+export function SourceLogin(props: { state: PluginsState; initialPlugin: string; initialSource?: SourceRecord; initialMethod?: string; lockedPlugin?: boolean; onClose: () => void }) {
   const plugin = signal(props.initialPlugin), method = signal(props.initialMethod ?? ""), values = signal<Record<string, string>>(Object.fromEntries(
     Object.entries(props.initialSource?.connection ?? {}).filter(([, value]) => value !== "[REDACTED]")
   ));
@@ -180,9 +99,22 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
     else if (activeMethod() === "sms") await step("sms.verify", code());
     else await step("password", values());
   }
+  const heading = () => {
+    if (props.initialSource) return "编辑连接";
+    if (props.lockedPlugin) {
+      const name = descriptor()?.name;
+      return name ? `登录 ${name}` : "登录";
+    }
+    return "添加新来源";
+  };
+  const submitLabel = () => {
+    if (props.initialSource) return "验证并保存";
+    if (props.lockedPlugin) return descriptor()?.connection ? "连接" : "登录";
+    return "连接并添加";
+  };
   return <View class="gap-4" testID="source-login">
-    <Text role="header" class="text-lg font-semibold text-foreground">{props.initialSource ? "编辑连接" : "添加新来源"}</Text>
-    <If when={!props.initialSource}><SettingSelect label="插件" value={plugin()} items={props.state.value().packages
+    <Text role="header" class="text-lg font-semibold text-foreground">{heading()}</Text>
+    <If when={!props.initialSource && !props.lockedPlugin}><SettingSelect label="插件" value={plugin()} items={props.state.value().packages
       .filter(p => p.kind !== "scraper").map(p => ({ value: p.id, title: p.name }))}
       onChange={id => { void cancel(); plugin.set(id); values.set({}); method.set(""); }} /></If>
     <If when={!descriptor()?.connection && !!descriptor()?.authMethods.length}>
@@ -229,60 +161,205 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
     <View class="flex-row justify-end gap-2">
       <Button label="取消" onPress={props.onClose} />
       <If when={(method() || descriptor()?.authMethods[0]) !== "qrcode"}>
-        <Button label={props.initialSource ? "验证并保存" : "连接并添加"} variant="primary" loading={props.state.busy()} onPress={() => void submit()} />
+        <Button label={submitLabel()} variant="primary" loading={props.state.busy()} onPress={() => void submit()} />
       </If>
     </View>
   </View>;
 }
 
-export function PluginsSettings(props: { state: PluginsState }) {
+/** Primary macOS-style import button opening the native menu on macOS and custom Menu elsewhere. */
+function ImportPluginMenu(props: { disabled?: boolean; onPick: (kind: string) => void; onUrl: () => void }) {
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
+  const triggerClass = `min-h-7 flex-row items-center justify-center rounded-(--radius) bg-primary px-3.5 py-1 active:bg-primary/80 selected:bg-primary/80 disabled:opacity-40 ${focus}`;
+  const label = () => <Text class="font-medium text-primary-foreground" style={{ fontSize: token("sidebar-text-size") }}>导入…</Text>;
+  const items = [
+    { label: "ZIP 文件…", onSelect: () => props.onPick("zip") },
+    { label: "本地目录…", onSelect: () => props.onPick("directory") },
+    { label: "TypeScript 文件…", onSelect: () => props.onPick("typescript") },
+    { label: "HTTPS URL…", onSelect: props.onUrl },
+  ];
+  if (nativeMenu) {
+    const open = signal(false);
+    let anchor: ViewRef | undefined;
+    async function openMenu() {
+      if (props.disabled || open()) return;
+      open.set(true);
+      try {
+        const measured = await anchor?.measure();
+        const at = measured
+          ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+          : undefined;
+        await DesktopMenu.popup(items, at);
+      } finally {
+        open.set(false);
+      }
+    }
+    return <View ref={node => { anchor = node; }} class="shrink-0">
+      <BaseButton testID="plugin-import-button" accessibilityLabel="导入插件" disabled={props.disabled}
+        selected={open()} onPress={() => void openMenu()} class={triggerClass}>
+        {label()}
+      </BaseButton>
+    </View>;
+  }
+  return <Menu trigger={
+    <BaseButton testID="plugin-import-button" accessibilityLabel="导入插件" disabled={props.disabled}
+      onPress={() => {}} class={triggerClass}>
+      {label()}
+    </BaseButton>
+  }>
+    <Each of={items} key={item => item.label}>{item =>
+      <MenuItem onSelect={item().onSelect}><Text>{item().label}</Text></MenuItem>
+    }</Each>
+  </Menu>;
+}
+
+function connectionSummary(source: SourceRecord) {
+  const address = source.connection?.baseUrl || "";
+  let host = address;
+  try { host = new URL(address.includes("://") ? address : `https://${address}`).host; } catch {}
+  return [host, source.connection?.username].filter(Boolean).join(" · ") || "已连接";
+}
+
+export function PluginsSettings(props: { state: PluginsState; initialLogin?: string }) {
   const importing = signal(false), location = signal(""), removing = signal<string | null>(null);
+  const loggingIn = signal(!!props.initialLogin);
+  const loginPlugin = signal(props.initialLogin ?? "subsonic.music");
+  const loginSource = signal<SourceRecord | undefined>(undefined);
+  const loginLocked = signal(!!props.initialLogin);
   const uses = (id: string) => props.state.value().sources.filter(s => s.pluginId === id);
+  const visiblePackages = () => props.state.value().packages.filter(p => p.kind !== "scraper");
+  const canLogin = (pkg: PluginDescriptor) => !!pkg.connection || pkg.authMethods.length > 0;
+  const sessions = (pkg: PluginDescriptor) => uses(pkg.id).filter(s =>
+    pkg.kind === "library" ? !s.needsLogin && !!s.connection : !s.needsLogin || !!s.user
+  );
   async function pick(kind: string) {
     await props.state.run(async c => {
       const path = await PluginService.pickImport(kind);
       if (path) await c.plugins.importPackage(path);
     });
   }
+  async function openLogin(pkg: PluginDescriptor, source?: SourceRecord) {
+    if (!pkg.enabled) {
+      await props.state.run(c => c.plugins.setPackageEnabled(pkg.id, true));
+    }
+    loginSource.set(source);
+    loginPlugin.set(pkg.id);
+    loginLocked.set(true);
+    loggingIn.set(true);
+  }
+  async function exportPlugin(pkg: PluginDescriptor) {
+    await props.state.run(async c => {
+      const path = await PluginService.pickExport(pkg.id);
+      if (path) await c.plugins.exportPackage(pkg.id, path);
+    });
+  }
+  async function toggleSource(source: SourceRecord, enabled: boolean) {
+    await props.state.run(c => c.sources.setEnabled(source.sourceId, enabled));
+  }
+  async function logout(pkg: PluginDescriptor, source: SourceRecord) {
+    await props.state.run(c =>
+      pkg.kind === "library"
+        ? c.sources.remove(source.sourceId)
+        : c.sources.logout(source.sourceId)
+    );
+  }
+  const removingPlugin = () => props.state.value().packages.find(p => p.id === removing());
   return <View class="flex-col gap-5" testID="plugins-settings">
-    <SettingSection title="已安装插件"
-      action={
-        <Menu trigger={<Button label="导入…" size="sm" variant="ghost" onPress={() => {}} />}>
-          <MenuItem onSelect={() => void pick("zip")}><Text>ZIP 文件…</Text></MenuItem>
-          <MenuItem onSelect={() => void pick("directory")}><Text>本地目录…</Text></MenuItem>
-          <MenuItem onSelect={() => void pick("typescript")}><Text>TypeScript 文件…</Text></MenuItem>
-          <MenuItem onSelect={() => importing.set(true)}><Text>HTTPS URL…</Text></MenuItem>
-        </Menu>
-      }>
-      <Each of={props.state.value().packages} key={p => p.id}>{(p, index) => <>
+    <SettingSection action={
+      <ImportPluginMenu disabled={props.state.busy()} onPick={kind => void pick(kind)}
+        onUrl={() => importing.set(true)} />
+    }>
+      <Each of={visiblePackages()} key={p => p.id}>{(p, index) => <>
         <If when={index() > 0}><SettingDivider /></If>
-        <View class="flex-row items-center justify-between gap-4 px-3 py-2">
-          <Popover class="flex-1 min-w-0" popupClass={`${popupSurface} w-80 gap-3 p-4`}
-            align="start" trigger={<BaseButton accessibilityLabel={`${p().name} 详情`}
-              class={`w-full min-w-0 flex-row items-center gap-3 rounded-(--radius) py-1 active:bg-muted ${focus}`}>
-              <View class="size-9 shrink-0 items-center justify-center rounded-(--radius) bg-card border border-border">
-                <If when={!!p().logo}><Image src={p().logo!} class="size-9 rounded-(--radius)" /></If>
-                <If when={!p().logo}><Icon name="plug" color="muted-foreground" /></If>
-              </View>
-              <View class="flex-1 min-w-0 gap-0.5">
-                <Text class="text-sm text-foreground">{p().name}</Text>
-                <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
-              </View>
-            </BaseButton>}>
-            <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
-            <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
-            <Text class="text-xs text-foreground">{p().capabilities.join("、")}</Text>
-            <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
-            <Button label="删除插件…" variant="destructive"
-              disabled={p().builtin || uses(p().id).length > 0} onPress={() => removing.set(p().id)} />
-          </Popover>
-          <View class="shrink-0 items-end">
-            <SettingSwitch label={`启用${p().name}`} hideLabel checked={p().enabled}
-              onChange={enabled => void props.state.run(c => c.plugins.setPackageEnabled(p().id, enabled))} />
+        <View class="flex-col">
+          <View class="flex-row items-center justify-between gap-4 px-3 py-2">
+            <Popover class="flex-1 min-w-0" popupClass={`${popupSurface} w-80 gap-3 p-4`}
+              align="start" trigger={<BaseButton accessibilityLabel={`${p().name} 详情`}
+                class={`w-full min-w-0 flex-row items-center gap-3 rounded-(--radius) py-1 active:bg-muted ${focus}`}>
+                <View class="size-9 shrink-0 items-center justify-center rounded-(--radius) bg-card border border-border">
+                  <If when={!!p().logo}><Image src={p().logo!} class="size-9 rounded-(--radius)" /></If>
+                  <If when={!p().logo}><Icon name="plug" color="muted-foreground" /></If>
+                </View>
+                <View class="flex-1 min-w-0 gap-0.5">
+                  <Text class="text-sm text-foreground">{p().name}</Text>
+                  <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
+                </View>
+              </BaseButton>}>
+              <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
+              <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
+              <Text class="text-xs text-foreground">{p().capabilities.join("、")}</Text>
+              <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
+            </Popover>
+            <ActionMenu
+              label="…"
+              accessibilityLabel={`${p().name} 操作`}
+              items={[
+                { label: "登录…", disabled: !canLogin(p()), onSelect: () => void openLogin(p()) },
+                { label: "导出…", onSelect: () => void exportPlugin(p()) },
+                { label: "删除…", separatorBefore: true, disabled: p().builtin, onSelect: () => removing.set(p().id) },
+              ]}
+            />
           </View>
+          <If when={sessions(p()).length > 0}>
+            <View class="flex-row flex-wrap items-center gap-2 px-3 pb-2.5">
+              <Each of={sessions(p())} key={s => s.sourceId}>{s => {
+                const isLib = () => p().kind === "library";
+                const name = () => isLib()
+                  ? connectionSummary(s())
+                  : (s().user?.name || s().displayName || "已登录");
+                const label = () => !s().enabled
+                  ? `${name()} · 已禁用`
+                  : s().needsLogin
+                    ? `${name()} · 需重新登录`
+                    : name();
+                return <View testID={`plugin-session-${s().sourceId}`}
+                  class="h-7 flex-row items-center gap-1.5 rounded-full border border-border bg-background pl-1 pr-1">
+                  <View class={`size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ${!s().enabled ? "opacity-50" : ""}`}>
+                    <If when={!!s().user?.avatar}>
+                      <Image src={s().user!.avatar!} class="size-5 rounded-full" />
+                    </If>
+                    <If when={!s().user?.avatar}>
+                      <Icon name={isLib() ? "radio" : "user"} class="size-3" color="muted-foreground" />
+                    </If>
+                  </View>
+                  <Text
+                    class={`max-w-52 px-0.5 text-xs ${!s().enabled ? "text-muted-foreground" : s().needsLogin ? "text-warning" : "text-foreground"}`}
+                    style={{ numberOfLines: 1 }}
+                  >
+                    {label()}
+                  </Text>
+                  <ActionMenu
+                    compact
+                    label="…"
+                    accessibilityLabel={`${name()} 菜单`}
+                    items={[
+                      ...(isLib() ? [{ label: "编辑连接…", onSelect: () => void openLogin(p(), s()) }] : []),
+                      ...(!isLib() && !!s().needsLogin ? [{ label: "重新登录…", onSelect: () => void openLogin(p()) }] : []),
+                      {
+                        label: s().enabled ? "禁用" : "启用",
+                        disabled: props.state.busy(),
+                        onSelect: () => void toggleSource(s(), !s().enabled),
+                      },
+                      {
+                        label: "登出",
+                        separatorBefore: true,
+                        disabled: props.state.busy(),
+                        onSelect: () => void logout(p(), s()),
+                      },
+                    ]}
+                  />
+                </View>;
+              }}</Each>
+            </View>
+          </If>
         </View>
       </>}</Each>
     </SettingSection>
+    <Dialog open={loggingIn()} onOpenChange={e => loggingIn.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
+      <If when={loggingIn()}><SourceLogin state={props.state} initialPlugin={loginPlugin()}
+        initialSource={loginSource()} lockedPlugin={loginLocked()}
+        onClose={() => loggingIn.set(false)} /></If>
+    </Dialog>
     <Dialog open={importing()} onOpenChange={e => importing.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
       <Text role="header" class="text-lg font-semibold text-foreground">导入插件</Text>
       <Field label="文件、目录或 HTTPS URL" value={location()} onChange={value => location.set(value)} />
@@ -293,10 +370,17 @@ export function PluginsSettings(props: { state: PluginsState }) {
     </Dialog>
     <Dialog open={!!removing()} onOpenChange={e => { if (!e.open) removing.set(null); }} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
       <Text role="header" class="text-lg font-semibold text-foreground">删除插件？</Text>
-      <Text class="text-sm text-muted-foreground">将从本机移除 {removing()}。</Text>
+      <Text class="text-sm text-muted-foreground">
+        {uses(removing() ?? "").length > 0
+          ? `将从本机移除 ${removingPlugin()?.name || removing()}，同时清除其登录信息与本地数据。`
+          : `将从本机移除 ${removingPlugin()?.name || removing()}。`}
+      </Text>
       <View class="flex-row justify-end gap-2"><Button label="取消" onPress={() => removing.set(null)} />
         <Button label="删除" variant="destructive" onPress={() => void props.state.run(async c => {
-          await c.plugins.deletePackage(removing()!); removing.set(null);
+          const target = removing()!;
+          for (const s of uses(target)) await c.sources.remove(s.sourceId);
+          await c.plugins.deletePackage(target);
+          removing.set(null);
         })} /></View>
     </Dialog>
   </View>;

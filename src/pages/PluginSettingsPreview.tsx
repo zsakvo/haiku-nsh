@@ -19,7 +19,7 @@ export function PluginSettingsPreview(props: { category: string; login?: boolean
     await c.sources.connect("subsonic.music", {
       baseUrl: url, username: "fixture", password: "fake-password",
     }, "Subsonic 离线音乐库", null);
-    if (props.category === "来源" && !props.login) {
+    if (props.category === "插件" && !props.login) {
       await c.sources.connect("subsonic.music", {
         baseUrl: url, username: "archive", password: "fake-password",
       }, "Subsonic 离线音乐库", null);

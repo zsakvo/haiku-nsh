@@ -37,13 +37,32 @@ impl Cancellation {
     }
 }
 #[derive(Clone, Serialize, Deserialize, Default)]
-struct Credentials {
+pub(crate) struct Credentials {
     #[serde(default)]
-    credential: Value,
+    pub(crate) credential: Value,
     #[serde(default)]
+    pub(crate) connection: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    pub(crate) user: Option<Value>,
+}
+pub(crate) fn redact_connection(
+    descriptor: Option<&Descriptor>,
     connection: Option<BTreeMap<String, String>>,
-    #[serde(default)]
-    user: Option<Value>,
+) -> Option<BTreeMap<String, String>> {
+    connection.map(|mut values| {
+        if let Some(descriptor) = descriptor {
+            for (key, value) in &mut values {
+                if descriptor
+                    .connection
+                    .as_ref()
+                    .is_some_and(|c| c["fields"][key]["type"] == "secret")
+                {
+                    *value = "[REDACTED]".into();
+                }
+            }
+        }
+        values
+    })
 }
 pub struct Source {
     pub record: SourceRecord,
@@ -184,23 +203,10 @@ impl Source {
     }
     pub fn redacted_connection(&self) -> Option<BTreeMap<String, String>> {
         let descriptor = self.descriptor();
-        self.credentials
-            .lock()
-            .unwrap()
-            .connection
-            .clone()
-            .map(|mut values| {
-                for (key, value) in &mut values {
-                    if descriptor
-                        .connection
-                        .as_ref()
-                        .is_some_and(|c| c["fields"][key]["type"] == "secret")
-                    {
-                        *value = "[REDACTED]".into();
-                    }
-                }
-                values
-            })
+        redact_connection(
+            Some(&descriptor),
+            self.credentials.lock().unwrap().connection.clone(),
+        )
     }
     pub(crate) fn persist_credentials(&self) -> Result<()> {
         write_private(
