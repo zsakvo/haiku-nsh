@@ -299,19 +299,13 @@ export function AppShell(props: {
     <ShellSidebar>
       <SidebarChrome />
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
-        {["发现", "音乐库"].map((group) => <View class="gap-(--navigation-row-gap)">
-          <SectionLabel label={group} />
-          {destinations.filter((page) => page.group === group).map((page) =>
+        <View class="gap-(--navigation-row-gap)">
+          <SectionLabel label="发现" />
+          {destinations.filter((page) => page.group === "发现").map((page) =>
             <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
-              selected={nav.current().kind === page.id || (page.id === "library" && "ref" in nav.current()
-                && !PluginService.isRemote((nav.current() as {ref:string}).ref) && ["album", "artist"].includes(nav.current().kind))}
+              selected={nav.current().kind === page.id}
               onPress={() => nav.navigate({ kind: page.id })} />)}
-          <If when={group === "音乐库"}><Each of={librarySources()} key={(s) => s.sourceId}>{(source) =>
-            <SidebarItem icon="folder" label={source().displayName || plugins.value().packages.find((p) => p.id === source().pluginId)?.name || source().sourceId}
-              selected={nav.current().kind === "source" && (nav.current() as {source:string}).source === source().sourceId}
-              onPress={() => nav.navigate({kind:"source",source:source().sourceId})} />}
-          </Each></If>
-        </View>)}
+        </View>
         <If when={!!core()}><PlaylistSidebar core={core()!} snapshot={plugins.value()} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
       <View class="shrink-0 px-2 pb-4">
@@ -319,7 +313,7 @@ export function AppShell(props: {
           selected={overlay() === "settings"} onPress={showSettings} />
       </View>
     </ShellSidebar>
-    <WindowPanel bleedRight dock>
+    <WindowPanel>
       <If when={!floatingNavigation}>{navigationBar()}</If>
       <View class="flex-1 min-h-0" style={{ paddingTop: navigationLayout.inset() }}>
         {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
@@ -371,6 +365,12 @@ export function AppShell(props: {
         </If>
       </View>
       <If when={floatingNavigation}>{navigationBar()}</If>
+      <If when={!!core()}>
+        <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {
+          nowPlaying.set(event.open);
+          if (event.open) closeOverlay();
+        }} />
+      </If>
     </WindowPanel>
     <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
@@ -385,10 +385,6 @@ export function AppShell(props: {
         onFindLyrics={() => lyricsSearch.set(true)}
         onOpenChange={(event) => nowPlaying.set(event.open)} />
       <LyricsSearch core={core()!} open={lyricsSearch()} onClose={() => lyricsSearch.set(false)} />
-      <PlayerDock onLyricChange={(event) => props.onLyricChange?.(event.index ?? null)} onOpenChange={(event) => {
-        nowPlaying.set(event.open);
-        if (event.open) closeOverlay();
-      }} />
     </If>
     <CommandPalette core={core()??undefined} initialQuery={props.initialCommandQuery} navigate={nav.navigate} search={openSearch} open={overlay() === "command"} onClose={closeOverlay} onSelect={selectCommand}
       items={commandItems()} />

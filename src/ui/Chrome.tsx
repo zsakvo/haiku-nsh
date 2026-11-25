@@ -19,20 +19,8 @@ export function SidebarChrome(props: { children?: JSX.Element }) {
 export function SidebarSearch(props: { children?: JSX.Element }) {
   return <View class="shrink-0 px-2 pb-(--sidebar-search-gap)">{props.children}</View>;
 }
-export function WindowPanel(props: { children?: JSX.Element; bleedRight?: boolean; dock?: boolean }) {
-  // bleedRight: the viewport runs to the window's right edge so scroll bars sit flush against it,
-  // while the rounded card is drawn as a background inset by panel-gap.
-  // dock: reserve the PlayerDock's row below the card, separated by one panel-gap.
-  const bottom = () => token("panel-gap") + (props.dock ? token("dock-height") + token("panel-gap") : 0);
-  if (props.bleedRight) return <View class="flex-1 min-w-0 min-h-0 overflow-hidden"
-    style={{ marginTop: token("panel-gap"), marginBottom: bottom(), marginLeft: token("panel-gap"),
-      borderTopLeftRadius: token("radius-panel"), borderBottomLeftRadius: token("radius-panel") }}>
-    <View class="absolute inset-y-0 left-0 rounded-(--radius-panel) bg-background pointer-events-none"
-      style={{ right: token("panel-gap") }} />
-    {props.children}
-  </View>;
-  return <View class="flex-1 min-w-0 min-h-0 rounded-(--radius-panel) overflow-hidden bg-background"
-    style={{ margin: token("panel-gap"), marginBottom: bottom() }}>{props.children}</View>;
+export function WindowPanel(props: { children?: JSX.Element }) {
+  return <View class="flex-1 min-w-0 min-h-0 overflow-hidden bg-background">{props.children}</View>;
 }
 export function ShellToolbar(props: { children?: JSX.Element; testID?: string }) {
   return <View testID={props.testID} class="shrink-0 flex-row items-center justify-end gap-2 pl-(--content-inset-left) pr-(--content-inset-right)"
@@ -81,10 +69,10 @@ export function navigationScroll(active: () => boolean) {
  * something scrolls beneath it: on macOS that content shows through a blur, and a hairline appears. */
 export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean }) {
   return <View testID="navigation-bar"
-    class={`${props.floating ? "absolute top-0 left-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) px-(--content-inset-left)`}
-    style={{ height: token("navigation-bar-height"), ...(props.floating ? { right: token("panel-gap") } : { marginRight: token("panel-gap") }) }}
+    class={`${props.floating ? "absolute top-0 inset-x-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) px-(--content-inset-left)`}
+    style={{ height: token("navigation-bar-height") }}
     desktop={{ windowDrag: true }}>
-    <View class="absolute inset-0 rounded-t-(--radius-panel) overflow-hidden pointer-events-none">
+    <View class="absolute inset-0 overflow-hidden pointer-events-none">
       <If when={props.floating}>
         <GlassSurface class="absolute inset-0 pointer-events-none" radius={0} material="header" dark={colorScheme() === "dark"} />
       </If>

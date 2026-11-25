@@ -9,9 +9,8 @@ test("library source → paged album → playback, artist albums, favorite sideb
   await app.press("role:button[潮汐与回声]");
   await app.waitFor("text:Error: UPSTREAM_ERROR: 夹具连接暂时失败，请重试");
   await app.press("重试详情");
-  await app.waitFor("text:已加载 1 首");
-  await app.press("加载更多曲目");
-  await app.waitFor("text:已加载 2 首");
+  await app.waitFor("id:detail-header");
+  await app.waitUntil(() => app.count("id:detail-track-list >> role:row") >= 2);
   await app.press("播放全部");
   await app.waitFor("text:0:01");
   expect(app.enabled("label:播放 / 暂停")).toBe(true);
@@ -25,7 +24,7 @@ test("library source → paged album → playback, artist albums, favorite sideb
   await app.scroll("id:source-library-scroll", 420);
   await app.waitFor("role:button[夜航精选]");
   await app.press("role:button[夜航精选]");
-  await app.waitFor("text:已加载 1 首");
+  await app.waitFor("id:detail-header");
   await app.press("更多歌单操作");
   await app.press("收藏歌单");
   await app.press("更多歌单操作");

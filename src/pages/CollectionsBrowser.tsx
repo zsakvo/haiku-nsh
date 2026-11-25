@@ -1,16 +1,17 @@
-import { cleanup, effect, Image, List, Scroll, signal, Text, token, untracked, View } from "nsh";
+import { cleanup, effect, Image, List, platform, Scroll, signal, Text, token, untracked, View, type Point } from "nsh";
 import { Button as BaseButton, Collapsible } from "nsh/base";
+import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
 import { focus } from "../ui/Button";
 import { PluginService, type Core } from "haiku/native";
 import type { EntityRef, Route } from "../shell/navigation";
-import { mirrorCollections } from "../state/collections";
+import { mirrorCollections, type Collection } from "../state/collections";
 import type { PluginSnapshot } from "../state/plugins";
 import { Icon } from "../ui/Icon";
 import { IconButton } from "../ui/IconButton";
 import { SectionLabel, SidebarItem } from "../ui/Navigation";
 import { Button } from "../ui/Button";
 import { ToggleGroup } from "../ui/LibraryControls";
-import { Menu, MenuItem } from "../ui/Surfaces";
+import { ContextMenu, Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { CollectionArtwork } from "../ui/CollectionArtwork";
 import { PlaylistEditor } from "./PlaylistEditor";
 
@@ -42,10 +43,33 @@ export function PlaylistSidebar(props: {
 }) {
   const mirror = mirrorCollections(props.core);
   const creating = signal(false);
+  const editing = signal<Collection | null>(null);
+  const deleting = signal<Collection | null>(null);
+  const menuOpen = signal(false);
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
   const collapsed = signal<Record<string, boolean>>({});
   const remoteState = signal<Record<string, RemotePlaylistState>>({});
   let disposed = false;
   cleanup(() => { disposed = true; });
+
+  function downloadPlaylist(playlist: Collection) {
+    void props.core.downloads.enqueue(props.core.collections.tracks(playlist.id)).catch(console.error);
+  }
+
+  async function openPlaylistMenu(playlist: Collection, at?: Point) {
+    if (menuOpen()) return;
+    menuOpen.set(true);
+    try {
+      await DesktopMenu.popup([
+        { label: "编辑", onSelect: () => editing.set(playlist) },
+        { label: "下载", disabled: !playlist.trackCount, onSelect: () => downloadPlaylist(playlist) },
+        { type: "separator" },
+        { label: "删除", onSelect: () => deleting.set(playlist) },
+      ], at);
+    } finally {
+      menuOpen.set(false);
+    }
+  }
 
   const isExpanded = (id: string) => !collapsed()[id];
   const toggleGroup = (id: string) => collapsed.set({ ...collapsed(), [id]: isExpanded(id) });
@@ -206,10 +230,27 @@ export function PlaylistSidebar(props: {
             onPress={() => creating.set(true)}
           />
         </View>
+        <SidebarItem
+          testID="nav-favorites"
+          icon="heart"
+          label="喜欢"
+          selected={props.current.kind === "favorites"}
+          onPress={() => props.navigate({ kind: "favorites" })}
+        />
         <Each of={userPlaylists()} key={(p) => p.id}>
-          {(p) => <SidebarItem icon="music" label={p().title}
-            selected={props.current.kind === "playlist" && props.current.ref === props.core.collections.key(p().id)}
-            onPress={() => props.navigate(collectionRoute(props.core, p().id))} />}
+          {(p) => {
+            const item = <SidebarItem icon="music" label={p().title}
+              selected={props.current.kind === "playlist" && props.current.ref === props.core.collections.key(p().id)}
+              onPress={() => props.navigate(collectionRoute(props.core, p().id))} />;
+            if (nativeMenu) {
+              return <View onContextMenu={(e) => void openPlaylistMenu(p(), e.pagePosition)}>{item}</View>;
+            }
+            return <ContextMenu trigger={item}>
+              <MenuItem onSelect={() => editing.set(p())}><Text>编辑</Text></MenuItem>
+              <MenuItem disabled={!p().trackCount} onSelect={() => downloadPlaylist(p())}><Text>下载</Text></MenuItem>
+              <MenuItem onSelect={() => deleting.set(p())}><Text>删除</Text></MenuItem>
+            </ContextMenu>;
+          }}
         </Each>
       </View>
 
@@ -269,6 +310,27 @@ export function PlaylistSidebar(props: {
     </Scroll>
     <If when={creating()}><PlaylistEditor core={props.core} onClose={() => creating.set(false)}
       onSaved={(id) => props.navigate(collectionRoute(props.core, id))} /></If>
+    <If when={!!editing()}><PlaylistEditor core={props.core} collection={editing()!}
+      onClose={() => editing.set(null)} /></If>
+    <Dialog open={!!deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(null); }} class="w-112 max-w-full m-auto p-5 gap-4">
+      <Text role="header" class="text-lg font-semibold text-foreground">删除歌单？</Text>
+      <Text class="text-sm text-muted-foreground">
+        {`“${deleting()?.title ?? ""}”将被删除，原始音乐文件会保留。`}
+      </Text>
+      <View class="flex-row justify-end gap-2">
+        <Button label="取消" onPress={() => deleting.set(null)} />
+        <Button label="确认删除歌单" variant="destructive" onPress={() => {
+          const target = deleting();
+          if (!target) return;
+          const deletedRef = props.core.collections.key(target.id);
+          props.core.collections.delete(target.id);
+          deleting.set(null);
+          if (props.current.kind === "playlist" && props.current.ref === deletedRef) {
+            props.navigate({ kind: "favorites" });
+          }
+        }} />
+      </View>
+    </Dialog>
   </View>;
 }
 /** User playlist overview. Virtual rows bound both list and three-column grid modes. */

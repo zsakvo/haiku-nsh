@@ -93,31 +93,38 @@ mod imp {
         menu
     }
 
+    unsafe fn show_on_main(items: &[MenuItemSpec]) -> Option<String> {
+        let app: id = msg_send![class!(NSApplication), sharedApplication];
+        if app == nil {
+            return None;
+        }
+        let selected = RefCell::new(None::<String>);
+        let target: id = msg_send![target_class(), new];
+        (*target).set_ivar::<*mut c_void>(
+            "selected",
+            (&selected as *const RefCell<Option<String>>) as *mut c_void,
+        );
+        let menu = build_menu(items, target);
+        let location: NSPoint = msg_send![class!(NSEvent), mouseLocation];
+        let _: BOOL = msg_send![menu, popUpMenuPositioningItem:nil atLocation:location inView:nil];
+        let result = selected.into_inner();
+        let _: () = msg_send![target, release];
+        result
+    }
+
     pub fn show(items: &[MenuItemSpec]) -> Option<String> {
         if items.is_empty() {
             return None;
         }
         unsafe {
             let is_main: BOOL = msg_send![class!(NSThread), isMainThread];
-            if is_main == NO {
-                return None;
+            if is_main == YES {
+                return show_on_main(items);
             }
-            let app: id = msg_send![class!(NSApplication), sharedApplication];
-            if app == nil {
-                return None;
-            }
-            let selected = RefCell::new(None::<String>);
-            let target: id = msg_send![target_class(), new];
-            (*target).set_ivar::<*mut c_void>(
-                "selected",
-                (&selected as *const RefCell<Option<String>>) as *mut c_void,
-            );
-            let menu = build_menu(items, target);
-            let location: NSPoint = msg_send![class!(NSEvent), mouseLocation];
-            let _: BOOL = msg_send![menu, popUpMenuPositioningItem:nil atLocation:location inView:nil];
-            let result = selected.into_inner();
-            let _: () = msg_send![target, release];
-            result
         }
+        if !crate::lifecycle::native_host() {
+            return None;
+        }
+        dispatch::Queue::main().exec_sync(|| unsafe { show_on_main(items) })
     }
 }

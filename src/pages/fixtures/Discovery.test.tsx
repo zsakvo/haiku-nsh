@@ -108,8 +108,8 @@ test("playlist details scroll as one virtual table and recycled rows play and li
   await app.waitFor("id:detail-header");
   await app.keyboard.press("mod+[");
   await app.press("id:shelf-entries >> role:button[每日30首]");
-  await app.waitFor("text:已加载 1 首");
+  await app.waitFor("id:detail-header");
   await app.press("播放全部");
   await app.waitFor("text:队列 2 首 · 潮汐之间");
-  expect(app.shows("text:已加载 2 首")).toBe(true);
+  expect(app.count("id:detail-track-list >> role:row")>=2).toBe(true);
 });

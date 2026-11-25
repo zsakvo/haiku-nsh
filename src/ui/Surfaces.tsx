@@ -29,7 +29,7 @@ export function Overlay(props: { open: boolean; onClose: () => void; children?: 
   return <>
     <If when={visible()}><View class="absolute inset-0 z-10 bg-sidebar" /></If>
     <Sheet open={props.open} side="bottom" popupClass="flex-col bg-sidebar"
-      popupStyle={{ top: 0, bottom: 112, left: 0, right: 0 }}
+      popupStyle={{ top: 0, bottom: 0, left: 0, right: 0 }}
       backdropClass="pointer-events-none" closeOnBackdropPress={false}
       onClose={() => visible.set(false)}
       onOpenChange={(event) => { if (!event.open) props.onClose(); }}>

@@ -40,32 +40,8 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     let state = p.bridge.state;
     let track = p.track;
     let art = p.artwork;
-    let open = p.open;
     let foreground = move || theme().foreground;
     let muted_foreground = move || theme().muted_foreground;
-    let fade = animated_value(if open.get_untracked() { 0. } else { 1. });
-    effect(move || {
-        let hidden = open.get();
-        let reduced = reduce_motion();
-        spawn(async move {
-            fade.timing(
-                if hidden { 0. } else { 1. },
-                if reduced {
-                    150.
-                } else if hidden {
-                    320.
-                } else {
-                    240.
-                },
-                if hidden {
-                    Easing::EaseOut
-                } else {
-                    Easing::EaseIn
-                },
-            )
-            .await;
-        });
-    });
     let line = p.line;
     effect(move || cx.emit(PlayerDockEvent::LyricChange(line.get().map(|i| i as u32))));
     let c = p.bridge.controller.clone();
@@ -79,31 +55,15 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     let native_glass = haiku_macos::lifecycle::native_host();
     #[cfg(not(target_os = "macos"))]
     let native_glass = false;
-    let dock_inset = move || theme().tokens().number("dock-inset").unwrap_or(12.);
-    let dock_radius = move || px(theme().tokens().number("dock-radius").unwrap_or(20.));
-    // Float inside the content panel with equal side and bottom clearance.
+    // Float flush over the bottom edge of the content panel, without reserving layout height.
     view().absolute()
-        .left(move ||px(theme().tokens().number("sidebar-width").unwrap_or(200.) + theme().tokens().number("panel-gap").unwrap_or(8.) + dock_inset()))
-        .right(move ||px(theme().tokens().number("panel-gap").unwrap_or(8.) + dock_inset()))
-        .bottom(move ||px(theme().tokens().number("panel-gap").unwrap_or(8.) + dock_inset())).z_index(30)
-        .pointer_events(move || if open.get() { nsh_core::PointerEvents::None } else { nsh_core::PointerEvents::Auto })
-        .bind_opacity(&fade)
-        .style_with(move |s| {
-            let hidden = open.get();
-            let s = if reduce_motion() { s.transition_none() } else {
-                let s = s.transition_transform().duration(if hidden {320.} else {240.});
-                if hidden {s.ease_out()} else {s.ease_in()}
-            };
-            s.translate_y(px(if hidden && !reduce_motion() {
-                theme().tokens().number("dock-height").unwrap_or(64.) + dock_inset() + theme().tokens().number("panel-gap").unwrap_or(8.)
-            } else {0.}))
-        })
+        .left(px(0.))
+        .right(px(0.))
+        .bottom(px(0.))
         .test_id(&identity).h(move ||px(theme().tokens().number("dock-height").unwrap_or(64.)))
         .flex_row().items_center().px_3()
-        .rounded(dock_radius)
         .child(view().test_id("dock-material").absolute().inset_0()
             .pointer_events(nsh_core::PointerEvents::None)
-            .rounded(dock_radius)
             .overflow_hidden().backdrop_blur(px(if native_glass {0.} else {
                 theme().tokens().number("dock-blur-radius").unwrap_or(20.)
             }))
@@ -113,11 +73,15 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
                 nsh_core::element::native("haiku.GlassSurface").test_id("dock-glass").absolute().inset_0()
                     .pointer_events(nsh_core::PointerEvents::None)
                     .opacity(move ||theme().tokens().number("dock-backdrop-opacity").unwrap_or(0.9))
-                    .prop("radius",move ||serde_json::json!(dock_radius().0))
+                    .prop("radius", || serde_json::json!(0.0))
+                    .prop("material", || serde_json::json!("header"))
                     .prop("dark",move ||serde_json::json!(nsh_core::element::dark()))
             }))
             .child(view().absolute().inset_0().bg(move ||
                 theme().color("dock-surface").unwrap()
+            ))
+            .child(view().absolute().top_0().left(px(0.)).right(px(0.)).h(px(1.)).bg(move ||
+                theme().color("navigation-backdrop-border").unwrap()
             )))
         .child(view().flex_1().min_w_0().flex_row().items_center().gap_3()
           .child(nsh_base::button().accessibility_label("打开正在播放")

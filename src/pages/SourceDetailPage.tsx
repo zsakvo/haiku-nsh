@@ -1,8 +1,9 @@
-import { cleanup, effect, resource, signal, Text, View } from "nsh";
+import { cleanup, effect, resource, signal, Text, untracked, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
 import { Button } from "../ui/Button";
+import { ErrorState, Spinner } from "../ui/Discovery";
 import { SourceGrid, SourceTracks } from "./SourceContent";
 import { ActionMenu, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
@@ -17,6 +18,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   const next = signal<string | null>(null), albumNext = signal<string | null>(null);
   const info = signal<any>(null), canFavorite = signal(false), expanded = signal(false);
   const error = signal(""), busy = signal(false);
+  const moreBusy = signal(false), moreError = signal(""), wantMore = signal(false);
   const unfavorite = signal(false);
   const collections = mirrorCollections(props.core);
   let epoch = 0;
@@ -27,7 +29,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
     refreshLease = undefined;
   }
   cleanup(() => { closed = true; epoch++; cancelRefresh(); });
-  effect(() => { if (!props.active) { epoch++; cancelRefresh(); } });
+  effect(() => { if (!props.active) { epoch++; cancelRefresh(); moreBusy.set(false); wantMore.set(false); } });
   function showSnapshot(item: any, reference: any) {
     info.set({ reference, title: item.title, description: item.description,
       cover: item.cover, creator: item.sourceLabel, track_count: item.trackCount });
@@ -36,7 +38,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   }
   const first = resource(() => props.active ? props.reference : undefined, async (reference) => {
     const version = ++epoch;
-    cancelRefresh(); error.set("");
+    cancelRefresh(); error.set(""); moreError.set(""); moreBusy.set(false); wantMore.set(false);
     const [source, kind, id] = JSON.parse(reference) as string[];
     const favorite = (props.core.collections.list() as any[]).find(
       p => p.kind === "plugin" && p.sourceId === source && p.remoteId === id && kind === "playlist");
@@ -91,6 +93,28 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
     if (kind === "tracks") { tracks.set([...tracks(), ...result.tracks.items]); next.set(result.tracks.next); }
     else { albums.set([...albums(), ...result.items]); albumNext.set(result.next); }
   }
+  async function loadMoreTracks() {
+    const cursor = next();
+    if (!cursor || moreBusy() || busy()) return;
+    const version = epoch, reference = props.reference;
+    moreBusy.set(true); moreError.set("");
+    try {
+      const result = await props.core.sources.detail(reference, cursor) as any;
+      if (closed || version !== epoch || reference !== props.reference || !props.active) return;
+      tracks.set([...tracks(), ...result.tracks.items]);
+      next.set(result.tracks.next ?? null);
+    } catch (e) {
+      if (!closed && version === epoch && reference === props.reference && props.active) moreError.set(String(e));
+    } finally {
+      if (!closed && version === epoch && reference === props.reference) moreBusy.set(false);
+    }
+  }
+  effect(() => {
+    if (wantMore() && props.active && !!next() && !first.loading() && !moreBusy() && !busy() && !moreError()) {
+      wantMore.set(false);
+      untracked(() => void loadMoreTracks());
+    }
+  });
   async function play(shuffle: boolean) {
     const version=epoch, reference=props.reference, seen=new Set<string>();
     let all=tracks(), cursor=next();
@@ -101,7 +125,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
       if(closed||version!==epoch||reference!==props.reference||!props.active)return;
       all=[...all,...page.tracks.items];cursor=page.tracks.next??null;
     }
-    tracks.set(all);next.set(null);
+    tracks.set(all);next.set(null);moreError.set("");wantMore.set(false);
     await props.core.player.setMode(shuffle ? "shuffle" : "sequential");
     if(closed||version!==epoch||reference!==props.reference||!props.active)return;
     await props.core.player.play(all, 0);
@@ -109,6 +133,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   return <View testID="page-source-detail" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
     <NavigationScrollArea><SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail onScrolled={navigationScroll(() => props.active)}
+      onLoadMore={() => wantMore.set(true)}
       header={<NavigationScrollHeader class="gap-2">
         <If when={first.loading() && !info()}>
           <View accessibilityLabel="正在加载详情" class={`flex-row gap-6 pb-2 ${isPlaylist() ? "pt-(--playlist-detail-top-gap)" : ""}`}>
@@ -152,10 +177,15 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
           </If>
         </If>
       </NavigationScrollHeader>}
-      footer={<View class="py-3 flex-row gap-3 items-center">
-        <If when={!!info()}><Text class="text-xs text-muted-foreground">{`已加载 ${tracks().length} 首`}</Text></If>
-        <If when={!!next()}><Button label="加载更多曲目" size="sm" loading={busy()} onPress={() => void act(() => more("tracks"))} /></If>
-      </View>} /></NavigationScrollArea>
+      footer={<If when={moreBusy() || !!moreError() || !!next()}>
+        <View class="py-3 items-center justify-center gap-2">
+          <If when={moreBusy()}><Spinner label="正在加载更多曲目…" /></If>
+          <If when={!!moreError()}><ErrorState message={moreError()} retry={() => void loadMoreTracks()} /></If>
+          <If when={!!next() && !moreBusy() && !moreError()}>
+            <Button label="加载更多曲目" size="sm" variant="ghost" onPress={() => void loadMoreTracks()} />
+          </If>
+        </View>
+      </If>} /></NavigationScrollArea>
     <Dialog open={expanded()} onOpenChange={e=>{if(!e.open)expanded.set(false);}} class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">歌单简介</Text>
       <Text class="text-sm text-muted-foreground">{info()?.description}</Text>
