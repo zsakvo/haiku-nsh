@@ -1,7 +1,9 @@
-import { effect, keymap, signal, Text, View, type JSX } from "nsh";
-import { Dialog as BaseDialog, Menu as BaseMenu, ContextMenu as BaseContextMenu,
+import { effect, keymap, platform, signal, Text, View, type JSX, type ViewRef } from "nsh";
+import { Button as BaseButton, Dialog as BaseDialog, Menu as BaseMenu, ContextMenu as BaseContextMenu,
   MenuItem as BaseMenuItem, Tooltip as BaseTooltip, Sheet } from "nsh/base";
 import type { DialogProps, MenuProps, ContextMenuProps, MenuItemProps } from "nsh/base";
+import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
+import { focus } from "./Button";
 export const popupSurface = "rounded-(--radius-surface) border border-border bg-popover shadow-lg";
 export const popupItem = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
 export function Tooltip(props: { label: string }) {
@@ -43,4 +45,59 @@ export function ContextMenu(props: ContextMenuProps) {
 }
 export function MenuItem(props: MenuItemProps) {
   return <BaseMenuItem {...props} class={popupItem} />;
+}
+export type ActionMenuItem = {
+  label: string;
+  disabled?: boolean;
+  onSelect: () => void;
+};
+/** Hover-free overflow menu button: native NSMenu on macOS, custom Menu on other platforms. */
+export function ActionMenu(props: {
+  label: string;
+  accessibilityLabel?: string;
+  items: ActionMenuItem[];
+}) {
+  const nativeMenu = platform.os === "macos" && desktopAvailable;
+  const triggerClass = `size-8 items-center justify-center rounded-(--radius) active:opacity-60 ${focus}`;
+  if (nativeMenu) {
+    let anchor: ViewRef | undefined;
+    async function openMenu() {
+      const measured = await anchor?.measure();
+      const at = measured
+        ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+        : undefined;
+      await DesktopMenu.popup(
+        props.items.map((item) => ({
+          label: item.label,
+          disabled: item.disabled,
+          onSelect: item.onSelect,
+        })),
+        at,
+      );
+    }
+    return <View ref={(node) => { anchor = node; }} class="shrink-0">
+      <BaseButton
+        accessibilityLabel={props.accessibilityLabel ?? props.label}
+        onPress={() => void openMenu()}
+        class={triggerClass}
+      >
+        <Text class="text-sm text-foreground">{props.label}</Text>
+      </BaseButton>
+    </View>;
+  }
+  return <Menu trigger={
+    <BaseButton
+      accessibilityLabel={props.accessibilityLabel ?? props.label}
+      onPress={() => {}}
+      class={triggerClass}
+    >
+      <Text class="text-sm text-foreground">{props.label}</Text>
+    </BaseButton>
+  }>
+    <Each of={props.items} key={(item) => item.label}>
+      {(item) => <MenuItem disabled={item().disabled} onSelect={item().onSelect}>
+        <Text>{item().label}</Text>
+      </MenuItem>}
+    </Each>
+  </Menu>;
 }

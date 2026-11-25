@@ -14,6 +14,7 @@ pub mod player_popover;
 pub mod lifecycle;
 pub mod menubar;
 pub mod menubar_api;
+pub mod popup_menu;
 pub mod shortcuts;
 #[cfg(target_os = "macos")]
 pub mod system;

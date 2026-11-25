@@ -1,5 +1,5 @@
-import { cleanup, effect, Image, List, resource, Scroll, signal, Text, token, View } from "nsh";
-import { Button as BaseButton, Input } from "nsh/base";
+import { cleanup, effect, Image, List, resource, Scroll, signal, Text, token, untracked, View } from "nsh";
+import { Button as BaseButton } from "nsh/base";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
 import { searchableSources, type SearchKind, type SearchPageResult, type SearchRequest } from "../state/search";
@@ -68,6 +68,7 @@ export function SearchPage(props: {
   const next = signal<string | null>(null);
   const error = signal("");
   const moreBusy = signal(false);
+  const wantMore = signal(false);
   const cancelled = signal(false);
   const confirm = signal(false);
   const histories = signal<string[]>((props.core.history.list() as any).searches ?? []);
@@ -113,6 +114,7 @@ export function SearchPage(props: {
     next.set(null);
     error.set("");
     moreBusy.set(false);
+    wantMore.set(false);
     const [s, k, q] = JSON.parse(key);
     const page = (await props.core.sources.search(s, k, q, null)) as SearchPageResult;
     if (closed || version !== epoch || identity() !== key) return;
@@ -129,6 +131,7 @@ export function SearchPage(props: {
     error.set("");
     note.set("");
     moreBusy.set(false);
+    wantMore.set(false);
   }
 
   function submit(value = query()) {
@@ -142,6 +145,7 @@ export function SearchPage(props: {
     epoch++;
     cancelled.set(true);
     moreBusy.set(false);
+    wantMore.set(false);
   }
 
   function switchKind(nextKind: SearchKind) {
@@ -153,6 +157,7 @@ export function SearchPage(props: {
     results.set([]);
     next.set(null);
     moreBusy.set(false);
+    wantMore.set(false);
     kind.set(nextKind);
   }
 
@@ -168,6 +173,7 @@ export function SearchPage(props: {
   async function selectSource(value: string) {
     epoch++;
     cancelled.set(false);
+    wantMore.set(false);
     source.set(value);
     error.set("");
     note.set("");
@@ -210,6 +216,13 @@ export function SearchPage(props: {
     }
   }
 
+  effect(() => {
+    if (wantMore() && props.active && !!next() && !first.loading() && !moreBusy() && !error() && !cancelled()) {
+      wantMore.set(false);
+      untracked(() => void more());
+    }
+  });
+
   function openEntity(route: Route) {
     if (
       route.kind === "program" &&
@@ -230,7 +243,7 @@ export function SearchPage(props: {
         <Spinner label="正在加载更多…" />
       </If>
       <If when={!!next() && !moreBusy()}>
-        <Button label="加载更多结果" size="sm" variant="secondary" onPress={() => void more()} />
+        <Button label="加载更多结果" size="sm" variant="ghost" onPress={() => void more()} />
       </If>
       <If when={!next() && !moreBusy() && results().length > 0}>
         <Text class="text-xs text-muted-foreground">已显示全部结果</Text>
@@ -244,43 +257,30 @@ export function SearchPage(props: {
       class="flex-1 min-h-0"
       style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}
     >
-      {/* Top search controls stay mounted so typing or switching tabs never drops input focus. */}
-      <View class="shrink-0 pl-(--content-inset-left) pr-(--content-inset-right) pt-1 pb-3 gap-3">
-        <View class="flex-row items-center gap-2">
-          <View class="flex-1 min-h-10 flex-row items-center gap-2.5 rounded-(--radius-panel) border border-input bg-card px-3 focus-within:border-ring">
-            <Icon name="search" small color="muted-foreground" />
-            <Input
-              accessibilityLabel="搜索词"
-              value={query()}
-              onChange={(event) => changeQuery(event.value)}
-              onSubmit={() => submit()}
-              placeholder="搜索歌曲、专辑、歌手或歌单…"
-              class="flex-1 min-w-0 text-sm text-foreground placeholder:text-muted-foreground"
-            />
-            <If when={query().length > 0}>
-              <BaseButton
-                accessibilityLabel="清空搜索词"
-                onPress={() => changeQuery("")}
-                class={`size-6 shrink-0 items-center justify-center rounded-(--radius-inset) hover:bg-accent active:bg-muted ${focus}`}
-              >
-                <Icon name="close" class="size-3.5" color="muted-foreground" />
-              </BaseButton>
-            </If>
-          </View>
-          <Button
-            label="搜索"
-            variant="secondary"
-            onPress={() => submit()}
-            disabled={!query().trim() || !source()}
-            class="min-h-10 px-4 rounded-(--radius-panel)"
-          />
+      <View class="shrink-0 pl-(--content-inset-left) pr-(--content-inset-right) pt-0 pb-5 gap-3">
+        <View testID="search-title" class="flex-row items-baseline gap-1.5 min-w-0">
+          <Text
+            role="header"
+            class="shrink-0 font-semibold text-foreground"
+            style={{ fontSize: 24 }}
+          >
+            搜索
+          </Text>
+          <If when={!!query().trim()}>
+            <Text
+              class="min-w-0 shrink font-semibold text-primary"
+              style={{ fontSize: 24, numberOfLines: 1, textOverflow: "ellipsis" }}
+            >
+              {query().trim()}
+            </Text>
+          </If>
         </View>
 
         <If when={types().length > 0}>
-          <View class="flex-row items-center justify-between gap-4">
+          <View class="flex-row items-center">
             <View
               testID="search-tabs"
-              class="flex-row items-center gap-0.5 rounded-(--radius) border border-border bg-sidebar p-0.5"
+              class="shrink-0 flex-row items-center gap-0.5 rounded-(--radius) border border-border bg-sidebar p-0.5"
             >
               <Each of={types()} key={(t) => t.id}>
                 {(t) => (
@@ -288,7 +288,7 @@ export function SearchPage(props: {
                     accessibilityLabel={t().label}
                     selected={kind() === t().id}
                     onPress={() => switchKind(t().id)}
-                    class={`group min-h-7 items-center justify-center rounded-(--radius-inset) px-3 py-1 transition-colors duration-150 motion-reduce:transition-none hover:bg-accent/50 selected:bg-popover selected:shadow-sm ${focus}`}
+                    class={`group min-h-7 items-center justify-center rounded-(--radius-inset) px-3 py-1 selected:bg-popover selected:shadow-sm ${focus}`}
                   >
                     <Text class="text-xs text-muted-foreground group-selected:text-foreground group-selected:font-medium">
                       {t().label}
@@ -297,14 +297,6 @@ export function SearchPage(props: {
                 )}
               </Each>
             </View>
-            <If when={!!query().trim() && results().length > 0}>
-              <Text
-                class="text-xs text-muted-foreground"
-                style={{ fontVariant: ["tabular-nums"] }}
-              >
-                {`已显示 ${results().length} 项`}
-              </Text>
-            </If>
           </View>
         </If>
 
@@ -419,50 +411,53 @@ export function SearchPage(props: {
               {cancelled() ? "搜索已取消" : "没有找到相关结果"}
             </Text>
             <Text class="text-xs text-muted-foreground">
-              {cancelled() ? "修改关键词或重新点击搜索" : "试试其他关键词，或在右上角切换音乐来源"}
+              {cancelled() ? "在顶部搜索框重新搜索" : "试试其他关键词，或在右上角切换音乐来源"}
             </Text>
           </View>
         </If>
 
-        {/* Full-height detail track table: artwork, inline likes, unified virtual scroll */}
+        {/* Full-height detail track table: artwork, inline likes, fixed heading + virtual scroll */}
         <If when={results().length > 0 && kind() === "track"}>
           <SourceTracks
             core={props.core}
             tracks={results()}
             active={props.active && !confirm()}
             detail
+            fixedHeading
             footer={paginationFooter()}
+            onLoadMore={() => wantMore.set(true)}
           />
         </If>
 
         {/* Full-height virtual entity list aligned to the exact same 58pt rhythm as tracks */}
         <If when={results().length > 0 && kind() !== "track"}>
-          <List
-            class="flex-1 min-h-0"
-            each={results()}
-            keyExtractor={(entity, index) =>
-              entity.reference ? JSON.stringify(entity.reference) : `${kind()}:${index}:${entity.title}`
-            }
-            estimatedItemSize={token("detail-row-height")}
-            contentStyle={{ paddingBottom: token("dock-scroll-clearance") }}
-            header={
-              <View class="pl-(--content-inset-left) pr-(--content-inset-right)">
-                <View class="flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border mb-2.5">
-                  <Text class="w-10 shrink-0 text-xs text-muted-foreground">#</Text>
-                  <Text class="flex-1 min-w-0 pr-6 text-xs text-muted-foreground" style={{ flexGrow: 1.6 }}>
-                    {entityColumnHeading(kind())}
-                  </Text>
-                  <Text class="flex-1 min-w-0 pr-6 text-xs text-muted-foreground">信息</Text>
-                  <View class="w-6 shrink-0" />
+          <View class="flex-1 min-h-0">
+            <View class="shrink-0 pl-(--content-inset-left) pr-(--content-inset-right)">
+              <View class="flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border">
+                <Text class="w-10 shrink-0 text-xs text-muted-foreground">#</Text>
+                <Text class="flex-1 min-w-0 pr-6 text-xs text-muted-foreground" style={{ flexGrow: 1.6 }}>
+                  {entityColumnHeading(kind())}
+                </Text>
+                <Text class="flex-1 min-w-0 pr-6 text-xs text-muted-foreground">信息</Text>
+                <View class="w-6 shrink-0" />
+              </View>
+            </View>
+            <List
+              class="flex-1 min-h-0"
+              each={results()}
+              keyExtractor={(entity, index) =>
+                entity.reference ? JSON.stringify(entity.reference) : `${kind()}:${index}:${entity.title}`
+              }
+              estimatedItemSize={token("detail-row-height")}
+              loadMoreThreshold={1}
+              onLoadMore={() => wantMore.set(true)}
+              contentStyle={{ paddingTop: 10, paddingBottom: token("dock-scroll-clearance") }}
+              footer={
+                <View class="pl-(--content-inset-left) pr-(--content-inset-right)">
+                  {paginationFooter()}
                 </View>
-              </View>
-            }
-            footer={
-              <View class="pl-(--content-inset-left) pr-(--content-inset-right)">
-                {paginationFooter()}
-              </View>
-            }
-          >
+              }
+            >
             {(entity, index) => {
               const isArtist = () => kind() === "artist";
               const subtitle = () => entitySubtitle(entity(), kind());
@@ -527,7 +522,8 @@ export function SearchPage(props: {
                 </View>
               );
             }}
-          </List>
+            </List>
+          </View>
         </If>
       </If>
 

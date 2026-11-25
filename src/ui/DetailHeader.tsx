@@ -8,7 +8,7 @@ export function DetailHeader(props: {
   title: string; cover?: string; description?: string; metadata?: string;
   playlist?: boolean; children?: JSX.Element;
 }) {
-  return <View testID="detail-header" class={`flex-row items-start gap-6 pb-2 ${props.playlist ? "pt-(--playlist-detail-top-gap)" : ""}`}>
+  return <View testID="detail-header" class={`flex-row items-start gap-6 pb-4 ${props.playlist ? "pt-(--playlist-detail-top-gap)" : ""}`}>
     <View testID="detail-cover" class={`shrink-0 rounded-(--detail-cover-radius) overflow-hidden bg-muted items-center justify-center
       ${props.playlist ? "size-(--playlist-detail-cover-size)" : "size-(--detail-cover-size)"}`}>
       <If when={!!props.cover}><Image src={props.cover!} class="size-full" style={{objectFit:"cover"}} /></If>

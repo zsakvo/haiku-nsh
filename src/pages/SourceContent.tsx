@@ -33,7 +33,8 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
 
 /** Remote rows share the existing native menus for likes and adding to user playlists. */
 export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean; fit?: boolean;
-  detail?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void }) {
+  detail?: boolean; fixedHeading?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void;
+  onLoadMore?: () => void }) {
   const selected = signal<string[]>([]);
   const error = signal(""), creating = signal<any[] | null>(null);
   const player = mirrorCore(props.core).player;
@@ -62,10 +63,11 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
     </If>
     <If when={!!handle()}>
       <TrackList class="flex-1 min-h-0" source={handle()!} active={props.active && !creating()}
-        detail={props.detail} header={props.header} footer={props.footer}
+        detail={props.detail} fixedHeading={props.fixedHeading} header={props.header} footer={props.footer}
         bottomInset={props.detail?token("dock-scroll-clearance"):0}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onSelectionChange={e => selected.set(e.ids)} onScrollChange={e => props.onScrolled?.(e.scrolled)}
+        onLoadMore={() => props.onLoadMore?.()}
         onPlay={(e) => void act(() => props.core.collections.playSource(e.source, e.id))}
         onAction={(e) => void act(async () => {
           const tracks = await CollectionsService.selectedTracks(handle()!, e.ids) as any[];

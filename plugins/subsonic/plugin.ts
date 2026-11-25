@@ -256,6 +256,22 @@ export default definePlugin({
       };
     },
   },
+  me: {
+    async playlists(ctx) {
+      const result = await call(ctx, 'getPlaylists');
+      const values = (result.playlists as {
+        playlist?: { id: string; name: string; owner?: string; coverArt?: string }[];
+      })?.playlist || [];
+      const items = await Promise.all(values.map(async v => ({
+        id: String(v.id),
+        title: v.name,
+        creator: v.owner,
+        owned: v.owner === ctx.connection?.username,
+        cover: await cover(ctx, v.coverArt),
+      })));
+      return page(items, ctx);
+    },
+  },
   library: {
     cards: [
       { id: 'albums', label: '专辑', entity: 'album' },

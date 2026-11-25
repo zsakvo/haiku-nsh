@@ -278,6 +278,9 @@ export default definePlugin({
       info: Playlist; tracks: Page<Track>;
     }>,
   },
+  me: {
+    playlists: (ctx) => list(ctx, '/playlist/list', v => playlist(ctx, v)),
+  },
   library: {
     cards: [
       { id: 'track', label: '歌曲', entity: 'track' },

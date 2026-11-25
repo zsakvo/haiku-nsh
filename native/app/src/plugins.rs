@@ -478,6 +478,40 @@ impl PluginService {
         }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
         Ok(crate::sources::project_covers(&projection_host, &projection_source, value, 192))
     }
+    /// Fetch all user/favorite playlists declared by a source's `me.playlists` capability.
+    pub async fn me_playlists(
+        this: Instance<Self>,
+        source_id: String,
+    ) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        let projection_host = host.clone();
+        let projection_source = source_id.clone();
+        let value = background(async move {
+            let source = host.source(&source_id)?;
+            let api = haiku_plugins::SourceApi::new(source);
+            let items = haiku_plugins::SourceApi::collect_all(|cursor| {
+                let api = api.clone();
+                async move {
+                    api.me_playlists(
+                        haiku_plugins::PageArgs { cursor, limit: 50 },
+                        None,
+                    )
+                    .await
+                }
+            })
+            .await?;
+            Ok::<_, haiku_plugins::PluginError>(json!(items))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+        Ok(crate::sources::project_covers(
+            &projection_host,
+            &projection_source,
+            value,
+            192,
+        ))
+    }
     /// Fetch another artist album page; cursors remain opaque plugin values.
     pub async fn artist_albums(
         this: Instance<Self>,

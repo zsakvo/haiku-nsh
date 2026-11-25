@@ -8,14 +8,22 @@ export function IconButton(props: {
   selected?: boolean; onPress: () => void;
   sidebar?: boolean; testID?: string;
   navigation?: boolean;
+  plain?: boolean;
 }) {
   return <BaseButton testID={props.testID} accessibilityLabel={props.label} disabled={props.disabled}
     selected={props.selected} onPress={props.onPress}
     tooltip={<Tooltip label={props.hint ?? props.label} />}
     class={`${props.navigation
       ? "group relative size-(--navigation-control-height) overflow-hidden rounded-(--radius) border border-source-chip-border"
-      : "size-(--compact-control-height) rounded-(--radius) hover:bg-accent active:bg-muted selected:bg-accent"} items-center justify-center disabled:opacity-35 ${focus}`}>
+      : props.plain
+        ? "size-5 rounded-(--radius-inset) active:opacity-60"
+        : "size-(--compact-control-height) rounded-(--radius) hover:bg-accent active:bg-muted selected:bg-accent"} items-center justify-center disabled:opacity-35 ${focus}`}>
     <If when={!!props.navigation}><NavigationControlBackdrop /></If>
-    <Icon name={props.icon} small sidebar={props.sidebar} navigation={props.navigation} color={props.selected ? "primary" : props.sidebar ? "sidebar-foreground" : "foreground"} />
+    <Icon name={props.icon}
+      class={props.plain ? "size-3.5" : undefined}
+      small={!props.plain}
+      sidebar={props.sidebar}
+      navigation={props.navigation}
+      color={props.selected ? "primary" : props.plain ? "muted-foreground" : props.sidebar ? "sidebar-foreground" : "foreground"} />
   </BaseButton>;
 }

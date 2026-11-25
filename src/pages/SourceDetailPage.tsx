@@ -4,7 +4,7 @@ import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
 import { Button } from "../ui/Button";
 import { SourceGrid, SourceTracks } from "./SourceContent";
-import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
+import { ActionMenu, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { DetailHeader, DetailAction } from "../ui/DetailHeader";
 import { usePageRefresh } from "../shell/pageRefresh";
@@ -128,12 +128,20 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
             <If when={info().reference?.kind !== "artist"}>
               <DetailAction label="下载全部" icon="download" pill={isPlaylist()} disabled={busy()} onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
             </If>
-            <Menu trigger={<Button label="…" accessibilityLabel="更多歌单操作" variant="ghost" size="sm" onPress={()=>{}} />}>
-              <MenuItem disabled={!tracks().length || busy()} onSelect={() => void act(() => play(true))}><Text>随机播放</Text></MenuItem>
-              <If when={canFavorite()}><MenuItem disabled={busy()} onSelect={() => favoriteId() ? unfavorite.set(true)
-                : void act(() => props.core.sources.favoritePlaylist(props.reference, true))}><Text>{favoriteId()?"取消收藏歌单":"收藏歌单"}</Text></MenuItem></If>
-              <If when={!!info().description}><MenuItem onSelect={()=>expanded.set(true)}><Text>查看完整简介…</Text></MenuItem></If>
-            </Menu>
+            <ActionMenu
+              label="…"
+              accessibilityLabel="更多歌单操作"
+              items={[
+                { label: "随机播放", disabled: !tracks().length || busy(), onSelect: () => void act(() => play(true)) },
+                ...(canFavorite() ? [{
+                  label: favoriteId() ? "取消收藏歌单" : "收藏歌单",
+                  disabled: busy(),
+                  onSelect: () => favoriteId() ? unfavorite.set(true)
+                    : void act(() => props.core.sources.favoritePlaylist(props.reference, true)),
+                }] : []),
+                ...(info().description ? [{ label: "查看完整简介…", onSelect: () => expanded.set(true) }] : []),
+              ] satisfies ActionMenuItem[]}
+            />
           </DetailHeader>
           <If when={!!favoriteId()}><View class="py-2"><AutoDownloadControls core={props.core} id={favoriteId()!} /></View></If>
           <If when={info().reference?.kind === "artist"}>

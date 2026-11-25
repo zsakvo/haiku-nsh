@@ -312,7 +312,7 @@ export function AppShell(props: {
               onPress={() => nav.navigate({kind:"source",source:source().sourceId})} />}
           </Each></If>
         </View>)}
-        <If when={!!core()}><PlaylistSidebar core={core()!} current={nav.current()} navigate={nav.navigate} /></If>
+        <If when={!!core()}><PlaylistSidebar core={core()!} snapshot={plugins.value()} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
       <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-4">
         <IconButton sidebar testID="nav-downloads" icon="download" label="下载"

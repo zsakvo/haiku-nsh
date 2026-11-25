@@ -4,7 +4,7 @@ import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
 import { Button } from "../ui/Button";
 import { DetailHeader, DetailAction } from "../ui/DetailHeader";
-import { Menu, MenuItem, Dialog } from "../ui/Surfaces";
+import { ActionMenu, Menu, MenuItem, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
@@ -94,16 +94,20 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
           onPress={() => void act(() => service.playSource(source()!, ""))} />
         <DetailAction label="下载全部" icon="download" pill disabled={!collection()?.trackCount}
           onPress={() => void act(() => props.core.downloads.enqueue(service.tracks(props.id)))} />
-        <Menu trigger={<Button label="…" accessibilityLabel="更多歌单操作" variant="ghost" size="sm" onPress={()=>{}} />}>
-          <MenuItem onSelect={()=>managing.set(!managing())}><Text>{managing()?"收起歌单管理":"管理歌单"}</Text></MenuItem>
-          <If when={collection()?.kind === "user"}>
-            <MenuItem onSelect={()=>editor.set("edit")}><Text>编辑歌单…</Text></MenuItem>
-            <MenuItem onSelect={()=>deleting.set(true)}><Text>删除歌单…</Text></MenuItem>
-          </If>
-          <If when={collection()?.kind === "plugin"}>
-            <MenuItem onSelect={()=>deleting.set(true)}><Text>取消收藏歌单…</Text></MenuItem>
-          </If>
-        </Menu>
+        <ActionMenu
+          label="…"
+          accessibilityLabel="更多歌单操作"
+          items={[
+            { label: managing() ? "收起歌单管理" : "管理歌单", onSelect: () => managing.set(!managing()) },
+            ...(collection()?.kind === "user" ? [
+              { label: "编辑歌单…", onSelect: () => editor.set("edit") },
+              { label: "删除歌单…", onSelect: () => deleting.set(true) },
+            ] : []),
+            ...(collection()?.kind === "plugin" ? [
+              { label: "取消收藏歌单…", onSelect: () => deleting.set(true) },
+            ] : []),
+          ] satisfies ActionMenuItem[]}
+        />
       </DetailHeader>
       <If when={!!refreshError()}><Text class="text-sm text-destructive">{refreshError()}</Text></If>
       <If when={managing()}>

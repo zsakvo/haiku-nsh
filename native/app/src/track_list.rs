@@ -27,6 +27,9 @@ pub struct TrackListProps {
     /// Playlist detail layout with artwork, inline likes and a scrolling heading.
     #[prop(default)]
     pub detail: Prop<bool>,
+    /// Keep the detail table heading fixed above the scrolling rows.
+    #[prop(default)]
+    pub fixed_heading: Prop<bool>,
     /// Page content above the table, scrolling with the songs.
     pub header: Prop<Option<Slot>>,
     /// Pagination and status below the songs.
@@ -47,6 +50,8 @@ pub enum TrackListEvent {
     /// Detail lists only: whether content has moved off the top, sent when that changes.
     #[args(scrolled)]
     ScrollChange(bool),
+    /// Reached near the end of the list; consumer may append the next page.
+    LoadMore,
 }
 fn source(props: TrackListProps) -> Option<Source> {
     track_source::get(props.source.get())
@@ -231,6 +236,116 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
         ))
 }
 const ITEM: &str = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground hover:bg-accent active:bg-muted focus:bg-accent";
+fn row_menu_button(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> impl IntoElement {
+    #[cfg(target_os = "macos")]
+    {
+        return nsh_base::button()
+            .accessibility_label("更多曲目操作")
+            .app_class("size-8 items-center justify-center rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
+            .on_press(move || show_native_row_menu(props, at, cx))
+            .child(text("…").text_color(move || theme().muted_foreground))
+            .into_element();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        menu()
+            .popup_class(POPUP)
+            .trigger(
+                nsh_base::button()
+                    .accessibility_label("更多曲目操作")
+                    .app_class("size-8 items-center justify-center rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
+                    .child(text("…").text_color(move || theme().muted_foreground)),
+            )
+            .child(commands(props, at, cx))
+            .into_element()
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn show_native_row_menu(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) {
+    use haiku_macos::popup_menu::{self, MenuItemSpec};
+    let item = |id: &str, title: &str| MenuItemSpec {
+        id: id.into(),
+        title: title.into(),
+        enabled: true,
+        is_separator: false,
+        children: vec![],
+    };
+    let bridge = crate::presentation::get().map(|p| p.bridge.clone());
+    let store = bridge.as_ref().map(|b| b.collections.clone());
+    let tracks = selected_tracks(props, at);
+    let mut items = vec![
+        item("play", "播放"),
+        item("next", "下一首播放"),
+        item("append", "加入队列"),
+        item("download", "下载"),
+    ];
+    if let Some(store) = &store {
+        let all_liked = !tracks.is_empty() && tracks.iter().all(|t| store.is_liked(&t.entity_ref()));
+        items.push(item("toggle-like", if all_liked { "取消喜欢" } else { "喜欢" }));
+        let mut children: Vec<MenuItemSpec> = store
+            .list()
+            .into_iter()
+            .filter(|p| p.kind == "user")
+            .map(|p| MenuItemSpec {
+                id: format!("add-playlist:{}", p.id),
+                title: p.title,
+                enabled: true,
+                is_separator: false,
+                children: vec![],
+            })
+            .collect();
+        children.push(item("new-playlist", "新建歌单…"));
+        items.push(MenuItemSpec {
+            id: "submenu-add-playlist".into(),
+            title: "加入歌单".into(),
+            enabled: true,
+            is_separator: false,
+            children,
+        });
+    }
+    let collection_id = source(props).and_then(|s| s.provider.collection_id());
+    if collection_id.as_deref().is_some_and(|id| id != "__liked__") {
+        items.push(item("move-up", "上移"));
+        items.push(item("move-down", "下移"));
+    }
+    if collection_id.is_some() {
+        items.push(item("remove", "从此列表移除"));
+    }
+    if !tracks.is_empty() && tracks.iter().all(|t| t.source == "local") {
+        items.push(item("edit", "编辑信息…"));
+        if collection_id.is_none() {
+            items.push(item("scrape", "刮削…"));
+        }
+        items.push(item("reveal", "在 Finder 中显示"));
+    }
+    let Some(chosen) = popup_menu::show(&items) else {
+        return;
+    };
+    if chosen == "play" {
+        if let Some(id) = id_at(props, at) {
+            play(props, cx, id);
+        }
+    } else if chosen == "toggle-like" {
+        if let Some(store) = &store {
+            let value = !tracks.iter().all(|t| store.is_liked(&t.entity_ref()));
+            for track in tracks {
+                if let Err(e) = store.set_liked(&track, Some(value)) {
+                    log::error!("Like: {e}");
+                }
+            }
+        }
+    } else if let Some(pid) = chosen.strip_prefix("add-playlist:") {
+        if let Some(store) = &store {
+            if let Err(e) = store.add(pid, &tracks) {
+                log::error!("Add playlist: {e}");
+            }
+        }
+    } else {
+        cx.emit(TrackListEvent::Action(chosen, targets(props, at)));
+    }
+}
+
 const POPUP: &str =
     "rounded-(--radius-surface) border border-border bg-popover shadow-lg min-w-48 p-1";
 
@@ -514,21 +629,7 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                                 .text_color(move || theme().primary)
                             },
                         ))
-                        .child(
-                            menu()
-                                .popup_class(POPUP)
-                                .trigger(
-                                    nsh_base::button()
-                                        .accessibility_label("更多曲目操作")
-                                        .size_8()
-                                        .rounded(move || theme().radius)
-                                        .hover(|s| s.bg(move || theme().muted))
-                                        .child(
-                                            text("…").text_color(move || theme().muted_foreground),
-                                        ),
-                                )
-                                .child(commands(props, at, cx)),
-                        );
+                        .child(row_menu_button(props, at, cx));
                     view()
                         .child(when(
                             move || {
@@ -586,6 +687,7 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                     );
                 }
             })
+            .on_load_more(move || cx.emit(TrackListEvent::LoadMore))
             .element_ref(&list)
             .flex_1()
             .min_h_0(),
@@ -593,9 +695,13 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
         .into_element()
 }
 
-fn detail_heading() -> impl IntoElement {
+fn detail_heading(fixed: bool) -> impl IntoElement {
     view().test_id("detail-song-heading")
-        .app_class("flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border mb-2.5")
+        .app_class(if fixed {
+            "flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border"
+        } else {
+            "flex-row items-center gap-3 h-(--detail-heading-height) px-4 border-b border-border mb-2.5"
+        })
         .child(text("#").app_class("w-10 shrink-0 text-xs text-muted-foreground"))
         .child(text("标题").flex_1().flex_grow(1.6).min_w_0().app_class("pr-6 text-xs text-muted-foreground"))
         .child(text("专辑").flex_1().min_w_0().app_class("pr-6 text-xs text-muted-foreground"))
@@ -612,7 +718,8 @@ fn detail_list(
 ) -> impl IntoElement {
     let bridge = crate::presentation::get().map(|p| p.bridge.clone());
     let scrolled = std::rc::Rc::new(std::cell::Cell::new(false));
-    virtual_list(
+    let fixed_heading = props.fixed_heading.get_untracked();
+    let vlist = virtual_list(
         move || source(props).map(|s| s.ids.with(Vec::len)).unwrap_or(0),
         move |at| {
             let track = computed(move || {
@@ -699,10 +806,7 @@ fn detail_list(
                 .child(text(move || track.with(|t| t.as_ref().and_then(|t| t.duration).filter(|s| *s > 0.)
                     .map(|s| format!("{:02}:{:02}", s as u64 / 60, s as u64 % 60)).unwrap_or_else(|| "—".into())))
                     .app_class("w-(--detail-duration-width) shrink-0 text-xs text-muted-foreground"))
-                .child(menu().popup_class(POPUP).trigger(nsh_base::button()
-                    .accessibility_label("更多曲目操作").app_class("size-8 rounded-(--radius) hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring")
-                    .child(text("…").text_color(move || theme().muted_foreground)))
-                    .child(commands(props, at, cx)));
+                .child(row_menu_button(props, at, cx));
             view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(context_menu().popup_class(POPUP)
                 .on_open_change(move |event: &nsh_base::MenuEvent| {
                     if matches!(event, nsh_base::MenuEvent::OpenChange(true, _))
@@ -718,11 +822,34 @@ fn detail_list(
         let next = event.offset.y.0 > 0.;
         if scrolled.replace(next) != next { cx.emit(TrackListEvent::ScrollChange(next)); }
     })
-    .header(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.header.place(|s| s)).child(detail_heading()))
+    .on_load_more(move || cx.emit(TrackListEvent::LoadMore))
     .footer(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.footer.place(|s| s)))
     .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())
     .initial_scroll_index(initial)
     .content_padding_bottom(move || px(props.bottom_inset.get()))
     .estimated_item_size(move || px(theme().tokens().number("detail-row-height").unwrap_or(58.)))
-    .empty(text("没有符合条件的歌曲").app_class("p-4 text-sm text-muted-foreground"))
+    .empty(text("没有符合条件的歌曲").app_class("p-4 text-sm text-muted-foreground"));
+    if fixed_heading {
+        view()
+            .flex_1()
+            .min_h_0()
+            .child(
+                view()
+                    .flex_shrink_0()
+                    .app_class("pl-(--content-inset-left) pr-(--content-inset-right)")
+                    .child(props.header.place(|s| s))
+                    .child(detail_heading(true)),
+            )
+            .child(vlist.content_padding_top(px(10.)))
+            .into_element()
+    } else {
+        vlist
+            .header(
+                view()
+                    .app_class("pl-(--content-inset-left) pr-(--content-inset-right)")
+                    .child(props.header.place(|s| s))
+                    .child(detail_heading(false)),
+            )
+            .into_element()
+    }
 }

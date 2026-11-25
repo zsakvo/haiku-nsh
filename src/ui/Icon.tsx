@@ -11,7 +11,9 @@ const download = "asset:/ui/icons/download.svg";
 const settings = "asset:/ui/icons/settings.svg";
 const left = "asset:/ui/icons/nav-arrow-left.svg";
 const right = "asset:/ui/icons/nav-arrow-right.svg";
+const down = "asset:/ui/icons/nav-arrow-down.svg";
 const close = "asset:/ui/icons/xmark.svg";
+const plus = "asset:/ui/icons/plus.svg";
 const check = "asset:/ui/icons/check.svg";
 const palette = "asset:/ui/icons/palette.svg";
 const user = "asset:/ui/icons/user.svg";
@@ -26,7 +28,7 @@ const plug = "asset:/ui/icons/plug-type-a.svg";
 const sync = "asset:/ui/icons/refresh-double.svg";
 const keyboard = "asset:/ui/icons/key-command.svg";
 const code = "asset:/ui/icons/code-brackets.svg";
-const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, close, check, palette,
+const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, down, close, plus, check, palette,
   user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code };
 export type IconName = keyof typeof icons;
 export function Icon(props: {
