@@ -28,7 +28,7 @@ import type {
 } from 'haiku';
 import { api, batch, request, checkCode, credential, cookies } from './api.ts';
 import { auth } from './auth.ts';
-import { decryptQrc, randomHex } from './crypto.ts';
+import { decryptQrc, device, randomHex } from './crypto.ts';
 import type {
   Singer,
   RemoteAlbum,
@@ -284,7 +284,7 @@ async function streams(
     midurlinfo: { filename: string; result: number; purl: string }[];
   }>(ctx, 'music.vkey.GetVkey', 'UrlGetVkey', {
     uin: c.str_musicid || String(c.musicid),
-    guid: randomHex(16),
+    guid: device().guid,
     filename: tiers.map(filename),
     songmid: tiers.map(() => s.mid),
     songtype: tiers.map(() => s.type || 0),

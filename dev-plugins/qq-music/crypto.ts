@@ -300,51 +300,55 @@ export interface Device {
   fingerprint: string;
   imei: string;
 }
+export const DEVICE_BRAND = 'Google';
+export const DEVICE_MODEL = 'Pixel 11Pro';
+export const DEVICE_CODENAME = 'pixel11pro';
+export const DEVICE_OS_VER = '15';
+export const DEVICE_API_LEVEL = '35';
+
+// Fixed device profile so every installation of this plugin identifies as the same Pixel 11Pro.
+const FIXED_DEVICE: Readonly<Device> = {
+  guid: '7a9e4c21f5b803d6e12a94c7b0853f1e',
+  androidId: '9c4e71a2d805f3b6',
+  imei: '356789114208356',
+  fingerprint: 'google/pixel11pro/pixel11pro:15/AP4A.250205.002/12821495:user/release-keys',
+};
+const FIXED_BEACON_ID_SRC = Array.from({ length: 40 }, (_, i) => {
+  const k = i + 1;
+  const value = [1, 2, 13, 14, 17, 18, 21, 22, 25, 26, 29, 30, 33, 34, 37, 38].includes(k)
+    ? '2025-02-01482913.619402758'
+    : k === 3
+      ? '0000000000000000'
+      : k === 4
+        ? '9a3c7e5b2d4f816a'
+        : ((k * 733 + 1297) % 9000) + 1000;
+  return `k${k}:${value};`;
+}).join('');
+
 export function device(): Device {
-  const digits = Array.from({ length: 14 }, () => Math.floor(Math.random() * 10));
-  const sum = digits.reduce((n, d, i) => n + (i % 2 ? (d * 2 > 9 ? d * 2 - 9 : d * 2) : d), 0);
-  return {
-    guid: randomHex(16),
-    androidId: randomHex(8),
-    imei: digits.join('') + ((10 - (sum % 10)) % 10),
-    fingerprint: `xiaomi/iarim/sagit:10/eomam.200122.001/${Math.floor(Math.random() * 9000000) + 1000000}:user/release-keys`,
-  };
+  return { ...FIXED_DEVICE };
 }
-export function qimeiRequest(dev: Device) {
+export function qimeiRequest(dev: Device, previous?: { q16?: string; q36?: string }) {
   const md5 = (...values: string[]) => createHash('md5').update(values.join('')).digest('hex');
   const now = Math.floor(Date.now() / 1000);
-  const month = new Date().toISOString().slice(0, 7) + '-01';
-  const r1 = Math.floor(Math.random() * 900000) + 100000;
-  const r2 = Math.floor(Math.random() * 900000000) + 100000000;
-  const beacon = Array.from({ length: 40 }, (_, i) => {
-    const k = i + 1;
-    const value = [1, 2, 13, 14, 17, 18, 21, 22, 25, 26, 29, 30, 33, 34, 37, 38].includes(k)
-      ? `${month}${r1}.${r2}`
-      : k === 3
-        ? '0000000000000000'
-        : k === 4
-          ? randomHex(8).replace(/0/g, '1')
-          : Math.floor(Math.random() * 10000);
-    return `k${k}:${value};`;
-  }).join('');
   const payload = {
     androidId: dev.androidId,
     platformId: 1,
     appKey: APP_KEY,
     appVersion: '14.9.0.8',
-    beaconIdSrc: beacon,
-    brand: 'Xiaomi',
+    beaconIdSrc: FIXED_BEACON_ID_SRC,
+    brand: DEVICE_BRAND,
     channelId: '10003505',
     cid: '',
     imei: dev.imei,
     imsi: '',
     mac: '',
-    model: 'MI 6',
+    model: DEVICE_MODEL,
     networkType: 'unknown',
     oaid: '',
-    osVersion: 'Android 10,level 29',
-    qimei: '',
-    qimei36: '',
+    osVersion: `Android ${DEVICE_OS_VER},level ${DEVICE_API_LEVEL}`,
+    qimei: previous?.q16 || '',
+    qimei36: previous?.q36 || '',
     sdkVersion: '1.2.13.6',
     targetSdkVersion: '33',
     audit: '',
@@ -359,18 +363,15 @@ export function qimeiRequest(dev: Device) {
       oz: 'UhYmelwouA+V2nPWbOvLTgN2/m8jwGB+yUB5v9tysQg=',
       oo: 'Xecjt+9S1+f8Pz2VLSxgpw==',
       kelong: '0',
-      uptimes: new Date((now - Math.floor(Math.random() * 14400)) * 1000)
-        .toISOString()
-        .slice(0, 19)
-        .replace('T', ' '),
+      uptimes: '2025-02-05 08:30:00',
       multiUser: '0',
-      bod: 'Xiaomi',
-      dv: 'sagit',
+      bod: DEVICE_BRAND,
+      dv: DEVICE_CODENAME,
       firstLevel: '',
-      manufact: 'Xiaomi',
-      name: 'MI 6',
-      host: 'se.infra',
-      kernel: 'Linux 5.4.0-54-generic',
+      manufact: DEVICE_BRAND,
+      name: DEVICE_MODEL,
+      host: 'abfarm-release-2004-0192',
+      kernel: 'Linux 6.1.99-android15',
     }),
   };
   // QIMEI uses RSA PKCS#1 v1.5 for the AES key and AES-CBC with key == IV for the fingerprint.

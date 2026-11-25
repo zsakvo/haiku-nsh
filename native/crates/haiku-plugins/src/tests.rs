@@ -1146,18 +1146,26 @@ async fn qq_android_session_survives_reload_and_expires() {
       import {api} from './api.ts';
       export default definePlugin({id:'qq.session',name:'QQ session',version:'1.0.0',
         track:{streams:async(id,ctx)=>{
-          if(id==='expire'||id==='corrupt'){
+          if(id==='expire'||id==='corrupt'||id==='stale-device'){
             const key='qq.android-session.14090008.v1',saved=ctx.storage.get(key);
-            ctx.storage.set(key,id==='expire'?{...saved,expires:1}:{expires:Date.now()+10000});
+            ctx.storage.set(key,id==='expire'?{...saved,expires:1}
+              :id==='stale-device'?{...saved,guid:'old-random-guid',fingerprint:'xiaomi/iarim/sagit:10/eomam.200122.001/1234567:user/release-keys'}
+              :{expires:Date.now()+10000});
             return [{url:'https://fixture.invalid/changed'}];
           }
           let calls=0;
+          let deviceSig='';
           const http={post:(url,options)=>({response:async()=>{
             calls++;
             const req=options.body?JSON.parse(options.body):null;
             const body=url.includes('/proxy')?{data:JSON.stringify({data:{q16:'q16',q36:'q36'}})}
               :{code:0,req_0:{code:0,data:req.req_0.method==='GetSession'
                 ?{session:{uid:'uid',sid:'sid'}}:{}}};
+            if(req?.comm){
+              if(req.comm.phonetype!=='Pixel 11Pro')throw Error('unexpected phonetype: '+req.comm.phonetype);
+              if(req.comm.os_ver!=='15'||req.comm.devicelevel!=='35')throw Error('unexpected os/level');
+              deviceSig=[req.comm.OpenUDID,req.comm.aid,req.comm.rom].join('|');
+            }
             if(req?.req_0.method!=='GetSession'&&req?.comm){
               const saved=ctx.storage.get('qq.android-session.14090008.v1');
               if(req.comm.OpenUDID!==saved.guid||req.comm.QIMEI!==saved.q16)throw Error('device mismatch');
@@ -1165,7 +1173,7 @@ async fn qq_android_session_survives_reload_and_expires() {
             return new Response(JSON.stringify(body),{status:200});
           }})};
           await api({...ctx,http},'test','read');
-          return [{url:'https://fixture.invalid/'+calls}];
+          return [{url:'https://fixture.invalid/'+calls+'?dev='+encodeURIComponent(deviceSig)}];
         }}});"#;
     host.install_files(BTreeMap::from([
         ("plugin.ts".into(), entry.as_bytes().to_vec()),
@@ -1173,21 +1181,34 @@ async fn qq_android_session_survives_reload_and_expires() {
         ("crypto.ts".into(), std::fs::read(package.join("crypto.ts")).unwrap()),
     ]), false).await.unwrap();
     let source = host.activate("qq.session").await.unwrap();
-    for expected in [3, 1] {
-        let result = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
-        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}"));
-    }
+    let first = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
+    let first_url = first[0]["url"].as_str().unwrap().to_owned();
+    let (prefix, dev_sig) = first_url.split_once("?dev=").unwrap();
+    assert_eq!(prefix, "https://fixture.invalid/3");
+    let second = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
+    assert_eq!(second[0]["url"], format!("https://fixture.invalid/1?dev={dev_sig}"));
     drop(source);
     drop(host);
-    for (expected, invalidate) in [(1, "expire"), (3, "corrupt"), (3, "")] {
+    for (expected, invalidate) in [(1, "expire"), (3, "stale-device"), (3, "corrupt"), (3, "")] {
         let host = Host::open(dir.path()).await.unwrap();
         let source = host.source("qq.session").unwrap();
         let result = source.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
-        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}"));
+        assert_eq!(result[0]["url"], format!("https://fixture.invalid/{expected}?dev={dev_sig}"));
         if !invalidate.is_empty() {
             source.invoke("track.streams", vec![json!(invalidate)], json!({}), None).await.unwrap();
         }
     }
+    // A second independent installation must register the exact same fixed device identity.
+    let dir2 = tempfile::tempdir().unwrap();
+    let host2 = Host::open(dir2.path()).await.unwrap();
+    host2.install_files(BTreeMap::from([
+        ("plugin.ts".into(), entry.as_bytes().to_vec()),
+        ("api.ts".into(), std::fs::read(package.join("api.ts")).unwrap()),
+        ("crypto.ts".into(), std::fs::read(package.join("crypto.ts")).unwrap()),
+    ]), false).await.unwrap();
+    let source2 = host2.activate("qq.session").await.unwrap();
+    let other = source2.invoke("track.streams", vec![json!("read")], json!({}), None).await.unwrap();
+    assert_eq!(other[0]["url"], format!("https://fixture.invalid/3?dev={dev_sig}"));
 }
 
 #[tokio::test]

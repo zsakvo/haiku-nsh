@@ -12,7 +12,16 @@ import {
   NotFound,
 } from 'haiku';
 import type { Context, HttpOptions, Json } from 'haiku';
-import { device, hash33, qimeiRequest, sign, type Device } from './crypto.ts';
+import {
+  device,
+  DEVICE_API_LEVEL,
+  DEVICE_MODEL,
+  DEVICE_OS_VER,
+  hash33,
+  qimeiRequest,
+  sign,
+  type Device,
+} from './crypto.ts';
 import type { Credential, Envelope } from './types.ts';
 
 export interface Request {
@@ -96,23 +105,42 @@ export async function request(
 }
 async function androidSession(ctx: Context) {
   if (!session || Date.now() >= sessionExpires) {
+    const fingerprint = device();
     const cached = ctx.storage.get(SESSION_KEY) as (AndroidSession & { expires: number }) | null;
-    if (cached && Number.isFinite(cached.expires) && cached.expires > Date.now() &&
+    const sameDevice =
+      !!cached &&
+      cached.guid === fingerprint.guid &&
+      cached.androidId === fingerprint.androidId &&
+      cached.fingerprint === fingerprint.fingerprint &&
+      cached.imei === fingerprint.imei;
+    if (
+      sameDevice &&
+      Number.isFinite(cached.expires) &&
+      cached.expires > Date.now() &&
       cached.expires <= Date.now() + SESSION_TTL &&
-      (['q16', 'q36', 'uid', 'sid', 'guid', 'androidId', 'fingerprint', 'imei'] as const)
-        .every(key => typeof cached[key] === 'string' && cached[key].length > 0)) {
+      (['q16', 'q36', 'uid', 'sid'] as const).every(
+        (key) => typeof cached[key] === 'string' && cached[key].length > 0,
+      )
+    ) {
       sessionExpires = cached.expires;
       session = Promise.resolve(cached);
       return session;
     }
     sessionExpires = Date.now() + SESSION_TTL;
     session = (async () => {
-      const fingerprint = device();
+      const previousQimei =
+        sameDevice &&
+        typeof cached.q16 === 'string' &&
+        cached.q16.length > 0 &&
+        typeof cached.q36 === 'string' &&
+        cached.q36.length > 0
+          ? { q16: cached.q16, q36: cached.q36 }
+          : undefined;
       // QQMusicApi initializes QIMEI before Android CGI requests, including search and SMS.
       const res = await request(
         ctx,
         'https://api.tencentmusic.com/tme/trpc/proxy',
-        qimeiRequest(fingerprint),
+        qimeiRequest(fingerprint, previousQimei),
         true,
       );
       const body = (await res.json()) as { data: string };
@@ -182,10 +210,10 @@ function comm(
     uid: state?.uid,
     sid: state?.sid,
     aid: state?.androidId,
-    os_ver: '10',
-    phonetype: 'MI 6',
-    devicelevel: '29',
-    newdevicelevel: '29',
+    os_ver: DEVICE_OS_VER,
+    phonetype: DEVICE_MODEL,
+    devicelevel: DEVICE_API_LEVEL,
+    newdevicelevel: DEVICE_API_LEVEL,
     rom: state?.fingerprint,
   };
 }
@@ -210,7 +238,8 @@ async function send<T extends unknown[]>(
       query: options.sign ? { _: Date.now(), sign: sign(text) } : undefined,
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': platform === 'android' ? 'QQMusic 14090008(android 10)' : WEB_UA,
+        'User-Agent':
+          platform === 'android' ? `QQMusic 14090008(android ${DEVICE_OS_VER})` : WEB_UA,
         Cookie: cookies(credential(ctx)),
       },
     },
