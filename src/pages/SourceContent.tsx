@@ -50,20 +50,23 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
   async function act(work: () => Promise<unknown>) {
     try { error.set(""); await work(); } catch (e) { error.set(String(e)); }
   }
+  const selectionBar = () => <View class={`flex-row items-center gap-2 py-2 ${props.detail ? "" : "pl-(--content-inset-left) pr-(--content-inset-right)"}`}>
+    <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
+    <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void act(async () => {
+      await props.core.downloads.enqueue(await CollectionsService.selectedTracks(handle()!, selected()));
+    })} />
+  </View>;
+  const detailHeader = () => <View class="flex-col">
+    {props.header}
+    <If when={selected().length > 1 && !!handle()}>{selectionBar()}</If>
+  </View>;
   return <View class={props.fit ? "shrink-0 min-h-0" : "flex-1 min-h-0"}
     style={props.fit ? {height:Math.min(props.tracks.length,8)*token("track-row-height")+token("compact-control-height")+8} : {}}>
     <If when={!!error() || !!handle.error()}><Text class="text-sm text-destructive">{error() || String(handle.error())}</Text></If>
-    <If when={!!selected().length && !!handle()}>
-      <View class="flex-row gap-2 pl-(--content-inset-left) pr-(--content-inset-right) py-2">
-        <Text class="text-xs text-muted-foreground">已选择 {selected().length} 首</Text>
-        <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void act(async () => {
-          await props.core.downloads.enqueue(await CollectionsService.selectedTracks(handle()!, selected()));
-        })} />
-      </View>
-    </If>
+    <If when={!props.detail && !!selected().length && !!handle()}>{selectionBar()}</If>
     <If when={!!handle()}>
       <TrackList class="flex-1 min-h-0" source={handle()!} active={props.active && !creating()}
-        detail={props.detail} fixedHeading={props.fixedHeading} header={props.header} footer={props.footer}
+        detail={props.detail} fixedHeading={props.fixedHeading} header={props.detail ? detailHeader() : props.header} footer={props.footer}
         bottomInset={props.detail?token("dock-scroll-clearance"):0}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onSelectionChange={e => selected.set(e.ids)} onScrollChange={e => props.onScrolled?.(e.scrolled)}

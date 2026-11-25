@@ -4,6 +4,7 @@ import { Button as BaseButton, Dialog as BaseDialog, Menu as BaseMenu, ContextMe
 import type { DialogProps, MenuProps, ContextMenuProps, MenuItemProps } from "nsh/base";
 import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
 import { focus } from "./Button";
+import { Icon } from "./Icon";
 export const popupSurface = "rounded-(--radius-surface) border border-border bg-popover shadow-lg";
 export const popupItem = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
 export function Tooltip(props: { label: string }) {
@@ -59,6 +60,9 @@ export function ActionMenu(props: {
 }) {
   const nativeMenu = platform.os === "macos" && desktopAvailable;
   const triggerClass = `size-8 items-center justify-center rounded-(--radius) active:opacity-60 ${focus}`;
+  const triggerContent = () => props.label === "…"
+    ? <Icon name="harmonyosDotGrid1x2" small color="foreground" />
+    : <Text class="text-sm text-foreground">{props.label}</Text>;
   if (nativeMenu) {
     let anchor: ViewRef | undefined;
     async function openMenu() {
@@ -81,7 +85,7 @@ export function ActionMenu(props: {
         onPress={() => void openMenu()}
         class={triggerClass}
       >
-        <Text class="text-sm text-foreground">{props.label}</Text>
+        {triggerContent()}
       </BaseButton>
     </View>;
   }
@@ -91,7 +95,7 @@ export function ActionMenu(props: {
       onPress={() => {}}
       class={triggerClass}
     >
-      <Text class="text-sm text-foreground">{props.label}</Text>
+      {triggerContent()}
     </BaseButton>
   }>
     <Each of={props.items} key={(item) => item.label}>

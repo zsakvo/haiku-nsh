@@ -1,7 +1,9 @@
 //! A reusable compact table. Cells bind their current position, never row-local state.
 use crate::track_source::{self, Source};
 use haiku_library::service::artist_names;
-use nsh_base::{context_menu, menu, menu_item, submenu, theme};
+#[cfg(not(target_os = "macos"))]
+use nsh_base::{context_menu, menu};
+use nsh_base::{menu_item, submenu, theme};
 use nsh_core::{PressEvent, prelude::*};
 use std::collections::BTreeSet;
 
@@ -236,6 +238,56 @@ fn commands(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> i
         ))
 }
 const ITEM: &str = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent";
+fn wrap_row_context_menu(
+    row: impl IntoElement,
+    props: TrackListProps,
+    at: Position,
+    cx: Scope<TrackListEvent>,
+) -> impl IntoElement {
+    #[cfg(target_os = "macos")]
+    {
+        return view()
+            .on_context_menu(move |_: &ContextMenuEvent| {
+                if let Some(s) = source(props)
+                    && !id_at(props, at)
+                        .is_some_and(|id| s.selected.with_untracked(|set| set.contains(&id)))
+                {
+                    s.select(at.index(), false, false);
+                    selection(props, cx);
+                }
+                show_native_row_menu(props, at, cx);
+            })
+            .child(row)
+            .into_element();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        context_menu()
+            .popup_class(POPUP)
+            .on_open_change(move |event: &nsh_base::MenuEvent| {
+                if matches!(event, nsh_base::MenuEvent::OpenChange(true, _))
+                    && let Some(s) = source(props)
+                    && !id_at(props, at)
+                        .is_some_and(|id| s.selected.with_untracked(|set| set.contains(&id)))
+                {
+                    s.select(at.index(), false, false);
+                    selection(props, cx);
+                }
+            })
+            .trigger(row)
+            .child(commands(props, at, cx))
+            .into_element()
+    }
+}
+fn row_menu_icon() -> impl IntoElement {
+    image(|| {
+        nsh_core::element::ImageSrc::svg_markup(include_str!(
+            "../../../assets/icons/harmonyos-dot-grid-1x2.svg"
+        ))
+    })
+    .size(px(16.))
+    .tint_color(move || theme().muted_foreground)
+}
 fn row_menu_button(props: TrackListProps, at: Position, cx: Scope<TrackListEvent>) -> impl IntoElement {
     #[cfg(target_os = "macos")]
     {
@@ -243,7 +295,7 @@ fn row_menu_button(props: TrackListProps, at: Position, cx: Scope<TrackListEvent
             .accessibility_label("更多曲目操作")
             .app_class("size-8 items-center justify-center rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
             .on_press(move || show_native_row_menu(props, at, cx))
-            .child(text("…").text_color(move || theme().muted_foreground))
+            .child(row_menu_icon())
             .into_element();
     }
     #[cfg(not(target_os = "macos"))]
@@ -254,7 +306,7 @@ fn row_menu_button(props: TrackListProps, at: Position, cx: Scope<TrackListEvent
                 nsh_base::button()
                     .accessibility_label("更多曲目操作")
                     .app_class("size-8 items-center justify-center rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
-                    .child(text("…").text_color(move || theme().muted_foreground)),
+                    .child(row_menu_icon()),
             )
             .child(commands(props, at, cx))
             .into_element()
@@ -645,24 +697,7 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
                                 .app_class("px-3 pt-3 pb-1 text-xs text-muted-foreground")
                             },
                         ))
-                        .child(
-                            context_menu()
-                                .popup_class(POPUP)
-                                .on_open_change(move |event: &nsh_base::MenuEvent| {
-                                    if matches!(event, nsh_base::MenuEvent::OpenChange(true, _)) {
-                                        if let Some(s) = source(props) {
-                                            if !id_at(props, at).is_some_and(|id| {
-                                                s.selected.with_untracked(|set| set.contains(&id))
-                                            }) {
-                                                s.select(at.index(), false, false);
-                                                selection(props, cx);
-                                            }
-                                        }
-                                    }
-                                })
-                                .trigger(row)
-                                .child(commands(props, at, cx)),
-                        )
+                        .child(wrap_row_context_menu(row, props, at, cx))
                 },
             )
             .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())
@@ -806,14 +841,9 @@ fn detail_list(
                     .map(|s| format!("{:02}:{:02}", s as u64 / 60, s as u64 % 60)).unwrap_or_else(|| "—".into())))
                     .app_class("w-(--detail-duration-width) shrink-0 text-xs text-muted-foreground"))
                 .child(row_menu_button(props, at, cx));
-            view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(context_menu().popup_class(POPUP)
-                .on_open_change(move |event: &nsh_base::MenuEvent| {
-                    if matches!(event, nsh_base::MenuEvent::OpenChange(true, _))
-                        && let Some(s) = source(props)
-                        && !id_at(props, at).is_some_and(|id| s.selected.with_untracked(|set| set.contains(&id))) {
-                        s.select(at.index(), false, false); selection(props, cx);
-                    }
-                }).trigger(row).child(commands(props, at, cx)))
+            view()
+                .app_class("pl-(--content-inset-left) pr-(--content-inset-right)")
+                .child(wrap_row_context_menu(row, props, at, cx))
         },
     )
     .test_id("detail-track-list").element_ref(&list).flex_1().min_h_0()
