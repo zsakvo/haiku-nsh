@@ -1,0 +1,920 @@
+{
+  "login": {
+    "cookie": "userid=10001; token=fake-initial-token; t1=fake-t1"
+  },
+  "routes": [
+    {
+      "path": "/risk/v3/r_register_dev",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": { "dfid": "fake-dfid-0001" }
+      }
+    },
+    {
+      "path": "/v3/get_my_info",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "userid": 10001,
+          "nickname": "Fixture User",
+          "pic": "http://imge.kugou.com/user/{size}/avatar.jpg"
+        }
+      }
+    },
+    {
+      "path": "/v1/get_union_vip",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "busi_vip": [{ "is_vip": 1, "product_type": "concept" }]
+        }
+      }
+    },
+    {
+      "path": "/v2/qrcode",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": { "qrcode": "fake-qr-key" }
+      }
+    },
+    {
+      "path": "/v2/get_userinfo_qrcode",
+      "method": "GET",
+      "query": { "qrcode": "fake-qr-expired" },
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": { "status": 0 }
+      }
+    },
+    {
+      "path": "/v7/send_mobile_code",
+      "method": "POST",
+      "body": { "status": 1, "errcode": 0, "data": {} }
+    },
+    {
+      "path": "/v5/login_by_token",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "userid": 10001,
+          "token": "fake-renewed-token",
+          "t1": "fake-t1-renewed"
+        }
+      }
+    },
+    {
+      "path": "/v2/search/song",
+      "method": "GET",
+      "query": { "page": "1" },
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 2,
+          "lists": [
+            {
+              "FileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "HQFileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+              "SQFileHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+              "SongName": "Fixture Song",
+              "OriSongName": "Fixture Song",
+              "SingerName": "Fixture Artist",
+              "Singers": [{ "id": 2001, "name": "Fixture Artist" }],
+              "AlbumID": 3001,
+              "AlbumName": "Fixture Album",
+              "Duration": 215,
+              "Image": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "MixSongID": 4001
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v2/search/song",
+      "method": "GET",
+      "query": { "page": "2" },
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 2,
+          "lists": [
+            {
+              "FileHash": "cccccccccccccccccccccccccccccccc",
+              "SongName": "Fixture Song 2",
+              "SingerName": "Fixture Artist",
+              "Singers": [{ "id": 2001, "name": "Fixture Artist" }],
+              "AlbumID": 3001,
+              "AlbumName": "Fixture Album",
+              "Duration": 180,
+              "Image": "http://imge.kugou.com/stdmusic/{size}/song2.jpg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v1/search/album",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 1,
+          "lists": [
+            {
+              "albumid": 3001,
+              "albumname": "Fixture Album",
+              "img": "http://imge.kugou.com/stdmusic/240/album.jpg",
+              "singers": [{ "id": 2001, "name": "Fixture Artist" }],
+              "publish_time": "2024-05-01",
+              "songcount": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v1/search/author",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 1,
+          "lists": [
+            {
+              "AuthorId": 2001,
+              "AuthorName": "Fixture Artist",
+              "Avatar": "http://imge.kugou.com/singer/240/artist.jpg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v1/search/special",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 1,
+          "lists": [
+            {
+              "gid": "collection_5001",
+              "specialname": "Fixture Playlist",
+              "img": "http://imge.kugou.com/soft/collection/150/pl.jpg",
+              "nickname": "Curator",
+              "song_count": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v2/get_res_privilege/lite",
+      "method": "POST",
+      "requestJson": {
+        "resource": [{ "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }]
+      },
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "album_id": 3001,
+            "album_audio_id": 4002,
+            "name": "Fixture Artist - VIP Song",
+            "singername": "Fixture Artist",
+            "albumname": "Fixture Album",
+            "privilege": 10,
+            "relate_goods": [
+              {
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "quality": "128",
+                "level": 2,
+                "privilege": 10,
+                "status": 1,
+                "info": { "duration": 200, "filesize": 3200000, "bitrate": 128, "extname": "mp3" }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "/v2/get_res_privilege/lite",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "album_id": 3001,
+            "album_audio_id": 4001,
+            "name": "Fixture Artist - Fixture Song",
+            "songname": "Fixture Song",
+            "singername": "Fixture Artist",
+            "albumname": "Fixture Album",
+            "privilege": 0,
+            "info": { "duration": 215, "image": "http://imge.kugou.com/stdmusic/{size}/song.jpg" },
+            "relate_goods": [
+              {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+                "quality": "flac",
+                "level": 5,
+                "privilege": 0,
+                "status": 1,
+                "info": { "filesize": 28000000, "bitrate": 900, "extname": "flac" }
+              },
+              {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+                "quality": "320",
+                "level": 4,
+                "privilege": 0,
+                "status": 1,
+                "info": { "filesize": 8600000, "bitrate": 320, "extname": "mp3" }
+              },
+              {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "quality": "128",
+                "level": 2,
+                "privilege": 0,
+                "status": 1,
+                "info": { "filesize": 3400000, "bitrate": 128, "extname": "mp3" }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "/v5/url",
+      "method": "GET",
+      "query": { "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      "body": {
+        "status": 1,
+        "url": []
+      }
+    },
+    {
+      "path": "/v5/url",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "url": ["https://fixture.invalid/audio/song.mp3"],
+        "extName": "mp3",
+        "bitRate": 320,
+        "fileSize": 8600000,
+        "timeLength": 215
+      }
+    },
+    {
+      "path": "/v1/search",
+      "method": "GET",
+      "body": {
+        "status": 200,
+        "candidates": [{ "id": "9001", "accesskey": "fake-lyric-key" }]
+      }
+    },
+    {
+      "path": "/download",
+      "method": "GET",
+      "body": {
+        "status": 200,
+        "contenttype": 0,
+        "content": "a3JjMTjb6lmXhgaM/R4YAISHZqePDO6S1ASkdmcGAaV7475YRJVbcSh9gmnhNwKg7i7JIrc1YHerF2Ue"
+      }
+    },
+    {
+      "path": "/kmr/v2/albums",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "album_id": 3001,
+            "album_name": "Fixture Album",
+            "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/album.jpg",
+            "publish_date": "2024-05-01",
+            "intro": "Fixture album intro",
+            "authors": [{ "author_id": 2001, "author_name": "Fixture Artist" }]
+          }
+        ]
+      }
+    },
+    {
+      "path": "/v1/album_audio/lite",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 1,
+          "songs": [
+            {
+              "audio_info": {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "hash_320": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+                "duration": 215000
+              },
+              "base": {
+                "audio_name": "Fixture Song",
+                "author_name": "Fixture Artist",
+                "album_audio_id": 4001
+              },
+              "album_info": { "album_id": 3001, "album_name": "Fixture Album" },
+              "trans_param": { "union_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/kmr/v3/author",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "author_id": 2001,
+          "author_name": "Fixture Artist",
+          "sizable_avatar": "http://imge.kugou.com/singer/{size}/artist.jpg",
+          "intro": "Fixture artist bio",
+          "song_count": 1
+        }
+      }
+    },
+    {
+      "path": "/kmr/v1/audio_group/author",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "audio_name": "Fixture Song",
+            "author_name": "Fixture Artist",
+            "album_id": 3001,
+            "album_name": "Fixture Album",
+            "timelength": 215000,
+            "trans_param": { "union_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg" }
+          }
+        ]
+      }
+    },
+    {
+      "path": "/kmr/v1/author/albums",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "album_id": 3001,
+            "album_name": "Fixture Album",
+            "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/album.jpg",
+            "publish_date": "2024-05-01"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/v3/get_list_info",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "global_collection_id": "collection_5001",
+            "name": "Fixture Playlist",
+            "pic": "http://imge.kugou.com/soft/collection/{size}/pl.jpg",
+            "list_create_username": "Curator",
+            "count": 1,
+            "intro": "Fixture playlist intro"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/pubsongs/v2/get_other_list_file_nofilt",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "list_info": {
+            "global_collection_id": "collection_5001",
+            "name": "Fixture Playlist",
+            "count": 1
+          },
+          "songs": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "name": "Fixture Artist - Fixture Song",
+              "albuminfo": { "id": 3001, "name": "Fixture Album" },
+              "cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "timelen": 215000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/ocean/v6/rank/list",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "info": [
+            {
+              "rankid": 8888,
+              "rankname": "酷狗 TOP500",
+              "imgurl": "http://imge.kugou.com/rank/{size}/top500.jpg",
+              "intro": "更新频率：每天"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/ocean/v6/rank/info",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "rankid": 8888,
+          "rankname": "酷狗 TOP500",
+          "imgurl": "http://imge.kugou.com/rank/{size}/top500.jpg",
+          "intro": "更新频率：每天"
+        }
+      }
+    },
+    {
+      "path": "/openapi/kmr/v2/rank/audio",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "total": 1,
+          "songlist": [
+            {
+              "songname": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "album_id": 3001,
+              "album_name": "Fixture Album",
+              "deprecated": {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "duration": 215000
+              },
+              "trans_param": { "union_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/youth/v1/song/single_card_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "card_info": { "card_id": 3005, "card_title": "潮流尝鲜" },
+          "song_list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "ori_audio_name": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "album_info": {
+                "album_id": "3001",
+                "album_name": "Fixture Album",
+                "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg"
+              },
+              "audio_info": {
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "hash_320": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+                "timelength_128": "215000"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/youth/v1/song/tag_card_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "tag_list": [
+            {
+              "label_id": 8,
+              "label_name": "嘻哈",
+              "label_desc": "健身房必听",
+              "cover_pic": "https://fixture.invalid/hiphop.png",
+              "song_list": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/youth/v2/channel/channel_all_list",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "list": [
+            {
+              "global_collection_id": "channel_6001",
+              "name": "纯漫之歌",
+              "cover": "http://imge.kugou.com/channel/{size}/anime.jpg",
+              "intro": "二次元精选频道"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/youth/api/channel/v1/channel_list_by_id",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": [
+          {
+            "global_collection_id": "channel_6001",
+            "name": "纯漫之歌",
+            "cover": "http://imge.kugou.com/channel/{size}/anime.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/channel/v1/channel_get_song_list",
+      "method": "GET",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "total": 1,
+          "list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "ori_audio_name": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "time_length": 215000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/everydayrec.service/everyday_style_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "title": "华语流行",
+          "song_list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "ori_audio_name": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "time_length": 215000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v1/daily_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "list": [
+            {
+              "id": 498441,
+              "type": 1,
+              "title": "编辑精选歌单",
+              "image_url": "http://imge.kugou.com/soft/collection/480/ip.jpg",
+              "extra": { "global_collection_id": "collection_5001" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/concepts/v1/ai/recommend_song",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "error_code": 0,
+        "data": {
+          "card_info": { "card_title": "免费听" },
+          "list": [
+            {
+              "songname": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "album_info": { "album_id": "3001", "album_name": "Fixture Album", "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg" },
+              "audio_info": { "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "timelength": "215000" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/homediscoverrec/v1/client/home_discover_rec",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "items": [
+            {
+              "item_id": "4001",
+              "item_type": "song",
+              "song_info": {
+                "songname": "Fixture Song",
+                "author_name": "Fixture Artist",
+                "album_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+                "hash_128": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "timelength_128": 215000
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/everyday_song_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "song_list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "ori_audio_name": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "time_length": 215000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v2/special_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "special_list": [
+            {
+              "global_collection_id": "collection_5001",
+              "specialname": "Fixture Playlist",
+              "flexible_cover": "http://imge.kugou.com/soft/collection/{size}/pl.jpg",
+              "intro": "Fixture intro"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/musicadservice/v1/mobile_newalbum_sp",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "chn": [
+            {
+              "albumid": 3001,
+              "albumname": "Fixture Album",
+              "imgurl": "http://imge.kugou.com/stdmusic/{size}/album.jpg",
+              "singername": "Fixture Artist"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/musicadservice/container/v1/newsong_publish",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "songname": "Fixture Song",
+            "author_name": "Fixture Artist",
+            "album_sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+            "timelength": 215000
+          }
+        ]
+      }
+    },
+    {
+      "path": "/pubsongs/v1/get_tags_by_type",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": [
+          {
+            "tag_id": 10,
+            "tag_name": "语种",
+            "son": [{ "tag_id": 11292, "tag_name": "Hi-Res" }]
+          }
+        ]
+      }
+    },
+    {
+      "path": "/v7/get_all_list",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "info": [
+            {
+              "listid": 2,
+              "global_collection_id": "collection_5001",
+              "name": "我喜欢",
+              "list_create_userid": 10001,
+              "count": 1,
+              "sort": 0
+            },
+            {
+              "listid": 99,
+              "global_collection_id": "collection_5002",
+              "name": "收藏歌单",
+              "list_create_userid": 99999,
+              "count": 10,
+              "sort": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/v1/class_fm_song",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "data": [{ "fmid": 100, "fmname": "流行电台", "imgurl": "http://imge.kugou.com/fm/{size}/pop.jpg" }]
+        }
+      }
+    },
+    {
+      "path": "/v2/personal_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "song_list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "songname": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "time_length": 215000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/singlecardrec.service/v1/single_card_recommend",
+      "method": "POST",
+      "body": {
+        "status": 1,
+        "errcode": 0,
+        "data": {
+          "song_list": [
+            {
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "songname": "Fixture Song",
+              "author_name": "Fixture Artist",
+              "sizable_cover": "http://imge.kugou.com/stdmusic/{size}/song.jpg",
+              "time_length": 215000
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "cases": [
+    { "name": "auth user", "path": "auth.user", "args": [] },
+    {
+      "name": "auth qr start",
+      "path": "auth.qrcode.start",
+      "args": ["kugou"],
+      "expectedJson": { "state": { "variant": "kugou", "key": "fake-qr-key" } }
+    },
+    {
+      "name": "auth qr expired",
+      "path": "auth.qrcode.poll",
+      "args": [{ "variant": "kugou", "key": "fake-qr-expired" }],
+      "expectedJson": { "status": "expired" }
+    },
+    {
+      "name": "auth sms send",
+      "path": "auth.sms.send",
+      "args": ["13800138000"],
+      "expectedJson": { "cooldown": 60 }
+    },
+    { "name": "search track", "path": "search.track", "args": [{ "keyword": "test", "limit": 1 }] },
+    { "name": "search album", "path": "search.album", "args": [{ "keyword": "test", "limit": 10 }] },
+    { "name": "search artist", "path": "search.artist", "args": [{ "keyword": "test", "limit": 10 }] },
+    { "name": "search playlist", "path": "search.playlist", "args": [{ "keyword": "test", "limit": 10 }] },
+    { "name": "track get", "path": "track.get", "args": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] },
+    {
+      "name": "track streams",
+      "path": "track.streams",
+      "args": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "context": { "quality": "high" }
+    },
+    {
+      "name": "track vip required",
+      "path": "track.streams",
+      "args": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+      "context": { "quality": "high" },
+      "expectedCode": "VIP_REQUIRED"
+    },
+    {
+      "name": "track lyrics krc",
+      "path": "track.lyrics",
+      "args": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "expectedJson": { "format": "krc" }
+    },
+    { "name": "album get", "path": "album.get", "args": ["3001"], "context": { "limit": 20 } },
+    { "name": "artist get", "path": "artist.get", "args": ["2001"], "context": { "limit": 20 } },
+    { "name": "artist tracks", "path": "artist.tracks", "args": ["2001"], "context": { "limit": 20 } },
+    { "name": "artist albums", "path": "artist.albums", "args": ["2001"], "context": { "limit": 20 } },
+    { "name": "playlist get", "path": "playlist.get", "args": ["collection_5001"], "context": { "limit": 20 } },
+    { "name": "toplist list", "path": "toplist.list", "args": [] },
+    { "name": "toplist get", "path": "toplist.get", "args": ["8888"], "context": { "limit": 20 } },
+    { "name": "home", "path": "home", "args": [], "context": { "refresh": false } },
+    { "name": "categories list", "path": "categories.list", "args": [] },
+    {
+      "name": "categories playlists",
+      "path": "categories.playlists",
+      "args": ["11292"],
+      "context": { "limit": 20, "sort": "1" }
+    },
+    { "name": "me playlists", "path": "me.playlists", "args": [], "context": { "limit": 20 } },
+    { "name": "me likedTracks", "path": "me.likedTracks", "args": [], "context": { "limit": 20 } },
+    { "name": "radio channels", "path": "radio.channels", "args": [] },
+    { "name": "radio personal fm", "path": "radio.next", "args": [], "context": { "history": [], "count": 5 } },
+    { "name": "radio youth card", "path": "radio.next", "args": ["youth:3005"], "context": { "history": [], "count": 5 } },
+    { "name": "playlist channel get", "path": "playlist.get", "args": ["ch:channel_6001"], "context": { "limit": 20 } },
+    {
+      "name": "scrape search",
+      "path": "scrape.search",
+      "args": [{ "title": "Fixture Song", "artists": ["Fixture Artist"] }]
+    },
+    {
+      "name": "scrape lyrics",
+      "path": "scrape.lyrics",
+      "args": [{ "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "title": "Fixture Song", "artists": ["Fixture Artist"] }],
+      "expectedJson": { "format": "krc" }
+    }
+  ]
+}
