@@ -10,7 +10,9 @@ test("playlist automatic download adds existing tracks to the real download queu
   await app.waitFor("label:自动下载");
   await app.press("label:自动下载");
   await app.waitFor("label:跟随移除");
-  await app.press("id:nav-downloads");
+  await app.keyboard.press("mod+k");
+  await app.type("label:查找命令", "下载");
+  await app.keyboard.press("enter");
   await app.waitFor("id:download-list >> text:潮汐之间");
   await app.waitFor("id:download-list >> text:远方回声");
   await app.waitUntil(() => app.texts().filter(t => t === "已完成").length === 2);
@@ -24,7 +26,9 @@ test("directory move confirmation updates stored paths and moves the actual file
   await app.press("role:button[移动已有文件]");
   await app.waitUntil(() => app.texts().some(t => t.startsWith("目录已更新")));
   await app.press("label:关闭设置");
-  await app.press("id:nav-downloads");
+  await app.keyboard.press("mod+k");
+  await app.type("label:查找命令", "下载");
+  await app.keyboard.press("enter");
   await app.waitUntil(() => app.texts().filter(t => t === "已完成").length === 2);
   await app.press("检查迁移路径");
   await app.waitFor("text:迁移路径与文件已确认");

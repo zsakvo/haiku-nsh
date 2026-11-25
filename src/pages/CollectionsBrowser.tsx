@@ -1,5 +1,5 @@
 import { cleanup, effect, Image, List, Scroll, signal, Text, token, untracked, View } from "nsh";
-import { Button as BaseButton } from "nsh/base";
+import { Button as BaseButton, Collapsible } from "nsh/base";
 import { focus } from "../ui/Button";
 import { PluginService, type Core } from "haiku/native";
 import type { EntityRef, Route } from "../shell/navigation";
@@ -216,13 +216,37 @@ export function PlaylistSidebar(props: {
       <View class="gap-(--navigation-row-gap)">
         <SectionLabel label="插件歌单" />
         <Each of={pluginGroups()} key={(g) => g.id}>
-          {(g) => <View class="gap-(--navigation-row-gap)">
+          {(g) => <Collapsible
+            open={isExpanded(g().id)}
+            reveal
+            content={<View class="pt-(--navigation-row-gap) gap-(--navigation-row-gap)">
+              <If when={g().loading && g().items.length === 0}>
+                <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
+                  正在加载…
+                </Text>
+              </If>
+              <If when={!g().loading && g().items.length === 0 && !!g().authRequired}>
+                <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
+                  登录后查看歌单
+                </Text>
+              </If>
+              <If when={!g().loading && g().items.length === 0 && !g().authRequired && !!g().error}>
+                <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
+                  加载失败
+                </Text>
+              </If>
+              <Each of={g().items} key={(p) => p.key}>
+                {(p) => <SidebarItem icon="playlist" label={p().title}
+                  selected={props.current.kind === "playlist" && props.current.ref === p().routeRef}
+                  onPress={() => props.navigate(p().route)} />}
+              </Each>
+            </View>}
+          >
             <BaseButton
               accessibilityLabel={g().label}
               onPress={() => toggleGroup(g().id)}
-              class={`flex-row items-center gap-1.5 rounded-(--radius) min-h-(--navigation-row-height) px-2 py-0.5 active:bg-muted ${focus}`}
+              class={`flex-row items-center gap-2 rounded-(--radius) min-h-(--navigation-row-height) px-2 py-0.5 active:bg-muted ${focus}`}
             >
-              <Icon name={isExpanded(g().id) ? "down" : "right"} class="size-3 shrink-0" color="muted-foreground" />
               <If when={!!g().logo} else={<Icon name="plug" color="sidebar-foreground" sidebar />}>
                 <Image src={g().logo!} class="size-(--sidebar-icon-size) shrink-0 rounded-sm" />
               </If>
@@ -232,32 +256,14 @@ export function PlaylistSidebar(props: {
               >
                 {g().label}
               </Text>
-            </BaseButton>
-            <If when={isExpanded(g().id)}>
-              <View class="pl-5 gap-(--navigation-row-gap)">
-                <If when={g().loading && g().items.length === 0}>
-                  <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
-                    正在加载…
-                  </Text>
-                </If>
-                <If when={!g().loading && g().items.length === 0 && !!g().authRequired}>
-                  <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
-                    登录后查看歌单
-                  </Text>
-                </If>
-                <If when={!g().loading && g().items.length === 0 && !g().authRequired && !!g().error}>
-                  <Text style={{ fontSize: token("sidebar-hint-size") }} class="px-2 py-1 text-muted-foreground">
-                    加载失败
-                  </Text>
-                </If>
-                <Each of={g().items} key={(p) => p.key}>
-                  {(p) => <SidebarItem icon="playlist" label={p().title}
-                    selected={props.current.kind === "playlist" && props.current.ref === p().routeRef}
-                    onPress={() => props.navigate(p().route)} />}
-                </Each>
+              <View
+                class="shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none"
+                style={{ rotate: isExpanded(g().id) ? "0deg" : "-90deg" }}
+              >
+                <Icon name="down" class="size-3 shrink-0" color="muted-foreground" />
               </View>
-            </If>
-          </View>}
+            </BaseButton>
+          </Collapsible>}
         </Each>
       </View>
     </Scroll>

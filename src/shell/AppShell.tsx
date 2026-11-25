@@ -314,10 +314,9 @@ export function AppShell(props: {
         </View>)}
         <If when={!!core()}><PlaylistSidebar core={core()!} snapshot={plugins.value()} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
-      <View class="shrink-0 flex-row items-center justify-end gap-2 px-4 pb-4">
-        <IconButton sidebar testID="nav-downloads" icon="download" label="下载"
-          selected={nav.current().kind === "downloads"} onPress={() => nav.navigate({ kind: "downloads" })} />
-        <IconButton sidebar icon="settings" label="打开设置" hint={`设置 · ${keymap.label(binding("openSettings",shortcuts.settings))}`} onPress={showSettings} />
+      <View class="shrink-0 px-2 pb-4">
+        <SidebarItem testID="nav-settings" icon="settings" label="设置"
+          selected={overlay() === "settings"} onPress={showSettings} />
       </View>
     </ShellSidebar>
     <WindowPanel bleedRight dock>

@@ -6,7 +6,9 @@ test("library menu downloads a track and removal requires explicit confirmation"
   await app.waitFor("label:Song Alpha");
   await app.rightClick("label:Song Alpha");
   await app.press("role:menuitem[下载]");
-  await app.press("id:nav-downloads");
+  await app.keyboard.press("mod+k");
+  await app.type("label:查找命令", "下载");
+  await app.keyboard.press("enter");
   await app.waitFor("id:download-list >> text:Song Alpha");
   await app.waitFor("text:已完成");
   await app.press("label:移除 Song Alpha");
