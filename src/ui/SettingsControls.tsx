@@ -122,12 +122,13 @@ export function SettingSlider(props: {
   disabled?: boolean;
   onChange: (value: number) => void;
   testID?: string;
+  format?: (value: number) => string;
 }) {
   return (
     <View class="min-w-0 gap-1">
       <View class="flex-row justify-between gap-3">
         <Text class="text-xs text-muted-foreground">{props.label}</Text>
-        <Text class="text-xs text-foreground">{props.value.toFixed(1)}</Text>
+        <Text class="text-xs text-foreground">{props.format ? props.format(props.value) : props.value.toFixed(1)}</Text>
       </View>
       <BaseSlider
         testID={props.testID}

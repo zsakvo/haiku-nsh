@@ -8,6 +8,7 @@ export interface AudioEffects {
 export interface DesktopLyricsSettings {
   visible: boolean; locked: boolean; textColor: string; highlightColor: string;
   outline: boolean; shadow?: boolean; background: "none" | "solid" | "liquid";
+  backgroundOpacity: number; blurStrength: number; cornerRadius: number;
   fontSize: number; font: string; fontName: string;
   fontWeight: "light" | "regular" | "medium" | "semibold" | "bold";
   layout: "classic" | "focus" | "left" | "stage"; showTranslation: boolean;

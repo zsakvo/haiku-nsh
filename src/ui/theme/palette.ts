@@ -64,8 +64,8 @@ export function onColor(color: string): string {
  */
 export function brandPalette(seed: string, dark: boolean): Record<string, string> {
   const [, seedC, seedH] = hexToOklch(seed);
-  // An achromatic seed selects the plain theme: pure grays, white canvas. Only accents (primary, tonal and
-  // selected states, keywords) use the macOS system blue, so emphasis reads apart from text.
+  // An achromatic seed selects the plain theme: pure grays, white canvas. Only accents (primary and tonal
+  // actions, keywords) use the macOS system blue; sidebar selection and the source chip stay ink-on-gray, so emphasis reads apart from text.
   const plain = seedC < 0.02;
   const h = plain ? 257 : seedH;
   const vivid = plain ? 0.1 : Math.min(seedC, 0.2);
@@ -94,7 +94,7 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     chip: g(0.235), chipActive: g(0.29, 1.3), chipForeground: g(0.77, 1),
     border: g(0.3), divider: g(0.28), input: g(0.36), switchTrack: g(0.4), buffered: g(0.42),
     settingsCard: g(0.23), settingsSelected: g(0.27, 1.3),
-    selection: plain ? oklch(0.32, 0.05, h) : tint(0.33, 0.32), selectionForeground: plain ? oklch(0.86, 0.09, h) : tint(0.9, 0.4),
+    selection: plain ? g(0.32) : tint(0.33, 0.32), selectionForeground: plain ? g(0.96) : tint(0.9, 0.4),
     overlay: oklch(0.1, 0.01 * k, h, 0.55), navAlpha: 0.66, chipAlpha: 0.65,
   } : {
     background: plain ? "#ffffff" : g(0.988, 0.4), foreground: g(0.22, 1.6), card: oklch(1, 0, h), popover: plain ? "#ffffff" : tint(0.982, 0.06),
@@ -103,7 +103,7 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     chip: g(0.96), chipActive: g(0.925, 1.6), chipForeground: g(0.47, 1.8),
     border: g(0.91, 1.2), divider: g(0.92, 1.1), input: g(0.87, 1.3), switchTrack: g(0.86, 1.3),
     buffered: g(0.85, 1.3), settingsCard: g(0.965), settingsSelected: g(0.925, 1.6),
-    selection: plain ? oklch(0.93, 0.03, h) : tint(0.93, 0.22), selectionForeground: plain ? oklch(0.48, 0.19, h) : tint(0.4, 0.75),
+    selection: plain ? g(0.93) : tint(0.93, 0.22), selectionForeground: plain ? g(0.22) : tint(0.4, 0.75),
     overlay: oklch(0.2, 0.02 * k, h, 0.35), navAlpha: 0.62, chipAlpha: 0.72,
   };
 
@@ -128,13 +128,15 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     "source-chip-border": plain ? oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09)
       : oklch(dark ? 0.62 : 0.55, vivid * 0.5, h, dark ? 0.26 : 0.18),
     // Source chip: the tonal wash, translucent over the live blur, with a brand-tinted hairline.
-    "source-chip-accent-tint": soft + Math.round(s.chipAlpha * 255).toString(16),
-    "source-chip-accent-border": plain ? oklch(dark ? 0.7 : 0.45, vivid * 0.6, h, dark ? 0.24 : 0.16) : oklch(dark ? 0.6 : 0.55, vivid * 0.6, h, dark ? 0.3 : 0.18),
-    "source-chip-foreground": onSoft,
+    "source-chip-accent-tint": (plain ? (dark ? oklch(0.3, 0, 0) : oklch(0.94, 0, 0)) : soft) + Math.round(s.chipAlpha * 255).toString(16),
+    "source-chip-accent-border": plain ? oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09) : oklch(dark ? 0.6 : 0.55, vivid * 0.6, h, dark ? 0.3 : 0.18),
+    "source-chip-foreground": plain ? (dark ? oklch(0.96, 0, 0) : oklch(0.22, 0, 0)) : onSoft,
     "overlay-backdrop": s.overlay,
     primary, "primary-foreground": onPrimary, ring: primary, "primary-soft": soft, "primary-soft-foreground": onSoft,
     "sidebar-primary": primary, "sidebar-primary-foreground": onPrimary, "sidebar-ring": primary,
     selection: s.selection, "selection-foreground": s.selectionForeground,
+    // Selected sidebar icon: brand primary, except the plain theme keeps it ink like the label.
+    "selection-icon": plain ? s.selectionForeground : primary,
     "sidebar-accent": s.selection, "sidebar-accent-foreground": s.selectionForeground,
     destructive: status.destructive, "destructive-foreground": onColor(status.destructive),
     success: status.success, "success-foreground": onColor(status.success),

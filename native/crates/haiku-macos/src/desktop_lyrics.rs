@@ -1,5 +1,6 @@
-//! Compact native desktop lyrics. The 32-point hover toolbar has a permanent reserved
-//! row, so revealing controls never moves the lyrics. Classic, left and stage show
+//! Compact native desktop lyrics. The 32-point hover toolbar floats in a transparent
+//! strip above the lyric box, so revealing controls never moves the lyrics and the
+//! optional backdrop stays centered on the text. Classic, left and stage show
 //! current + translation (or next); focus shows only the current line.
 //!
 //! Text is rendered in independent Core Animation layers, preserving word timing
@@ -37,6 +38,11 @@ pub struct Style {
     pub outline: bool,
     pub shadow: bool,
     pub background: String,
+    /// Solid backdrop opacity, 0–1.
+    pub background_opacity: f64,
+    /// Blur backdrop strength, 0–1 (fades the native material).
+    pub blur_strength: f64,
+    pub corner_radius: f64,
     pub font_size: f64,
     pub font_family: String,
     /// Exact PostScript face chosen in the system font panel (including italic traits).
@@ -59,8 +65,12 @@ pub mod layout {
     use super::{LyricLine, Style};
 
     pub const PAD_X: f64 = 16.0;
-    pub const TOP: f64 = 40.0;
-    pub const BOTTOM: f64 = 8.0;
+    /// Transparent strip above the lyric box where the hover toolbar floats.
+    pub const TOP: f64 = 36.0;
+    /// Equal padding above and below the text inside the lyric box.
+    pub const PAD_Y: f64 = 10.0;
+    pub const BOTTOM: f64 = PAD_Y;
+    const MIN_BOX: f64 = 54.0;
     const GAP: f64 = 4.0;
 
     #[derive(Clone, Copy, Debug, PartialEq)]
@@ -94,6 +104,8 @@ pub mod layout {
     pub struct Layout {
         pub rows: Vec<Row>,
         pub height: f64,
+        /// Lyric box (and backdrop) height, measured from the window bottom.
+        pub box_height: f64,
     }
 
     /// Fit using the same native font metrics as rendering. Very long sentences stop
@@ -180,14 +192,16 @@ pub mod layout {
         }
         let text_height = rows.iter().map(|row| row.height).sum::<f64>()
             + GAP * rows.len().saturating_sub(1) as f64;
-        let height = (TOP + text_height + BOTTOM).max(90.0).ceil();
-        let mut y = height - TOP;
+        let box_height = (text_height + PAD_Y * 2.0).max(MIN_BOX).ceil();
+        let height = box_height + TOP;
+        // Center the text block inside the box, not the window.
+        let mut y = box_height - (box_height - text_height) * 0.5;
         for row in &mut rows {
             y -= row.height;
             row.y = y;
             y -= GAP;
         }
-        Layout { rows, height }
+        Layout { rows, height, box_height }
     }
 
     #[cfg(test)]
@@ -201,6 +215,9 @@ pub mod layout {
                 outline: true,
                 shadow: true,
                 background: "none".into(),
+                background_opacity: 0.45,
+                blur_strength: 1.0,
+                corner_radius: 14.0,
                 font_size: 28.0,
                 font_family: String::new(),
                 font_name: String::new(),
@@ -348,22 +365,22 @@ pub mod halo {
         let lightness = lt * 0.7 + lh * 0.3;
         let (hue, chroma) = if ch >= 0.03 { (hh, ch) } else if ct >= 0.02 { (ht, ct) } else { (0.0, 0.0) };
         let dark = lightness >= 0.55;
-        let (edge_l, edge_c, alpha) = if dark { (0.21, (chroma * 0.4).min(0.06), 0.82) }
-            else { (0.96, (chroma * 0.12).min(0.025), 0.9) };
+        let (edge_l, edge_c, alpha) = if dark { (0.26, (chroma * 0.4).min(0.06), 0.6) }
+            else { (0.95, (chroma * 0.12).min(0.025), 0.72) };
         let edge = rgb(edge_l, edge_c, hue);
 
-        // Visible edge is half the stroke: aim for 0.6–2.2 pt, thinner on heavy faces.
+        // Visible edge is half the stroke: aim for 0.5–1.6 pt, thinner on heavy faces.
         let size = font_size.max(1.0);
         let separation = (lightness - edge_l).abs();
         let boost = 1.0 + (0.6 - separation).max(0.0) * 0.8;
-        let stroke_width = ((6.0 - 2.5 * weight) * boost).clamp(120.0 / size, (440.0 / size).max(120.0 / size));
+        let stroke_width = ((4.5 - 2.0 * weight) * boost).clamp(100.0 / size, (320.0 / size).max(100.0 / size));
 
         let (shadow, shadow_radius, shadow_offset) = if dark {
             let deep = rgb(0.12, edge_c * 0.8, hue);
-            ((deep.0, deep.1, deep.2, if outline { 0.45 } else { 0.7 }),
+            ((deep.0, deep.1, deep.2, if outline { 0.35 } else { 0.65 }),
              (size * 0.1).clamp(2.0, 6.0), (size * 0.04).clamp(0.5, 2.0))
         } else {
-            ((edge.0, edge.1, edge.2, if outline { 0.7 } else { 0.9 }), (size * 0.16).clamp(3.0, 8.0), 0.0)
+            ((edge.0, edge.1, edge.2, if outline { 0.6 } else { 0.85 }), (size * 0.16).clamp(3.0, 8.0), 0.0)
         };
         Halo { stroke: (edge.0, edge.1, edge.2, alpha), stroke_width, shadow, shadow_radius, shadow_offset }
     }
@@ -886,6 +903,8 @@ mod imp {
 
             // Optional native material sits beneath text and controls.
             let glass = new_glass_view(content);
+            // Width follows the window; height is set to the lyric box on every rebuild.
+            let _: () = msg_send![glass, setAutoresizingMask: 2u64 | 32u64];
             configure_glass_backdrop(glass);
             let _: () = msg_send![glass, setHidden: YES];
             let _: () = msg_send![view, addSubview: glass];
@@ -907,6 +926,9 @@ mod imp {
                     outline: true,
                 shadow: true,
                     background: "none".to_string(),
+                    background_opacity: 0.45,
+                    blur_strength: 1.0,
+                    corner_radius: 14.0,
                     font_size: 28.0,
                     font_family: String::new(),
                     font_name: String::new(),
@@ -1276,7 +1298,7 @@ mod imp {
     fn toolbar_rect(width: f64, height: f64) -> NSRect {
         rect(
             (width - TOOLBAR_W) * 0.5,
-            height - TOOLBAR_H - 4.0,
+            height - TOOLBAR_H,
             TOOLBAR_W,
             TOOLBAR_H,
         )
@@ -1303,16 +1325,31 @@ mod imp {
 
     /// Transparent by default, with optional solid color or native macOS blur.
     /// Keep the panel shadow disabled: it caches stale lyric snapshots on macOS.
+    /// The backdrop covers only the lyric box; the toolbar strip above stays clear.
     unsafe fn apply_background(view: id) {
         let st = state_of(&*view);
         let liquid = matches!(st.style.background.as_str(), "liquid" | "blur");
-        let _: () = msg_send![st.glass, setHidden: if liquid { NO } else { YES }];
-        let background = if st.style.background == "solid" {
-            color(0.0, 0.0, 0.0, 0.45)
-        } else {
-            clear_color()
-        };
-        let _: () = msg_send![st.window as id, setBackgroundColor: background];
+        let solid = st.style.background == "solid";
+        let _: () = msg_send![st.window as id, setBackgroundColor: clear_color()];
+        let _: () = msg_send![st.glass, setHidden: if liquid || solid { NO } else { YES }];
+        let radius = st.style.corner_radius.clamp(0.0, 24.0);
+        let layer: id = msg_send![st.glass, layer];
+        let fill: id = msg_send![
+            if solid { color(0.0, 0.0, 0.0, st.style.background_opacity.clamp(0.0, 1.0)) } else { clear_color() },
+            CGColor
+        ];
+        let _: () = msg_send![layer, setBackgroundColor: fill];
+        let _: () = msg_send![layer, setCornerRadius: radius];
+        let _: () = msg_send![layer, setMasksToBounds: YES];
+        let subviews: id = msg_send![st.glass, subviews];
+        let count: usize = msg_send![subviews, count];
+        if count > 0 {
+            let effect: id = msg_send![subviews, objectAtIndex: 0usize];
+            let _: () = msg_send![effect, setHidden: if liquid { NO } else { YES }];
+            let _: () = msg_send![effect, setAlphaValue: st.style.blur_strength.clamp(0.0, 1.0)];
+            let effect_layer: id = msg_send![effect, layer];
+            let _: () = msg_send![effect_layer, setCornerRadius: radius];
+        }
     }
 
     fn controls(st: &ViewState) -> [(i64, id, &'static str); 8] {
@@ -1428,7 +1465,7 @@ mod imp {
     }
 
     /// Hover never reaches this function. All row geometry is computed once from
-    /// content + style, with a permanent toolbar reserve above the text.
+    /// content + style; the toolbar strip above the lyric box stays transparent.
     unsafe fn rebuild_all(view: id) {
         let st = state_of(&*view);
         if st.text_host == nil {
@@ -1456,6 +1493,7 @@ mod imp {
         // state before that call, then reacquire it for the layer rebuild.
         resize_window_height(st.window as id, layout.height);
         let st = state_of(&*view);
+        let _: () = msg_send![st.glass, setFrame: rect(0.0, 0.0, width, layout.box_height)];
         begin_tx();
         // Drop raw layer references before removing the owning tree.
         st.current_clip = nil;

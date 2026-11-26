@@ -61,5 +61,19 @@ export function DesktopLyricsSettings(props:{settings:ReturnType<typeof createSe
     <SettingSelectRow divider label="桌面歌词背景" value={d().background} items={[
       {value:"none",title:"透明"},{value:"solid",title:"纯色"},{value:"liquid",title:"系统模糊"},
     ]} onChange={background=>patch({background:background as Preferences["background"]})} />
+    <If when={d().background!=="none"}>
+      <SettingCardBlock divider>
+        <If when={d().background==="solid"}>
+          <SettingSlider label="背景不透明度" value={d().backgroundOpacity??45} min={0} max={100} step={5}
+            format={v=>`${Math.round(v)}%`} onChange={backgroundOpacity=>patch({backgroundOpacity})} />
+        </If>
+        <If when={d().background==="liquid"}>
+          <SettingSlider label="模糊强度" value={d().blurStrength??100} min={0} max={100} step={5}
+            format={v=>`${Math.round(v)}%`} onChange={blurStrength=>patch({blurStrength})} />
+        </If>
+        <SettingSlider label="背景圆角" value={d().cornerRadius??14} min={0} max={24} step={1}
+          format={v=>`${Math.round(v)} pt`} onChange={cornerRadius=>patch({cornerRadius})} />
+      </SettingCardBlock>
+    </If>
   </SettingSection>;
 }

@@ -14,6 +14,12 @@ pub struct DesktopLyrics {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shadow: Option<bool>,
     pub background: String,
+    /// Solid backdrop opacity, percent.
+    pub background_opacity: f64,
+    /// Blur backdrop strength, percent of the native material.
+    pub blur_strength: f64,
+    /// Backdrop corner radius in points.
+    pub corner_radius: f64,
     pub font_size: f64,
     pub font: String,
     pub font_name: String,
@@ -33,6 +39,9 @@ impl Default for DesktopLyrics {
             outline: true,
             shadow: None,
             background: "none".into(),
+            background_opacity: 45.,
+            blur_strength: 100.,
+            corner_radius: 14.,
             font_size: 28.,
             font: String::new(),
             font_name: String::new(),
@@ -83,6 +92,10 @@ impl DesktopLyrics {
         } else {
             28.
         };
+        let clamp = |v: f64, lo: f64, hi: f64, d: f64| if v.is_finite() { v.clamp(lo, hi) } else { d };
+        self.background_opacity = clamp(self.background_opacity, 0., 100., 45.);
+        self.blur_strength = clamp(self.blur_strength, 0., 100., 100.);
+        self.corner_radius = clamp(self.corner_radius, 0., 24., 14.);
         if self.background == "blur" {
             self.background = "liquid".into();
         }

@@ -72,6 +72,9 @@ pub(crate) fn style(d: &DesktopLyrics) -> Style {
         outline: d.outline,
         shadow: d.shadow.unwrap_or(d.outline),
         background: d.background.clone(),
+        background_opacity: d.background_opacity / 100.,
+        blur_strength: d.blur_strength / 100.,
+        corner_radius: d.corner_radius,
         font_size: d.font_size,
         font_family: if d.font == "system" {
             String::new()
