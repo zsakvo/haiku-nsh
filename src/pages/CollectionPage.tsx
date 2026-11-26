@@ -3,7 +3,7 @@ import { CollectionsService, Core, TrackList } from "haiku/native";
 import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
 import { Button } from "../ui/Button";
-import { DetailHeader, DetailAction } from "../ui/DetailHeader";
+import { DetailAction, DetailHeader, DetailLoadingSkeleton } from "../ui/DetailHeader";
 import { ActionMenu, Menu, MenuItem, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
@@ -151,10 +151,15 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
     </NavigationScrollHeader>;
   return <View testID={liked ? "page-favorites" : "page-playlist"}
     class="flex-1 min-h-0" style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <If when={!!source()} else={<View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-2">
-      <Text class="text-sm text-muted-foreground">{source.error()?String(source.error()):"正在加载歌单…"}</Text>
-      <If when={!!source.error()}><Button label="重试" size="sm" onPress={()=>source.refetch()} /></If>
-    </View>}>
+    <If when={!!source()} else={<NavigationScrollArea><View class="flex-1 pl-(--content-inset-left) pr-(--content-inset-right)">
+      <NavigationScrollHeader class="gap-3">
+        <If when={!source.error()}><DetailLoadingSkeleton playlist /></If>
+        <If when={!!source.error()}>
+          <Text class="text-sm text-destructive">{String(source.error())}</Text>
+          <View class="flex-row"><Button label="重试" size="sm" onPress={()=>source.refetch()} /></View>
+        </If>
+      </NavigationScrollHeader>
+    </View></NavigationScrollArea>}>
       <NavigationScrollArea><TrackList detail header={header()} bottomInset={token("dock-scroll-clearance")} source={source()!}
         active={props.active && !editor() && !deleting() && !trackEditor()}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}

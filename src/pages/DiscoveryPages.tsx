@@ -1,12 +1,12 @@
-import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, untracked, View, type ListRef } from "nsh";
+import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, untracked, View, type ListRef, type ScrollRef } from "nsh";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
 import type { Route } from "../shell/navigation";
 import { Button } from "../ui/Button";
-import { CardShelf, ErrorState, Shelf, Skeleton, Spinner } from "../ui/Discovery";
+import { CardShelf, CategoryChip, CategoryGroup, ErrorState, Shelf, Skeleton, Spinner } from "../ui/Discovery";
 import { EmptyState } from "../ui/EmptyState";
-import { SettingSelect } from "../ui/SettingsControls";
-import { entityRoute, SourceGrid } from "./SourceContent";
+import { entityRoute } from "./SourceContent";
+import { CategoryDetail, type CategoryPlaylist } from "./CategoryDetail";
 import { feedGap, FeedRow, type FeedItem } from "./HomeFeed";
 import { usePageRefresh } from "../shell/pageRefresh";
 import { usePageSource } from "../shell/pageSource";
@@ -228,47 +228,89 @@ export function HomePage(props:Props) {
 }
 export function CategoriesPage(props:Props) {
   const state=useSource(props,"categories.list","categorySourceId"), category=signal(""),title=signal(""),sort=signal("");
-  useToolbarSource(()=>props.active,state,()=>{category.set("");sort.set("");});
-  const items=signal<any[]>([]),next=signal<string|null>(null),error=signal(""),busy=signal(false);
+  useToolbarSource(()=>props.active,state,()=>{category.set("");sort.set("");props.navigate({kind:"categories"});});
+  const scrolled=navigationScroll(()=>props.active);
+  let scroll:ScrollRef|undefined;
+  const items=signal<CategoryPlaylist[]>([]),total=signal<number|null>(null),next=signal<string|null>(null),moreError=signal(""),busy=signal(false);
   let epoch=0,closed=false;cleanup(()=>{closed=true;epoch++;});
-  effect(()=>{const r=props.route;if(r.kind==="categories"&&r.source){state.selected.set(r.source);category.set(r.category??"");title.set("");}});
+  effect(()=>{
+    const r=props.route;
+    if(r.kind==="categories"){
+      if(r.source)state.selected.set(r.source);
+      category.set(r.category??"");
+      if(!r.category)title.set("");
+    }
+  });
+  effect(()=>{category();scroll?.scrollTo({y:0,animated:false});scrolled(false);});
   const groups=resource(()=>props.active&&state.selected()?state.selected():undefined,async s=>await props.core.sources.categories(s) as Categories);
-  const categoryTitle=()=>groups()?.groups.flatMap(g=>g.items).find(c=>c.id===category())?.title || title() || "分类歌单";
+  const currentGroup=()=>groups()?.groups.find(g=>g.items.some(c=>c.id===category()));
+  const categoryTitle=()=>currentGroup()?.items.find(c=>c.id===category())?.title || title() || "分类歌单";
+  const sourceName=()=>state.available().find(s=>s.id===state.selected())?.title;
   effect(()=>{const sorts=groups()?.sorts??[];if(!sorts.some((s:any)=>s.id===sort()))sort.set(sorts[0]?.id??"");});
   const identity=()=>props.active&&state.selected()&&category()?JSON.stringify([state.selected(),category(),sort()]):undefined;
   const result=resource(identity,async key=>{
-    const v=++epoch;items.set([]);next.set(null);error.set("");busy.set(false);
+    const v=++epoch;items.set([]);total.set(null);next.set(null);moreError.set("");busy.set(false);
     const [s,c,o]=JSON.parse(key);const page=await props.core.sources.categoryPlaylists(s,c,o||null,null) as any;
-    if(!closed&&v===epoch&&identity()===key){items.set(page.items);next.set(page.next??null);}
+    if(!closed&&v===epoch&&identity()===key){
+      items.set(page.items);
+      next.set(page.next??null);
+      total.set(typeof page.total==="number"?page.total:null);
+    }
   });
-  async function more(){const key=identity(),v=epoch,cursor=next();if(!key||!cursor||busy())return;busy.set(true);error.set("");
+  async function more(){const key=identity(),v=epoch,cursor=next();if(!key||!cursor||busy())return;busy.set(true);moreError.set("");
     try{const [s,c,o]=JSON.parse(key);const page=await props.core.sources.categoryPlaylists(s,c,o||null,cursor) as any;
-      if(!closed&&v===epoch&&identity()===key){items.set([...items(),...page.items]);next.set(page.next??null);}}
-    catch(e){if(v===epoch)error.set(String(e));}finally{if(v===epoch)busy.set(false);}}
-  function choose(id:string,name:string){category.set(id);title.set(name);}
+      if(!closed&&v===epoch&&identity()===key){
+        items.set([...items(),...page.items]);
+        next.set(page.next??null);
+        if(typeof page.total==="number")total.set(page.total);
+      }}
+    catch(e){if(v===epoch)moreError.set(String(e));}finally{if(v===epoch)busy.set(false);}}
+  function choose(id:string,name:string){
+    title.set(name);
+    category.set(id);
+    props.navigate({kind:"categories",source:state.selected()||undefined,category:id});
+  }
   usePageRefresh(() => props.active, {
     run: () => { groups.refetch(); if (category()) result.refetch(); },
     disabled: () => !state.selected() || groups.loading() || result.loading() || busy(),
   });
   return <View testID="page-categories" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">分类</Text></View>
-    <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <Scroll testID="categories-scroll" class="flex-1" contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) gap-4 pb-(--dock-scroll-clearance)">
-      <If when={!!groups.error()}><ErrorState message={String(groups.error())} retry={()=>groups.refetch()} /></If>
+    <NavigationScrollArea>
       <If when={!category()}>
-        <If when={groups.loading()}><Skeleton label="正在加载分类…" /></If>
-        <Each of={groups()?.groups??[]} key={g=>g.title}>{g=><Shelf id={`tags-${g().title}`} title={g().title}><View class="flex-row flex-wrap gap-2"><Each of={g().items} key={c=>c.id}>{c=><Button label={c().title} size="sm" onPress={()=>choose(c().id,c().title)} />}</Each></View></Shelf>}</Each>
+        <Scroll ref={node=>{scroll=node;}} testID="categories-scroll" class="flex-1" onScroll={e=>scrolled(e.offset.y>0)}
+          contentClass="flex-col pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)">
+          <NavigationScrollHeader class="gap-4">
+            <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
+            <If when={!!groups.error()}><ErrorState message={String(groups.error())} retry={()=>groups.refetch()} /></If>
+            <If when={groups.loading()}><Spinner label="正在加载分类…" /></If>
+            <Each of={groups()?.groups??[]} key={g=>g.title}>{g=><CategoryGroup id={`tags-${g().title}`} title={g().title}><View class="flex-row flex-wrap gap-2"><Each of={g().items} key={c=>c.id}>{c=><CategoryChip label={c().title} onPress={()=>choose(c().id,c().title)} />}</Each></View></CategoryGroup>}</Each>
+          </NavigationScrollHeader>
+        </Scroll>
       </If>
-      <If when={!!category()}><View class="flex-row items-center gap-3"><Button label="全部分类" size="sm" variant="ghost" onPress={()=>category.set("")} /><Text testID="category-title" class="flex-1 text-lg font-semibold text-foreground">{categoryTitle()}</Text>
-        <If when={!!groups()?.sorts?.length}><SettingSelect label="排序" value={sort()} items={(groups()?.sorts??[]).map((s:any)=>({value:s.id,title:s.title}))} onChange={v=>sort.set(v)} /></If>
-      </View><If when={result.loading()}><Skeleton label="正在加载歌单…" /></If>
-        <If when={!!result.error()||!!error()}><ErrorState message={error()||String(result.error())} retry={()=>result.refetch()} /></If>
-        <If when={!!items().length}><SourceGrid items={items()} navigate={props.navigate} /></If>
-        <If when={!result.loading()&&!result.error()&&!items().length}><Text class="text-sm text-muted-foreground">此分类暂无歌单</Text></If>
-        <If when={!!next()}><View class="flex-row"><Button label="加载更多歌单" size="sm" loading={busy()} onPress={()=>void more()} /></View></If>
-        <Text class="text-xs text-muted-foreground">{`已显示 ${items().length} 个歌单`}</Text>
+      <If when={!!category()}>
+        <CategoryDetail
+          categoryId={category()}
+          title={categoryTitle()}
+          siblings={currentGroup()?.items??[]}
+          sourceName={sourceName()}
+          sorts={groups()?.sorts??[]}
+          sort={sort()}
+          onSort={v=>sort.set(v)}
+          onSelectCategory={choose}
+          items={items()}
+          total={total()}
+          loading={result.loading()}
+          error={result.error()?String(result.error()):""}
+          onRetry={()=>result.refetch()}
+          hasMore={!!next()}
+          busy={busy()}
+          moreError={moreError()}
+          onMore={()=>void more()}
+          onOpen={item=>props.navigate(entityRoute(item))}
+          onScrolled={scrolled}
+        />
       </If>
-    </Scroll>
+    </NavigationScrollArea>
   </View>;
 }
 export function RadioPage(props:Props) {

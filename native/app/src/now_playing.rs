@@ -261,14 +261,19 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
                     .pointer_events(nsh_core::PointerEvents::None))
                 .child(content_root(content).test_id("now-playing").absolute().inset_0()
                     .focusable(true).min_h_0()
-                    .child(view().h(px(52.)).flex_shrink_0().pl(px(88.)).pr(px(24.))
+                    .child(view().h(header_height).flex_shrink_0()
+                        .pl(move || {
+                            let left = nsh_core::element::desktop::title_bar().left.0;
+                            px(if left > 0. { left + 8. } else { 24. })
+                        })
+                        .pr(px(24.))
                         .flex_row().items_center().window_drag(true)
-                        .child(view().top(px(2.)).child(close_on_dark(close))))
+                        .child(close_on_dark(close)))
                     .child(when(move || track.with(Option::is_none), || view().flex_1().items_center().justify_center()
                         .child(text("还没有正在播放的音乐").text_color(move || theme().color("now-playing-muted").unwrap()))))
                     .child(when(move || track.with(Option::is_some), { let p = p.clone(); move || view().test_id("now-playing-columns").flex_1().min_h_0().flex_row()
                         .gap(move || px(if window().width.0 < 1000. { 40. } else { 72. }))
-                        .pl(px(56.)).pr(px(64.)).pt(px(38.)).pb(px(90.))
+                        .pl(px(56.)).pr(px(64.)).pt(move || px((90. - header_height().0).max(24.))).pb(px(90.))
                         .child(view().test_id("now-playing-left").flex_1().min_w_0()
                             .items_center().justify_center().gap(px(28.))
                             .child(view().size(cover_size).flex_shrink_0()
@@ -300,6 +305,12 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
                             .child(crate::now_playing_controls::metadata(p.clone(), cx))
                             .child(lyrics_view(p.clone()))) })))
         }))
+}
+
+/// Matches the window's hidden title bar height so the collapse button shares the traffic lights' center line.
+fn header_height() -> Points {
+    let min = theme().tokens().number("toolbar-height").unwrap_or(40.);
+    px(nsh_core::element::desktop::title_bar().top.0.max(min))
 }
 
 /// Effect-owned interpolation cancels on interruption and samples the visible RGB.

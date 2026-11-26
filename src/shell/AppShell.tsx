@@ -301,7 +301,7 @@ export function AppShell(props: {
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
         <View class="gap-(--navigation-row-gap)">
           <SectionLabel label="发现" />
-          {destinations.filter((page) => page.group === "发现").map((page) =>
+          {destinations.filter((page) => page.group === "发现" && page.id !== "radio" && page.id !== "search").map((page) =>
             <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
               selected={nav.current().kind === page.id}
               onPress={() => nav.navigate({ kind: page.id })} />)}
@@ -310,7 +310,7 @@ export function AppShell(props: {
       </View>
       <View class="shrink-0 px-2 pb-4">
         <SidebarItem testID="nav-settings" icon="settings" label="设置"
-          selected={overlay() === "settings"} onPress={showSettings} />
+          selected={false} onPress={showSettings} />
       </View>
     </ShellSidebar>
     <WindowPanel>

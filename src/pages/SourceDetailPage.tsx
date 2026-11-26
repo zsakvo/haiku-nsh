@@ -1,4 +1,4 @@
-import { cleanup, effect, resource, signal, Text, untracked, View } from "nsh";
+import { cleanup, effect, resource, Scroll, signal, Text, untracked, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
@@ -7,7 +7,7 @@ import { ErrorState, Spinner } from "../ui/Discovery";
 import { SourceGrid, SourceTracks } from "./SourceContent";
 import { ActionMenu, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
-import { DetailHeader, DetailAction } from "../ui/DetailHeader";
+import { DetailAction, DetailHeader, DetailLoadingSkeleton } from "../ui/DetailHeader";
 import { usePageRefresh } from "../shell/pageRefresh";
 import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
@@ -19,6 +19,7 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   const info = signal<any>(null), canFavorite = signal(false), expanded = signal(false);
   const error = signal(""), busy = signal(false);
   const moreBusy = signal(false), moreError = signal(""), wantMore = signal(false);
+  const scrolled = navigationScroll(() => props.active);
   const unfavorite = signal(false);
   const collections = mirrorCollections(props.core);
   let epoch = 0;
@@ -132,60 +133,74 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
   }
   return <View testID="page-source-detail" class="flex-1 min-h-0"
     style={{ display: props.active ? "flex" : "none", flexDirection: "column" }}>
-    <NavigationScrollArea><SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail onScrolled={navigationScroll(() => props.active)}
-      onLoadMore={() => wantMore.set(true)}
-      header={<NavigationScrollHeader class="gap-2">
-        <If when={first.loading() && !info()}>
-          <View accessibilityLabel="正在加载详情" class={`flex-row gap-6 pb-2 ${isPlaylist() ? "pt-(--playlist-detail-top-gap)" : ""}`}>
-            <View class={`rounded-(--detail-cover-radius) bg-muted shrink-0 ${isPlaylist() ? "size-(--playlist-detail-cover-size)" : "size-(--detail-cover-size)"}`} />
-            <View class="flex-1 gap-3"><View class="h-6 w-64 bg-muted rounded-(--radius)" /><View class="h-4 w-48 bg-muted rounded-(--radius)" /></View>
-          </View>
-        </If>
-        <If when={!!first.error() || !!error()}>
-          <Text class="text-sm text-destructive">{error() || String(first.error())}</Text>
-          <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />
-        </If>
-        <If when={!!info()}>
-          <DetailHeader playlist={isPlaylist()} title={info().title} cover={info().cover} description={info().description}
-            metadata={[info().creator || info().subtitle || (info().artists ?? []).map((a:any)=>typeof a==="string"?a:a.name).join(" / "),
-              info().track_count != null ? `${info().track_count} 首` : null, info().year].filter(Boolean).join(" · ")}>
-            <DetailAction label="播放全部" icon="play" primary pill={isPlaylist()} disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
-            <If when={info().reference?.kind !== "artist"}>
-              <DetailAction label="下载全部" icon="download" pill={isPlaylist()} disabled={busy()} onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
+    <NavigationScrollArea>
+      <If when={!info()}>
+        <Scroll class="flex-1" onScroll={(e) => scrolled(e.offset.y > 0)}
+          contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)">
+          <NavigationScrollHeader class="gap-3">
+            <If when={!first.error() && !error()}>
+              <DetailLoadingSkeleton playlist={isPlaylist()} />
             </If>
-            <ActionMenu
-              label="…"
-              accessibilityLabel="更多歌单操作"
-              items={[
-                { label: "随机播放", disabled: !tracks().length || busy(), onSelect: () => void act(() => play(true)) },
-                ...(canFavorite() ? [{
-                  label: favoriteId() ? "取消收藏歌单" : "收藏歌单",
-                  disabled: busy(),
-                  onSelect: () => favoriteId() ? unfavorite.set(true)
-                    : void act(() => props.core.sources.favoritePlaylist(props.reference, true)),
-                }] : []),
-                ...(info().description ? [{ label: "查看完整简介…", onSelect: () => expanded.set(true) }] : []),
-              ] satisfies ActionMenuItem[]}
-            />
-          </DetailHeader>
-          <If when={!!favoriteId()}><View class="py-2"><AutoDownloadControls core={props.core} id={favoriteId()!} /></View></If>
-          <If when={info().reference?.kind === "artist"}>
-            <Text class="text-sm font-semibold text-foreground">专辑</Text>
-            <SourceGrid items={albums()} navigate={props.navigate} compact />
-            <If when={!!albumNext()}><Button label="加载更多专辑" size="sm" loading={busy()} onPress={() => void act(() => more("albums"))} /></If>
-            <Text class="text-sm font-semibold text-foreground">热门曲目</Text>
-          </If>
-        </If>
-      </NavigationScrollHeader>}
-      footer={<If when={moreBusy() || !!moreError() || !!next()}>
-        <View class="py-3 items-center justify-center gap-2">
-          <If when={moreBusy()}><Spinner label="正在加载更多曲目…" /></If>
-          <If when={!!moreError()}><ErrorState message={moreError()} retry={() => void loadMoreTracks()} /></If>
-          <If when={!!next() && !moreBusy() && !moreError()}>
-            <Button label="加载更多曲目" size="sm" variant="ghost" onPress={() => void loadMoreTracks()} />
-          </If>
-        </View>
-      </If>} /></NavigationScrollArea>
+            <If when={!!first.error() || !!error()}>
+              <View class="gap-2 py-4">
+                <Text class="text-sm text-destructive">{error() || String(first.error())}</Text>
+                <View class="flex-row">
+                  <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />
+                </View>
+              </View>
+            </If>
+          </NavigationScrollHeader>
+        </Scroll>
+      </If>
+      <If when={!!info()}>
+        <SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail onScrolled={scrolled}
+          onLoadMore={() => wantMore.set(true)}
+          header={<NavigationScrollHeader class="gap-2">
+            <If when={!!first.error() || !!error()}>
+              <Text class="text-sm text-destructive">{error() || String(first.error())}</Text>
+              <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />
+            </If>
+            <DetailHeader playlist={isPlaylist()} title={info().title} cover={info().cover} description={info().description}
+              metadata={[info().creator || info().subtitle || (info().artists ?? []).map((a:any)=>typeof a==="string"?a:a.name).join(" / "),
+                info().track_count != null ? `${info().track_count} 首` : null, info().year].filter(Boolean).join(" · ")}>
+              <DetailAction label="播放全部" icon="play" primary pill={isPlaylist()} disabled={!tracks().length || busy()} onPress={() => void act(() => play(false))} />
+              <If when={info().reference?.kind !== "artist"}>
+                <DetailAction label="下载全部" icon="download" pill={isPlaylist()} disabled={busy()} onPress={() => void act(() => props.core.downloads.enqueue(info().reference))} />
+              </If>
+              <ActionMenu
+                label="…"
+                accessibilityLabel="更多歌单操作"
+                items={[
+                  { label: "随机播放", disabled: !tracks().length || busy(), onSelect: () => void act(() => play(true)) },
+                  ...(canFavorite() ? [{
+                    label: favoriteId() ? "取消收藏歌单" : "收藏歌单",
+                    disabled: busy(),
+                    onSelect: () => favoriteId() ? unfavorite.set(true)
+                      : void act(() => props.core.sources.favoritePlaylist(props.reference, true)),
+                  }] : []),
+                  ...(info().description ? [{ label: "查看完整简介…", onSelect: () => expanded.set(true) }] : []),
+                ] satisfies ActionMenuItem[]}
+              />
+            </DetailHeader>
+            <If when={!!favoriteId()}><View class="py-2"><AutoDownloadControls core={props.core} id={favoriteId()!} /></View></If>
+            <If when={info().reference?.kind === "artist"}>
+              <Text class="text-sm font-semibold text-foreground">专辑</Text>
+              <SourceGrid items={albums()} navigate={props.navigate} compact />
+              <If when={!!albumNext()}><Button label="加载更多专辑" size="sm" loading={busy()} onPress={() => void act(() => more("albums"))} /></If>
+              <Text class="text-sm font-semibold text-foreground">热门曲目</Text>
+            </If>
+          </NavigationScrollHeader>}
+          footer={<If when={moreBusy() || !!moreError() || !!next()}>
+            <View class="py-3 items-center justify-center gap-2">
+              <If when={moreBusy()}><Spinner label="正在加载更多曲目…" /></If>
+              <If when={!!moreError()}><ErrorState message={moreError()} retry={() => void loadMoreTracks()} /></If>
+              <If when={!!next() && !moreBusy() && !moreError()}>
+                <Button label="加载更多曲目" size="sm" variant="ghost" onPress={() => void loadMoreTracks()} />
+              </If>
+            </View>
+          </If>} />
+      </If>
+    </NavigationScrollArea>
     <Dialog open={expanded()} onOpenChange={e=>{if(!e.open)expanded.set(false);}} class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">歌单简介</Text>
       <Text class="text-sm text-muted-foreground">{info()?.description}</Text>

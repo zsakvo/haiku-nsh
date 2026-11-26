@@ -25,6 +25,18 @@ export function Shelf(props:{id:string;title:string;more?:()=>void;tight?:boolea
     <If when={!!props.more}><Button label={`更多${props.title}`} variant="ghost" size="sm" onPress={()=>props.more?.()} /></If>
   </View></If>{props.children}</View>;
 }
+export function CategoryGroup(props:{id:string;title:string;children?:any}) {
+  return <View testID={props.id} class="shrink-0 mb-2">
+    <Text role="header" class="mb-3 text-sm font-semibold text-foreground">{props.title}</Text>
+    {props.children}
+  </View>;
+}
+export function CategoryChip(props:{label:string;selected?:boolean;disabled?:boolean;onPress:()=>void}) {
+  return <BaseButton selected={props.selected} disabled={props.disabled} onPress={props.onPress}
+    class={`group items-center justify-center rounded-full min-h-7 px-3 py-1 bg-category-chip active:bg-category-chip-active selected:bg-selection disabled:opacity-40 ${focus}`}>
+    <Text class="text-xs text-category-chip-foreground group-selected:font-medium group-selected:text-selection-foreground">{props.label}</Text>
+  </BaseButton>;
+}
 export function Card(props:{title:string;subtitle?:string;cover?:string;onPress:()=>void;listening?:boolean;hideTitle?:boolean}) {
   const coverClass=()=>props.listening?"size-(--listening-cover-size)":"size-28";
   return <BaseButton accessibilityLabel={props.title} onPress={props.onPress}
