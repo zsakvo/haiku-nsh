@@ -32,8 +32,9 @@ const plug = "asset:/ui/icons/plug-type-a.svg";
 const sync = "asset:/ui/icons/refresh-double.svg";
 const keyboard = "asset:/ui/icons/key-command.svg";
 const code = "asset:/ui/icons/code-brackets.svg";
+const edit = "asset:/ui/icons/edit-pencil.svg";
 const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, down, close, plus, check, palette,
-  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code,
+  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code, edit,
   harmonyosDownload, harmonyosHeart, harmonyosHeartFill, harmonyosDotGrid1x2 };
 export type IconName = keyof typeof icons;
 export function Icon(props: {

@@ -1,7 +1,7 @@
 import { expect, open, test } from "nsh/test";
 
 const options = { platform: "macos" as const, width: 1200, height: 800 };
-test("merged plugins settings connects, edits, logs out, imports and deletes; developer invokes and Stop detaches", async () => {
+test("merged plugins settings connects, edits, logs out, imports and deletes", async () => {
   const app = await open("./PluginSettingsFixture.tsx", options);
   await app.waitFor("id:plugins-settings");
   const url = app.texts().find(text => /^http:\/\/127\.0\.0\.1:\d+$/.test(text))!;
@@ -53,13 +53,6 @@ test("merged plugins settings connects, edits, logs out, imports and deletes; de
   await app.press("删除…");
   await app.press("role:button[删除]");
   await app.waitUntil(() => !app.shows("text:Settings fixture"));
-  await app.press("role:button[开发者]");
-  await app.type("label:原始 ID", "song:1/字");
-  await app.press("role:button[调用]");
-  await app.waitFor("id:plugin-call-result");
-  await app.waitFor('text:title: "Fixture Song"');
-  expect(app.shows("role:button[收起warnings]")).toBe(false);
-  expect(app.shows("text:warnings: []")).toBe(true);
 });
 
 test("QR expires, refreshes and cancels; SMS cooldown, cookie/web fallback and event Stop", async () => {

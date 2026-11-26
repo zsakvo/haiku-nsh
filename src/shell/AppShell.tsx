@@ -25,6 +25,9 @@ import { Button } from "../ui/Button";
 import { createCoreState, type PlayerSnapshot } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
+import { closeDevTools, openDevTools } from "./DevTools";
+import { startTraceCapture, stopTraceCapture } from "../state/devtools";
+import { createSettings } from "../state/settings";
 import { CommandPalette, type PaletteCommand } from "./CommandPalette";
 import { LyricsSearch } from "./LyricsSearch";
 import { createPageRefresh, PageRefreshContext } from "./pageRefresh";
@@ -35,7 +38,7 @@ import { SourceChip } from "../ui/SourceChip";
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialDownloadDirectory?: string;
-  initialSettingsCategory?: string; initialShortcutConflict?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; initialNowPlaying?: boolean;
+  initialSettingsCategory?: string; initialShortcutConflict?: string; initialPluginLogin?: string; initialRoute?: Route; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
   backupPath?: string; initialBackupDialog?: "export" | "import";
@@ -54,6 +57,14 @@ export function AppShell(props: {
   const searchRequest=signal<SearchRequest|undefined>(props.initialSearch);
   function openSearch(request:SearchRequest){searchRequest.set({...request});nav.navigate({kind:"search"});}
   const plugins = createPlugins();
+  const appSettings = createSettings();
+  const developerMode = () => !!appSettings.value()?.developerMode;
+  effect(() => {
+    const c = core();
+    if (!appSettings.value()) return;
+    if (!developerMode()) { stopTraceCapture(); closeDevTools(); }
+    else if (c) startTraceCapture(c);
+  });
   const librarySources = () => plugins.value().sources.filter((s) => s.enabled
     && plugins.value().packages.some((p) => p.id === s.pluginId && p.enabled && p.capabilities.includes("library.browse")));
   const nowPlaying = signal(props.initialNowPlaying ?? false);
@@ -299,9 +310,14 @@ export function AppShell(props: {
         </View>
         <If when={!!core()}><PlaylistSidebar core={core()!} snapshot={plugins.value()} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
-      <View class="shrink-0 px-2 pb-4">
-        <SidebarItem testID="nav-settings" icon="settings" label="设置"
+      {/* Equal left and bottom insets; developer tools sit beside settings in the same row. */}
+      <View class="shrink-0 flex-row items-center gap-1 px-2 pb-2">
+        <SidebarItem testID="nav-settings" icon="settings" label="设置" fit
           selected={false} onPress={showSettings} />
+        <If when={developerMode()}>
+          <SidebarItem testID="nav-devtools" icon="code" label="开发工具" fit
+            selected={false} onPress={openDevTools} />
+        </If>
       </View>
     </ShellSidebar>
     <WindowPanel>
@@ -345,7 +361,7 @@ export function AppShell(props: {
         }} />
       </If>
     </WindowPanel>
-    <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} />
+    <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />

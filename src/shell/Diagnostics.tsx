@@ -2,14 +2,15 @@ import { cleanup, Clipboard, List, resource, signal, Text, View } from "nsh";
 import type { Core } from "haiku/native";
 import { Button } from "../ui/Button";
 import { SearchField } from "../ui/SearchField";
-import { SettingRow, SettingSection } from "../ui/SettingsControls";
+import { SettingRow, SettingSection, SettingSwitchRow } from "../ui/SettingsControls";
+import type { createSettings } from "../state/settings";
 import { Dialog, Menu, MenuItem } from "../ui/Surfaces";
 import { localDateTime } from "../ui/dateTime";
 import { AboutContent } from "./About";
 import { BackupSettings } from "./BackupSettings";
 
 /** Filtered pages and redaction come from Rust; copying and saving are explicit actions. */
-export function LogsView(props: { core: Core }) {
+export function LogsView(props: { core: Core; fill?: boolean }) {
   const service = props.core.logs;
   const revision = signal(0), channel = signal(""), level = signal("");
   const source = signal(""), query = signal(""), offset = signal(0);
@@ -24,8 +25,8 @@ export function LogsView(props: { core: Core }) {
   async function act(action: () => Promise<unknown>) {
     try { await action(); error.set(""); } catch (e) { error.set(String(e)); }
   }
-  return <View testID="logs-viewer" class="gap-3">
-    <Text role="header" class="text-lg font-semibold text-foreground">日志查看器</Text>
+  return <View testID="logs-viewer" class={props.fill ? "flex-1 min-h-0 gap-3" : "gap-3"}>
+    <If when={!props.fill}><Text role="header" class="text-lg font-semibold text-foreground">日志查看器</Text></If>
     <View class="flex-row gap-2 flex-wrap">
       <Menu trigger={<Button label={`频道：${channel() || "全部"}`} size="sm" onPress={() => {}} />}>
         {["", "app", "plugin"].map((v) => <MenuItem onSelect={() => { channel.set(v); offset.set(0); }}><Text>{v || "全部频道"}</Text></MenuItem>)}
@@ -44,7 +45,7 @@ export function LogsView(props: { core: Core }) {
     <If when={!!error() || !!result.error()}><Text class="text-sm text-destructive">{error() || String(result.error())}</Text></If>
     <Text class="text-xs text-muted-foreground">{`共 ${data()?.total ?? 0} 条日志`}</Text>
     <List each={data()?.items ?? []} keyExtractor={(e: any, index) => `${e.time}:${e.session}:${index}`}
-      class="h-72 min-h-0 rounded-(--radius) border border-border" estimatedItemSize={80}>
+      class={`${props.fill ? "flex-1" : "h-72"} min-h-0 rounded-(--radius) border border-border`} estimatedItemSize={80}>
       {(e: () => any) => <View class="gap-1 px-3 py-3 border-b border-border">
         <Text class="text-xs text-muted-foreground">{`${localDateTime(e().time)} · ${e().channel}/${e().level} · ${e().source} · 会话 ${e().session}`}</Text>
         <Text class="text-sm text-foreground">{e().message}</Text>
@@ -69,7 +70,7 @@ export function LogsView(props: { core: Core }) {
   </View>;
 }
 /** Logs and software identification live in Settings → Other. */
-export function OtherSettings(props: { core: Core; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import" }) {
+export function OtherSettings(props: { core: Core; settings: ReturnType<typeof createSettings>; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import" }) {
   const logs = signal(props.initialLogs ?? false);
   return <View class="flex-col gap-5">
     <BackupSettings core={props.core} fixturePath={props.backupPath} initialDialog={props.initialBackupDialog} />
@@ -77,6 +78,9 @@ export function OtherSettings(props: { core: Core; initialLogs?: boolean; backup
       <SettingRow title="日志查看器" description="查看、筛选与导出应用及插件日志。">
         <Button label="日志查看器…" size="sm" onPress={() => logs.set(true)} />
       </SettingRow>
+      <SettingSwitchRow divider label="开发者模式" description="在主窗口侧栏底部显示“开发工具”，用于编写插件、查看网络请求和日志。"
+        checked={!!props.settings.value()?.developerMode}
+        onChange={(developerMode) => void props.settings.update({ developerMode })} />
     </SettingSection>
     <Dialog open={logs()} onOpenChange={(e) => logs.set(e.open)}
       class="w-240 p-5 gap-4">

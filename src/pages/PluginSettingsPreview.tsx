@@ -43,8 +43,7 @@ export function PluginSettingsPreview(props: { category: string; login?: boolean
   cleanup(() => { void ready()?.core.plugins.stopFixtures(); });
   return <View class="flex-1">
     <If when={!!ready()}><AppShell initialMode="light" initialOverlay="settings"
-      initialSettingsCategory={props.category} initialPluginLogin={props.login ? props.loginPlugin || "subsonic.music" : undefined}
-      initialPluginResult={props.category === "开发者" ? ready()!.result : undefined} /></If>
+      initialSettingsCategory={props.category} initialPluginLogin={props.login ? props.loginPlugin || "subsonic.music" : undefined} /></If>
     <If when={!!ready.error()}><Text>{String(ready.error())}</Text></If>
   </View>;
 }

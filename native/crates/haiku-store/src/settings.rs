@@ -80,6 +80,8 @@ pub struct Settings {
     pub download_reuse_media_cache: bool,
     pub auto_download_playlists: Vec<String>,
     pub download_follow_playlist_removal: bool,
+    /// Shows the developer tools entry in the main sidebar.
+    pub developer_mode: bool,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -117,6 +119,7 @@ impl Default for Settings {
             download_reuse_media_cache: true,
             auto_download_playlists: vec![],
             download_follow_playlist_removal: false,
+            developer_mode: false,
             extra: BTreeMap::new(),
         }
     }

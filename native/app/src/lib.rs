@@ -29,6 +29,7 @@ mod sources;
 mod discovery;
 mod network_fixture;
 mod plugin_tools;
+mod plugin_workspace;
 mod presentation;
 mod seek_bar;
 mod settings;

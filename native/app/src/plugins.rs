@@ -41,6 +41,7 @@ pub struct PluginService {
     favorite_refresh: crate::favorite_refresh::FavoriteRefresh,
     remote: Rc<crate::sources::RemoteSources>,
     network_fixtures: Arc<Mutex<Vec<crate::network_fixture::Server>>>,
+    workspaces: std::path::PathBuf,
 }
 impl PluginService {
     pub(crate) fn new(
@@ -48,6 +49,7 @@ impl PluginService {
         logs: haiku_store::logs::Logs,
         collections: haiku_store::collections::Collections,
         home_root: std::path::PathBuf,
+        workspaces: std::path::PathBuf,
     ) -> Instance<Self> {
         let event_listeners = Listeners::default();
         let listeners = event_listeners.clone();
@@ -121,6 +123,7 @@ impl PluginService {
             collections,
             remote: Rc::new(Default::default()),
             network_fixtures: Arc::default(),
+            workspaces,
         })
     }
     pub(crate) fn host(this: &Instance<Self>) -> Arc<Host> {
@@ -1016,6 +1019,118 @@ impl PluginService {
                         }
                         result => callback.post(format!("目录读取失败：{result:?}")),
                     }
+                }
+            })
+        });
+        Ok(Stop::new(move || running.set(false)))
+    }
+    /// Create an agent authoring workspace: reference SDK files, an empty `plugin/` package
+    /// directory and the prompt to paste into an agent. The prompt is also saved as AGENT.md.
+    pub async fn create_workspace(
+        this: Instance<Self>,
+        name: String,
+        author: String,
+        description: String,
+    ) -> Result<JsonValue, String> {
+        let root = this.with(|s| s.workspaces.clone());
+        blocking(move || crate::plugin_workspace::create(&root, &name, &author, &description))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    /// Authoring workspaces created by the developer tools, newest first.
+    pub async fn workspaces(this: Instance<Self>) -> Result<JsonValue, String> {
+        let root = this.with(|s| s.workspaces.clone());
+        blocking(move || json!(crate::plugin_workspace::list(&root)))
+            .await
+            .map_err(|e| e.to_string())
+    }
+    /// Delete a workspace directory. An installed package stays installed.
+    pub async fn remove_workspace(this: Instance<Self>, path: String) -> Result<(), String> {
+        let root = this.with(|s| s.workspaces.clone());
+        blocking(move || crate::plugin_workspace::remove(&root, &path))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    /// Show a workspace directory in the system file manager.
+    pub async fn reveal_workspace(this: Instance<Self>, path: String) -> Result<(), String> {
+        let root = this.with(|s| s.workspaces.clone());
+        blocking(move || {
+            let path = crate::plugin_workspace::resolve(&root, &path)?;
+            let opener = if cfg!(target_os = "macos") { "open" }
+                else if cfg!(target_os = "windows") { "explorer" } else { "xdg-open" };
+            std::process::Command::new(opener).arg(&path).spawn().map(|_| ()).map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    /// Watch a workspace once a second. Each content change of `plugin/` is installed
+    /// transactionally (keeping KV); `DONE` written by the agent after a successful load
+    /// completes it. Status: `{phase, message, plugin?, summary?}` with phase one of
+    /// waiting, failed, loaded or done; only changes are posted. Stop ends the watch.
+    pub async fn watch_workspace(
+        this: Instance<Self>,
+        path: String,
+        #[args(status)] callback: Callback<JsonValue>,
+    ) -> Result<Stop, String> {
+        let root = this.with(|s| s.workspaces.clone());
+        let path = blocking(move || crate::plugin_workspace::resolve(&root, &path))
+            .await
+            .map_err(|e| e.to_string())??;
+        let running = Rc::new(std::cell::Cell::new(true));
+        let active = running.clone();
+        let host = Self::host(&this);
+        Owner::detached().run(|| {
+            spawn(async move {
+                let mut hash: Option<u64> = None;
+                let mut loaded: Option<Result<JsonValue, String>> = None;
+                let mut last = JsonValue::Null;
+                while active.get() {
+                    let (dir, host, previous) = (path.clone(), host.clone(), hash);
+                    let step = background(async move {
+                        let package = dir.join("plugin");
+                        if !package.join("plugin.ts").is_file() {
+                            return (None, None, crate::plugin_workspace::done(&dir));
+                        }
+                        let next = match crate::plugin_tools::directory_hash(&package) {
+                            Ok(next) => next,
+                            Err(error) => return (previous, Some(Err(error)), None),
+                        };
+                        let install = if Some(next) == previous {
+                            None
+                        } else {
+                            Some(host.install_directory(&package, false).await
+                                .map(|d| json!({"id":d.id,"name":d.name,"version":d.version,
+                                    "kind":d.kind,"capabilities":d.capabilities}))
+                                .map_err(|e| e.to_string()))
+                        };
+                        (Some(next), install, crate::plugin_workspace::done(&dir))
+                    })
+                    .await;
+                    if !active.get() {
+                        break;
+                    }
+                    let Ok((next, install, done)) = step else { break };
+                    if next.is_none() {
+                        loaded = None;
+                    }
+                    hash = next;
+                    if let Some(result) = install {
+                        if result.is_ok() {
+                            let _ = Self::changed(&this).await;
+                        }
+                        loaded = Some(result);
+                    }
+                    let status = match (&loaded, done) {
+                        (None, _) => json!({"phase":"waiting","message":"等待 Agent 写入 plugin/plugin.ts"}),
+                        (Some(Err(error)), _) => json!({"phase":"failed","message":error}),
+                        (Some(Ok(plugin)), None) => json!({"phase":"loaded","message":"已加载最新代码，等待 Agent 写入 DONE","plugin":plugin}),
+                        (Some(Ok(plugin)), Some((_, summary))) => json!({"phase":"done","message":"插件已完成并安装","plugin":plugin,"summary":summary}),
+                    };
+                    if status != last {
+                        callback.post(status.clone());
+                        last = status;
+                    }
+                    timer(std::time::Duration::from_secs(1)).await;
                 }
             })
         });

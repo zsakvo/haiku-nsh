@@ -455,6 +455,7 @@ impl Core {
         let plugin_logs = bridge.logs.clone();
         let plugins = crate::plugins::PluginService::new(
             plugins, plugin_logs, bridge.collections.clone(), bridge._root.path.join("cache/home"),
+            bridge._root.path.join("plugin-workspaces"),
         );
         let backup = crate::backup::BackupService::new(backup_runtime, settings.clone(), plugins.clone(), shortcuts.clone());
         let core = Instance::new(Self {

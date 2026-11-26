@@ -28,6 +28,7 @@ export interface SettingsSnapshot {
   lyricsCustomProviders: CustomLyricsProvider[];
   scrapersDisabled?: string[]; scraperOrder?: string[]; scrapeUseMusicPlugins?: boolean;
   scrapeMode?: "missing" | "replace";
+  developerMode?: boolean;
 }
 export interface CustomLyricsProvider {
   id: string; name: string; urlTemplate: string; responseType: string;

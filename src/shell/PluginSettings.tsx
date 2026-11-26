@@ -1,4 +1,4 @@
-import { cleanup, effect, Image, List, platform, Scroll, signal, Text, token, View, type ViewRef } from "nsh";
+import { cleanup, effect, Image, platform, Scroll, signal, Text, token, View, type ViewRef } from "nsh";
 import { PluginService } from "haiku/native";
 import { Button as BaseButton, Popover } from "nsh/base";
 import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
@@ -414,21 +414,14 @@ function JsonTree(props: { value: unknown; name?: string }) {
   </View>;
 }
 
-function eventLine(value: unknown) {
-  const event = value as { kind?: string; method?: string; phase?: string;
-    status?: number; url?: string; level?: string; message?: string };
-  return event.kind === "http"
-    ? `HTTP ${event.method} · ${event.phase}${event.status ? ` · ${event.status}` : ""}\n${event.url}`
-    : `${event.level || "日志"} · ${event.message || JSON.stringify(value)}`;
-}
-
-export function DeveloperSettings(props: { state: PluginsState; initialResult?: unknown }) {
+/** Load a local package directory and invoke installed capabilities (developer tools window). */
+export function PluginDebugger(props: { state: PluginsState }) {
   const source = signal(""), capability = signal("track.get"), args = signal("[]");
   const raw = signal(false), values = signal<Record<string, string>>({});
   const watching = signal(""), watchStatus = signal("");
   let stopWatch: (() => void) | undefined;
   cleanup(() => stopWatch?.());
-  const location = signal(""), result = signal<unknown>(props.initialResult ?? null);
+  const location = signal(""), result = signal<unknown>(null);
   const activeSource = () => source() || props.state.value().sources[0]?.sourceId || "";
   const plugin = () => props.state.value().sources.find(s => s.sourceId === activeSource())?.pluginId;
   const descriptor = () => props.state.value().packages.find(p => p.id === plugin());
@@ -464,7 +457,7 @@ export function DeveloperSettings(props: { state: PluginsState; initialResult?: 
       watching.set(location()); watchStatus.set("正在监听文件变化");
     });
   }
-  return <View class="flex-row items-start gap-5 min-w-0" testID="developer-settings">
+  return <View class="flex-row items-start gap-5 min-w-0" testID="plugin-debugger">
     <View class="flex-1 min-w-0 flex-col gap-5">
       <SettingSection title="本地插件调试">
         <SettingCardBlock>
@@ -515,24 +508,14 @@ export function DeveloperSettings(props: { state: PluginsState; initialResult?: 
       </SettingSection>
     </View>
     <View class="flex-1 min-w-0 flex-col gap-5">
-      <If when={result() !== null}>
-        <SettingSection title="返回结果" testID="plugin-call-result">
-          <SettingCardBlock>
-            <Scroll class="h-64 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
+      <SettingSection title="返回结果" testID="plugin-call-result">
+        <SettingCardBlock>
+          <If when={result() !== null}>
+            <Scroll class="h-96 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
               <JsonTree value={result()} />
             </Scroll>
-          </SettingCardBlock>
-        </SettingSection>
-      </If>
-      <SettingSection title="日志与 HTTP 追踪">
-        <SettingCardBlock>
-          <List each={props.state.events()} class="h-48 min-h-0" testID="plugin-events"
-            keyExtractor={(_, index) => String(index)}
-            empty={<Text class="text-xs text-muted-foreground">尚无日志或 HTTP 追踪。调用能力后显示。</Text>}>
-            {event => <View class="border-b border-settings-divider py-2">
-              <Text class="text-xs text-muted-foreground" style={{ numberOfLines: 3 }}>{eventLine(event())}</Text>
-            </View>}
-          </List>
+          </If>
+          <If when={result() === null}><Text class="text-xs text-muted-foreground">调用能力、运行契约测试或查看存储后，结果显示在这里。</Text></If>
         </SettingCardBlock>
       </SettingSection>
     </View>
