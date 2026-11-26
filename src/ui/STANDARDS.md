@@ -19,7 +19,7 @@
 - 侧栏搜索入口最小宽 176pt、填满侧栏内宽；“前往…”与快捷键提示、设置搜索 placeholder 同为 11pt；设置搜索输入正文为 13pt。
 - 内容顶栏不显示页面标题；macOS 固定顶栏使用整宽模糊背景与底部细分隔线，导航胶囊可拖动；其他桌面平台保留至少 48pt 的导航行。设置顶栏保留 40pt 拖动区和右侧关闭按钮。
 - 主内容导航组依次为后退、前进、刷新、当前页面来源 chip；推荐页不再重复提供“刷新推荐”按钮。
-- 推荐页不显示独立“推荐”标题。内容区顶栏依次为后退、刷新、搜索入口（命令面板），来源选择位于行尾，采用全圆角模糊玻璃胶囊（原生实时模糊 + 半透明洗色 source-chip-tint + 细边框 source-chip-border，图标尺寸 source-icon-size 18pt、名称字号 source-label-size 11.2pt、图文间距 8pt）；macOS 点击弹出原生系统菜单切换来源，其余平台使用自绘制下拉选择；不提供前进按钮（前进仅保留快捷键与菜单）。顶栏高 navigation-bar-height 64pt（与底部播放栏同高），控件统一 navigation-control-height 32pt、间距 10pt，左右内边距对称均为 content-inset-left 24pt，主内容从其下方 navigation-content-gap 12pt 开始。顶栏与内容同色、无色差，静止时没有分隔线；推荐与歌单详情的留白随列表滚动，仅当内容滚入顶栏下方时才显示一条浅色细分隔线。macOS 顶栏使用原生实时背景模糊叠加与内容背景同色的半透明洗色，滚入的内容隐约透出。
+- 推荐页不显示独立“推荐”标题。内容区顶栏依次为后退、刷新、搜索入口（命令面板），来源选择位于行尾，采用全圆角模糊玻璃胶囊（原生实时模糊 + 半透明洗色 source-chip-tint + 细边框 source-chip-border，高 source-chip-height 26pt（低于其他 32pt 顶栏控件，垂直居中），图标尺寸 source-icon-size 16pt、名称字号 source-label-size 11.2pt、图文间距 6pt，左内边距 6pt、右内边距 10pt，紧凑包裹内容）；macOS 点击弹出原生系统菜单切换来源，其余平台使用自绘制下拉选择；不提供前进按钮（前进仅保留快捷键与菜单）。顶栏高 navigation-bar-height 64pt（与底部播放栏同高），控件统一 navigation-control-height 32pt、间距 10pt，左右内边距对称均为 content-inset-left 24pt，主内容从其下方 navigation-content-gap 12pt 开始。顶栏与内容同色、无色差，静止时没有分隔线；推荐与歌单详情的留白随列表滚动，仅当内容滚入顶栏下方时才显示一条浅色细分隔线。macOS 顶栏使用原生实时背景模糊叠加与内容背景同色的半透明洗色，滚入的内容隐约透出。
 - 发现和搜索页面的来源选择放在导航组末尾：圆形胶囊 chip，文字 12pt、插件图标 14pt，使用原生 Select 行为下拉切换；页面内不重复显示来源标签和选择框。
 - 推荐页歌曲货架横向分页，每屏两列、每列三首；单行 84pt、封面 52pt，分别由 home-track-row-height/home-track-cover-size 定义。歌曲显示封面、歌名、喜欢状态、来源实际提供的音质及艺术家；悬浮或键盘聚焦显示播放、下载、喜欢和更多操作。整块悬浮时显示两侧翻页箭头，边界禁用；同时保留触控板横向滚动与键盘操作。其他页面继续使用表格歌曲列表。
 - 首页连续推荐流按来源顺序混排歌曲、歌单和专辑，使用虚拟化封面网格；列数随内容宽度变化，最小列宽复用 listening-cover-size，列间距 16pt。网络分页不产生换行或重复标题，最后一行保留空槽；歌曲卡片显示艺术家，点击播放，集合卡片打开详情。近底部自动续载，失败在流末尾重试并保留已加载内容。
@@ -48,9 +48,10 @@
 - 唯一颜色定义位于 src/ui/theme；其余 UI 只能消费语义 token。
 - 标准角色覆盖背景、前景、卡片、popover、sidebar、muted、primary、secondary、accent、destructive、border、input、ring。
 - 应用角色覆盖 success、warning、进度、底栏、歌词和 now-playing；封面数据颜色日后经 token 覆盖进入。
-- 浅色为温暖中性色，深色为低亮度中性色；不以深浅色专用 class 代替 token。
-- 17 种品牌色沿用参考版，默认 orange；深色品牌色向白色混合 48%。
-- primary-foreground 依相对亮度选择对比度更高的黑/白；主色仅用于默认提交与持久选择。
+- 品牌色是唯一颜色种子：palette.ts 在 OKLCH 中取其色相，生成整套中性色（背景、侧栏、卡片、muted、边框、输入、文字）——低彩度（浅色 C≈0.01、深色 C≈0.014）带品牌色相的灰，参考 Linear 的 base/accent/contrast 模型与 Radix 的染色灰阶；选中态（selection、sidebar-accent）为品牌色浅染，正在播放/封面等沉浸表面同色相深色。各品牌共用同一亮度结构，对比度一致。不以深浅色专用 class 代替 token。
+- 17 种品牌色为等亮度 OKLCH 色票，默认 orange；另有「素」（neutral）：无彩色种子生成纯灰阶，浅色背景为纯白、primary 为墨黑，深色为中性黑，沉浸表面同样去色；primary 浅色取 L 0.58、深色取 L 0.76 并降低彩度。haiku.json 中的浅/深 token 为默认品牌的生成结果，调整 palette.ts 后需重新生成。
+- primary-foreground 在饱和中间色上取白、仅浅色填充取黑；主色仅用于默认提交与持久选择。
+- 页面内的主要动作（如详情页「播放全部」）用色调按钮：primary-soft 浅品牌色底 + primary-soft-foreground 品牌色文字与图标，不用实心 primary。
 - 外观模式与品牌色由 Rust 设置服务原子持久化，TSX 订阅已提交镜像；Rust set_tokens 与 NSH setColorScheme 同步所有消费者。
 
 ## 圆角与表面

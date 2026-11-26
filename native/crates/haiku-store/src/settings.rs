@@ -145,7 +145,7 @@ impl Settings {
         }
         if ![
             "red", "orange", "amber", "yellow", "lime", "green", "emerald", "teal", "cyan", "sky",
-            "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose",
+            "blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "neutral",
         ]
         .contains(&self.brand_color.as_str())
         {

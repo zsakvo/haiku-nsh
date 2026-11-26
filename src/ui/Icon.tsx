@@ -39,7 +39,7 @@ export type IconName = keyof typeof icons;
 export function Icon(props: {
   name: IconName;
   class?: string;
-  color?: "foreground" | "primary" | "primary-foreground" | "muted-foreground" | "sidebar-foreground" | "cover-foreground" | "destructive" | "selection-foreground";
+  color?: "foreground" | "primary" | "primary-foreground" | "muted-foreground" | "sidebar-foreground" | "cover-foreground" | "destructive" | "selection-foreground" | "primary-soft-foreground";
   small?: boolean;
   sidebar?: boolean;
   navigation?: boolean;

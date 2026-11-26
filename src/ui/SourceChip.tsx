@@ -17,7 +17,7 @@ export function SourceChip(props: {
 }) {
   const selected = () => props.items.find((item) => item.id === props.value) ?? props.items[0];
   const nativeMenu = platform.os === "macos" && desktopAvailable;
-  const triggerClass = `group relative h-(--navigation-control-height) max-w-56 flex-row items-center gap-2 overflow-hidden rounded-full border border-source-chip-border px-3 disabled:opacity-35 ${focus}`;
+  const triggerClass = `group relative h-(--source-chip-height) max-w-56 flex-row items-center gap-1.5 overflow-hidden rounded-full border border-source-chip-border pl-1.5 pr-2.5 disabled:opacity-35 ${focus}`;
   const triggerBody = () => <>
     <NavigationControlBackdrop pill />
     <SourceMark testID="source-chip-icon" logo={selected()?.logo} />
