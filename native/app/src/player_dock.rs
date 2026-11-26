@@ -53,6 +53,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     let next_c = c.clone();
     let seek_c = c.clone();
     let duration_p = p.clone();
+    let desktop_lyrics = desktop_lyrics_toggle(p.bridge.clone());
     #[cfg(target_os = "macos")]
     let native_glass = haiku_macos::lifecycle::native_host();
     #[cfg(not(target_os = "macos"))]
@@ -62,7 +63,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
         .left(px(0.))
         .right(px(0.))
         .bottom(px(0.))
-        .test_id(&identity).h(move ||px(theme().tokens().number("dock-height").unwrap_or(64.)))
+        .test_id(&identity).h(move ||px(theme().tokens().number("dock-height").unwrap_or(72.)))
         .flex_row().items_center().px_3()
         .child(view().test_id("dock-material").absolute().inset_0()
             .pointer_events(nsh_core::PointerEvents::None)
@@ -119,6 +120,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
             .on_seek(move |seconds: &f64| send(&seek_c,Command::Seek(*seconds)))
             .w_full().min_w_0()))
         .child(view().flex_1().min_w_0().flex_row().items_center().justify_end().gap(px(10.))
+            .children(desktop_lyrics)
             .child(compact_surface_control(
                 move || -> SharedString {
                     let label = match mode.get() {
@@ -142,4 +144,28 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
                 }))))
             .child(volume)
             .child(queue))
+}
+/// Desktop lyrics are a macOS-only surface; the toggle shares the shortcut's settings path.
+fn desktop_lyrics_toggle(bridge: std::rc::Rc<crate::core::CoreBridge>) -> Option<nsh_base::ButtonElement> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    let settings = bridge.settings;
+    Some(compact_surface_control(
+        move || -> SharedString {
+            if settings.with(|s| s.desktop_lyrics.visible) { "隐藏桌面歌词" } else { "显示桌面歌词" }.into()
+        },
+        "lyrics",
+        false.into(),
+    )
+    .selected(move || settings.with(|s| s.desktop_lyrics.visible))
+    .on_press(move || {
+        let Some(core) = global::<Option<Instance<crate::core::Core>>>().get_untracked() else { return };
+        let bridge = bridge.clone();
+        spawn(async move {
+            if let Err(e) = crate::shortcuts::dispatch(&bridge, "toggleDesktopLyrics", core.with(|c| c.settings())).await {
+                log::error!("desktop lyrics toggle: {e}");
+            }
+        });
+    }))
 }

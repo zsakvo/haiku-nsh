@@ -85,13 +85,16 @@ export function ActionMenu(props: {
   accessibilityLabel?: string;
   testID?: string;
   compact?: boolean;
+  /** Custom trigger content and classes; the whole element opens the menu. */
+  trigger?: JSX.Element;
+  triggerClass?: string;
   items: ActionMenuItem[];
 }) {
   const nativeMenu = platform.os === "macos" && desktopAvailable;
-  const triggerClass = props.compact
+  const triggerClass = props.triggerClass ? `${props.triggerClass} ${focus}` : props.compact
     ? `size-5 items-center justify-center rounded-full active:bg-muted selected:bg-muted ${focus}`
     : `size-8 items-center justify-center rounded-(--radius) active:opacity-60 selected:bg-muted ${focus}`;
-  const triggerContent = () => props.label === "…"
+  const triggerContent = () => props.trigger ? props.trigger : props.label === "…"
     ? <Icon name="harmonyosDotGrid1x2" class={props.compact ? "size-3.5" : "size-4"} color={props.compact ? "muted-foreground" : "foreground"} />
     : <Text class="text-sm text-foreground">{props.label}</Text>;
   if (nativeMenu) {

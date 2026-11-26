@@ -276,13 +276,13 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
             <Popover class="flex-1 min-w-0" popupClass={`${popupSurface} w-80 gap-3 p-4`}
               align="start" trigger={<BaseButton accessibilityLabel={`${p().name} 详情`}
                 class={`w-full min-w-0 flex-row items-center gap-3 rounded-(--radius) py-1 active:bg-muted ${focus}`}>
-                <View class="size-9 shrink-0 items-center justify-center rounded-(--radius) bg-card border border-border">
-                  <If when={!!p().logo}><Image src={p().logo!} class="size-9 rounded-(--radius)" /></If>
+                <View class={`size-9 shrink-0 items-center justify-center overflow-hidden rounded-(--radius) ${p().logo ? "" : "border border-border bg-card"}`}>
+                  <If when={!!p().logo}><Image src={p().logo!} class="size-9" /></If>
                   <If when={!p().logo}><Icon name="plug" color="muted-foreground" /></If>
                 </View>
                 <View class="flex-1 min-w-0 gap-0.5">
-                  <Text class="text-sm text-foreground">{p().name}</Text>
-                  <Text class="text-xs text-muted-foreground">{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
+                  <Text class="text-sm font-medium text-foreground">{p().name}</Text>
+                  <Text class="text-xs text-muted-foreground" style={{ numberOfLines: 1 }}>{[p().version, p().author, p().id].filter(Boolean).join(" · ")}</Text>
                 </View>
               </BaseButton>}>
               <Text class="text-sm font-semibold text-foreground">{p().name}</Text>
@@ -291,8 +291,13 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
               <Text class="text-xs text-muted-foreground">{uses(p().id).length} 个实例{p().builtin ? " · 内置插件" : ""}</Text>
             </Popover>
             <ActionMenu
-              label="…"
+              label="管理"
               accessibilityLabel={`${p().name} 操作`}
+              triggerClass="h-7 flex-row items-center gap-1 rounded-full border border-border bg-card pl-3 pr-2 active:bg-muted selected:bg-muted"
+              trigger={<>
+                <Text class="text-xs text-foreground">管理</Text>
+                <Icon name="down" class="size-3" color="muted-foreground" />
+              </>}
               items={[
                 { label: "登录…", disabled: !canLogin(p()), onSelect: () => void openLogin(p()) },
                 { label: "导出…", onSelect: () => void exportPlugin(p()) },
@@ -301,7 +306,7 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
             />
           </View>
           <If when={sessions(p()).length > 0}>
-            <View class="flex-row flex-wrap items-center gap-2 px-3 pb-2.5">
+            <View class="flex-row flex-wrap items-center gap-1.5 pb-3 pl-15 pr-3">
               <Each of={sessions(p())} key={s => s.sourceId}>{s => {
                 const isLib = () => p().kind === "library";
                 const name = () => isLib()
@@ -312,26 +317,24 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
                   : s().needsLogin
                     ? `${name()} · 需重新登录`
                     : name();
-                return <View testID={`plugin-session-${s().sourceId}`}
-                  class="h-7 flex-row items-center gap-1.5 rounded-full border border-border bg-background pl-1 pr-1">
-                  <View class={`size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ${!s().enabled ? "opacity-50" : ""}`}>
-                    <If when={!!s().user?.avatar}>
-                      <Image src={s().user!.avatar!} class="size-5 rounded-full" />
-                    </If>
-                    <If when={!s().user?.avatar}>
-                      <Icon name={isLib() ? "radio" : "user"} class="size-3" color="muted-foreground" />
-                    </If>
-                  </View>
-                  <Text
-                    class={`max-w-52 px-0.5 text-xs ${!s().enabled ? "text-muted-foreground" : s().needsLogin ? "text-warning" : "text-foreground"}`}
-                    style={{ numberOfLines: 1 }}
-                  >
-                    {label()}
-                  </Text>
+                const tone = () => !s().enabled ? "text-muted-foreground" : s().needsLogin ? "text-warning" : "text-foreground";
+                return <View testID={`plugin-session-${s().sourceId}`}>
                   <ActionMenu
-                    compact
-                    label="…"
+                    label={name()}
                     accessibilityLabel={`${name()} 菜单`}
+                    triggerClass="h-7 flex-row items-center gap-1.5 rounded-full border border-border bg-card pl-1 pr-2 active:bg-muted selected:bg-muted"
+                    trigger={<>
+                      <View class={`size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ${!s().enabled ? "opacity-50" : ""}`}>
+                        <If when={!!s().user?.avatar}>
+                          <Image src={s().user!.avatar!} class="size-5 rounded-full" />
+                        </If>
+                        <If when={!s().user?.avatar}>
+                          <Icon name={isLib() ? "radio" : "user"} class="size-3" color="muted-foreground" />
+                        </If>
+                      </View>
+                      <Text class={`max-w-52 text-xs ${tone()}`} style={{ numberOfLines: 1 }}>{label()}</Text>
+                      <Icon name="down" class="size-3" color="muted-foreground" />
+                    </>}
                     items={[
                       ...(isLib() ? [{ label: "编辑连接…", onSelect: () => void openLogin(p(), s()) }] : []),
                       ...(!isLib() && !!s().needsLogin ? [{ label: "重新登录…", onSelect: () => void openLogin(p()) }] : []),

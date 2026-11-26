@@ -56,12 +56,12 @@
       "brand-option-min-width": "7rem",
       "font-sans": "Allo, system-ui",
       "font-mono": "monospace",
-      "dock-height": "4rem",
+      "dock-height": "4.5rem",
       "dock-inset": "0rem",
       "dock-radius": "0rem",
       "dock-backdrop-opacity": "0.9",
       "dock-blur-radius": "1.25rem",
-      "dock-scroll-clearance": "5.5rem",
+      "dock-scroll-clearance": "6rem",
       "dock-progress-width": "24rem"
     },
     "light": {
