@@ -22,6 +22,8 @@ const presets=[
   {name:"墨夜",first:"#2B2B2B",second:"#E05A47"},
 ];
 const label=(color:string)=>color==="system"?"跟随系统":color.toUpperCase();
+/** The weight comes from the face picked in the system font panel; shown here, not edited. */
+const weights:Record<Preferences["fontWeight"],string>={light:"细体",regular:"常规",medium:"中等",semibold:"半粗",bold:"粗体"};
 /** Native surface preferences share the durable Rust settings authority. */
 export function DesktopLyricsSettings(props:{settings:ReturnType<typeof createSettings>}) {
   const d=()=>props.settings.value()!.desktopLyrics;
@@ -33,7 +35,7 @@ export function DesktopLyricsSettings(props:{settings:ReturnType<typeof createSe
     <SettingSelectRow divider label="桌面歌词布局" value={d().layout} items={[
       {value:"classic",title:"经典"},{value:"focus",title:"焦点"},{value:"left",title:"左对齐"},{value:"stage",title:"舞台"},
     ]} onChange={layout=>patch({layout:layout as Preferences["layout"]})} />
-    <SettingRow divider title="桌面歌词字体" description={d().font || "系统字体"}>
+    <SettingRow divider title="桌面歌词字体" description={`${d().font || "系统字体"} · ${weights[d().fontWeight] ?? "常规"}`}>
       <Button label="选择桌面歌词字体…" size="sm" onPress={()=>void (async()=>{
         try {await props.settings.core()!.settings.pickDesktopFont();error.set("");}catch(e){error.set(String(e));}
       })()} />
@@ -42,9 +44,6 @@ export function DesktopLyricsSettings(props:{settings:ReturnType<typeof createSe
     <SettingCardBlock divider>
       <SettingSlider label="桌面歌词字号" testID="desktop-lyrics-font-size" value={d().fontSize} min={14} max={60} step={1} onChange={fontSize=>patch({fontSize})} />
     </SettingCardBlock>
-    <SettingSelectRow divider label="桌面歌词字重" value={d().fontWeight} items={[
-      {value:"light",title:"细体"},{value:"regular",title:"常规"},{value:"medium",title:"中等"},{value:"semibold",title:"半粗"},{value:"bold",title:"粗体"},
-    ]} onChange={fontWeight=>patch({fontWeight:fontWeight as Preferences["fontWeight"],fontName:""})} />
     <SettingCardBlock divider>
       <Text class="text-foreground" style={{ fontSize: token("sidebar-text-size") }}>桌面歌词配色</Text>
       <ColorPairPresets label="桌面歌词配色" presets={presets} first={d().textColor} second={d().highlightColor}

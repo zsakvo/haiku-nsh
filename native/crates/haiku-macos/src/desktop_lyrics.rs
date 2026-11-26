@@ -317,6 +317,82 @@ pub mod layout {
     }
 }
 
+/// Readability halo derived from the chosen lyric colors instead of a fixed gray-black.
+/// The desktop behind the panel is unknown, so the halo always sits on the far side of
+/// the text's lightness: light text gets a deep tone, dark text a pale glow. Its hue is
+/// borrowed from the highlight (or the text when the highlight is gray) at low chroma,
+/// so a warm palette gets an umber edge and a cool one a navy edge. Stroke width tracks
+/// size and weight to keep a steady visible edge; weak text/halo separation widens it.
+pub mod halo {
+    pub type Rgb = (f64, f64, f64);
+    pub type Rgba = (f64, f64, f64, f64);
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct Halo {
+        pub stroke: Rgba,
+        /// NSStrokeWidth: percent of the point size, centered on the glyph outline.
+        pub stroke_width: f64,
+        pub shadow: Rgba,
+        pub shadow_radius: f64,
+        /// Downward offset in points; zero turns the shadow into an even glow.
+        pub shadow_offset: f64,
+    }
+
+    pub const DEFAULT_TEXT: Rgb = (1.0, 1.0, 1.0);
+    pub const DEFAULT_HIGHLIGHT: Rgb = (0xAC as f64 / 255.0, 0x5E as f64 / 255.0, 0x4F as f64 / 255.0);
+
+    pub fn derive(text: Rgb, highlight: Rgb, font_size: f64, weight: f64, outline: bool) -> Halo {
+        let (lt, ct, ht) = oklch(text);
+        let (lh, ch, hh) = oklch(highlight);
+        // The base fill covers most of the line; the karaoke sweep only part of it.
+        let lightness = lt * 0.7 + lh * 0.3;
+        let (hue, chroma) = if ch >= 0.03 { (hh, ch) } else if ct >= 0.02 { (ht, ct) } else { (0.0, 0.0) };
+        let dark = lightness >= 0.55;
+        let (edge_l, edge_c, alpha) = if dark { (0.21, (chroma * 0.4).min(0.06), 0.82) }
+            else { (0.96, (chroma * 0.12).min(0.025), 0.9) };
+        let edge = rgb(edge_l, edge_c, hue);
+
+        // Visible edge is half the stroke: aim for 0.6–2.2 pt, thinner on heavy faces.
+        let size = font_size.max(1.0);
+        let separation = (lightness - edge_l).abs();
+        let boost = 1.0 + (0.6 - separation).max(0.0) * 0.8;
+        let stroke_width = ((6.0 - 2.5 * weight) * boost).clamp(120.0 / size, (440.0 / size).max(120.0 / size));
+
+        let (shadow, shadow_radius, shadow_offset) = if dark {
+            let deep = rgb(0.12, edge_c * 0.8, hue);
+            ((deep.0, deep.1, deep.2, if outline { 0.45 } else { 0.7 }),
+             (size * 0.1).clamp(2.0, 6.0), (size * 0.04).clamp(0.5, 2.0))
+        } else {
+            ((edge.0, edge.1, edge.2, if outline { 0.7 } else { 0.9 }), (size * 0.16).clamp(3.0, 8.0), 0.0)
+        };
+        Halo { stroke: (edge.0, edge.1, edge.2, alpha), stroke_width, shadow, shadow_radius, shadow_offset }
+    }
+
+    fn to_linear(n: f64) -> f64 { if n <= 0.04045 { n / 12.92 } else { ((n + 0.055) / 1.055).powf(2.4) } }
+    fn to_gamma(n: f64) -> f64 { if n <= 0.0031308 { n * 12.92 } else { 1.055 * n.powf(1.0 / 2.4) - 0.055 } }
+
+    fn oklch((r, g, b): Rgb) -> (f64, f64, f64) {
+        let (r, g, b) = (to_linear(r), to_linear(g), to_linear(b));
+        let l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b).cbrt();
+        let m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b).cbrt();
+        let s = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b).cbrt();
+        let a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+        let bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+        (0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, a.hypot(bb), bb.atan2(a).to_degrees())
+    }
+
+    fn rgb(l: f64, c: f64, h: f64) -> Rgb {
+        let (a, b) = (c * h.to_radians().cos(), c * h.to_radians().sin());
+        let lc = (l + 0.3963377774 * a + 0.2158037573 * b).powi(3);
+        let mc = (l - 0.1055613458 * a - 0.0638541728 * b).powi(3);
+        let sc = (l - 0.0894841775 * a - 1.291485548 * b).powi(3);
+        let f = |n: f64| to_gamma(n.clamp(0.0, 1.0));
+        (f(4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc),
+         f(-1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc),
+         f(-0.0041960863 * lc - 0.7034186147 * mc + 1.707614701 * sc))
+    }
+}
+
 // ===================== 非 macOS：no-op =====================
 
 #[cfg(not(target_os = "macos"))]
@@ -372,6 +448,7 @@ mod imp {
     use super::{DesktopLyricsEvent, LyricLine, Sender, Style, Position};
 
     use super::layout::{self, LineKind, Row};
+    use super::halo::{self, Halo};
 
     const WINDOW_W: f64 = 600.0;
     const WINDOW_H: f64 = 90.0;
@@ -1412,7 +1489,7 @@ mod imp {
                 st.style.font_weight,
             );
             if row.kind == LineKind::Current {
-                build_current_line(st, content, &row.text, font, scale);
+                build_current_line(st, content, &row.text, font, row.font_size, scale);
             } else {
                 let layer = text_layer(
                     &row.text,
@@ -1420,6 +1497,7 @@ mod imp {
                     text_color(st),
                     st.style.outline,
                     st.style.shadow,
+                    &halo_for(st, row.font_size),
                     0.0,
                     0.0,
                     scale,
@@ -1446,9 +1524,11 @@ mod imp {
         container: id,
         text: &str,
         font: id,
+        font_size: f64,
         scale: f64,
     ) {
         let (x, y) = (0.0, 0.0);
+        let halo = halo_for(st, font_size);
         let base_attrs = text_attrs(font, text_color(st));
         let hi_attrs = text_attrs(font, highlight_color(st));
 
@@ -1460,11 +1540,11 @@ mod imp {
         // Stroke every glyph first, then fill the complete line above it. This
         // covers CJK overlap contours instead of stroking each filled glyph last.
         if st.style.outline {
-            let stroke = new_text_layer(attr_string(text, styled_attrs(font)), tw, th, x, y, scale);
+            let stroke = new_text_layer(attr_string(text, styled_attrs(font, &halo)), tw, th, x, y, scale);
             let _: () = msg_send![container, addSublayer: stroke];
         }
         let base = new_text_layer(attr_string(text, base_attrs), tw, th, x, y, scale);
-        apply_text_shadow(base, st.style.shadow);
+        apply_text_shadow(base, st.style.shadow, &halo);
         let _: () = msg_send![container, addSublayer: base];
 
         let has_words = matches!(&st.current, Some(c) if !c.words.is_empty());
@@ -1488,6 +1568,7 @@ mod imp {
         fg: id,
         outline: bool,
         shadow: bool,
+        halo: &Halo,
         x: f64,
         y: f64,
         scale: f64,
@@ -1497,7 +1578,7 @@ mod imp {
         let group: id = msg_send![class!(CALayer), layer];
         let _: () = msg_send![group, setFrame: rect(x,y,size.width,size.height.ceil()+2.0)];
         if outline {
-            let stroke = new_text_layer(attr_string(text,styled_attrs(font)),size.width,size.height.ceil()+2.0,0.,0.,scale);
+            let stroke = new_text_layer(attr_string(text,styled_attrs(font,halo)),size.width,size.height.ceil()+2.0,0.,0.,scale);
             let _: () = msg_send![group, addSublayer: stroke];
         }
         let l = new_text_layer(
@@ -1509,21 +1590,33 @@ mod imp {
             scale,
         );
         let _: () = msg_send![group, addSublayer: l];
-        apply_text_shadow(group, shadow);
+        apply_text_shadow(group, shadow, halo);
         group
     }
 
-    /// 文字可读性效果：在图层上叠加一层柔和黑色投影。投影由 Core Animation 按文字
-    /// alpha 计算，不会像自绘按钮那样改变文字/图标的宽高比；关闭「文字阴影」时无此层。
-    unsafe fn apply_text_shadow(layer: id, enabled: bool) {
+    /// The halo for one row size, derived from the configured lyric colors.
+    fn halo_for(st: &ViewState, font_size: f64) -> Halo {
+        halo::derive(
+            st.style.text_color.unwrap_or(halo::DEFAULT_TEXT),
+            st.style.highlight_color.unwrap_or(halo::DEFAULT_HIGHLIGHT),
+            font_size,
+            st.style.font_weight,
+            st.style.outline,
+        )
+    }
+
+    /// 文字可读性效果：按 halo 叠加投影（浅色字为同色相深色投影，深色字为浅色光晕）。
+    /// 投影由 Core Animation 按文字 alpha 计算；关闭「文字阴影」时无此层。
+    unsafe fn apply_text_shadow(layer: id, enabled: bool, halo: &Halo) {
         if !enabled || layer == nil {
             return;
         }
-        let cg: id = msg_send![color(0.0, 0.0, 0.0, 0.85), CGColor];
+        let (r, g, b, a) = halo.shadow;
+        let cg: id = msg_send![color(r, g, b, 1.0), CGColor];
         let _: () = msg_send![layer, setShadowColor: cg];
-        let _: () = msg_send![layer, setShadowOpacity: 0.8f32];
-        let _: () = msg_send![layer, setShadowRadius: 3.0];
-        let _: () = msg_send![layer, setShadowOffset: NSSize::new(0.0, -1.5)];
+        let _: () = msg_send![layer, setShadowOpacity: a as f32];
+        let _: () = msg_send![layer, setShadowRadius: halo.shadow_radius];
+        let _: () = msg_send![layer, setShadowOffset: NSSize::new(0.0, -halo.shadow_offset)];
         // 显式保持 shadow 不被自身 bounds 裁掉（CATextLayer 默认 masksToBounds=NO）。
         let _: () = msg_send![layer, setMasksToBounds: NO];
     }
@@ -1950,11 +2043,13 @@ mod imp {
         dict
     }
 
-    unsafe fn styled_attrs(font:id)->id {
-        let attrs=text_attrs(font,color(0.,0.,0.,0.85));
-            let stroke:id=msg_send![class!(NSNumber),numberWithDouble:2.0f64];
-            let _:()=msg_send![attrs,setObject:stroke forKey:NSStrokeWidthAttributeName];
-            let _:()=msg_send![attrs,setObject:color(0.,0.,0.,0.85) forKey:NSStrokeColorAttributeName];
+    unsafe fn styled_attrs(font: id, halo: &Halo) -> id {
+        let (r, g, b, a) = halo.stroke;
+        let edge = color(r, g, b, a);
+        let attrs = text_attrs(font, edge);
+        let stroke: id = msg_send![class!(NSNumber), numberWithDouble: halo.stroke_width];
+        let _: () = msg_send![attrs, setObject: stroke forKey: NSStrokeWidthAttributeName];
+        let _: () = msg_send![attrs, setObject: edge forKey: NSStrokeColorAttributeName];
         attrs
     }
 
