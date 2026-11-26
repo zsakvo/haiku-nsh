@@ -43,6 +43,35 @@ export function ColorPairPresets(props: {
   );
 }
 
+/** Single-color presets as labeled dots; `system` renders as an empty ring. */
+export function ColorPresets(props: {
+  label: string;
+  presets: { name: string; color: string }[];
+  value: string;
+  onSelect: (color: string) => void;
+}) {
+  return (
+    <RadioGroup class="flex-row flex-wrap items-center gap-2">
+      {props.presets.map((p) => {
+        const checked = () => sameColor(props.value, p.color);
+        return (
+          <Radio
+            accessibilityLabel={`${props.label}：${p.name}`}
+            checked={checked()}
+            onChange={() => props.onSelect(p.color)}
+            class={`flex-row items-center gap-1.5 rounded-full border px-2 py-1 active:opacity-80 ${focus}`}
+            style={{ borderColor: checked() ? token("primary") : token("border") }}
+          >
+            <View class="size-4 rounded-full border border-border"
+              style={p.color.startsWith("#") ? { backgroundColor: p.color } : {}} />
+            <Text class="text-xs text-foreground">{p.name}</Text>
+          </Radio>
+        );
+      })}
+    </RadioGroup>
+  );
+}
+
 /** A swatch trigger that opens a saturation/hue picker, a hex field and the system eyedropper. */
 export function ColorPickerButton(props: {
   label: string;

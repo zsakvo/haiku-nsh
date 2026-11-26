@@ -1,6 +1,7 @@
-import { platform, signal, Text, View } from "nsh";
+import { platform, signal, Text, token, View } from "nsh";
 import { DesktopLyricsSettings } from "./DesktopLyricsSettings";
 import { Button } from "../ui/Button";
+import { ColorPickerButton, ColorPresets } from "../ui/ColorControls";
 import { Field } from "../ui/LibraryControls";
 import {
   SettingCardBlock,
@@ -12,14 +13,24 @@ import {
 } from "../ui/SettingsControls";
 import { lyricsProviders, type createSettings, type CustomLyricsProvider } from "../state/settings";
 
+/** Mid-lightness accents that read on both light and dark menu bars. */
+const menubarHighlights = [
+  { name: "跟随系统", color: "system" },
+  { name: "晴空", color: "#3D9BFF" },
+  { name: "薄荷", color: "#2FBF8A" },
+  { name: "落日", color: "#FF8A3D" },
+  { name: "珊瑚", color: "#FF6B5E" },
+  { name: "樱粉", color: "#FF6FA3" },
+  { name: "鎏金", color: "#E6B422" },
+  { name: "紫雾", color: "#9B7BFF" },
+];
+
 /** Settings are persisted by Rust; the editable custom-provider form is a local draft. */
 export function LyricsSettings(props: { settings: ReturnType<typeof createSettings> }) {
   const settings = () => props.settings.value()!;
   const providers = () => lyricsProviders(settings());
   const editing = signal(false), id = signal(""), name = signal(""), url = signal("");
   const response = signal("text"), path = signal(""), headers = signal("{}"), error = signal("");
-  const highlightDraft = signal("");
-  const highlightError = signal("");
   const custom = (key: string) => settings().lyricsCustomProviders.find(p => p.id === key);
   function edit(provider?: CustomLyricsProvider) {
     id.set(provider?.id ?? ""); name.set(provider?.name ?? "");
@@ -68,25 +79,16 @@ export function LyricsSettings(props: { settings: ReturnType<typeof createSettin
           onChange={notificationLyrics => void props.settings.update({ notificationLyrics })} />
         <SettingSwitchRow divider label="菜单栏歌词" checked={settings().menubarLyricsVisible}
           onChange={menubarLyricsVisible => void props.settings.update({ menubarLyricsVisible })} />
-        <SettingSelectRow divider label="菜单栏逐字高亮" value={settings().menubarLyricHighlight === "system" ? "system" : "custom"}
-          items={[{ value: "system", title: "跟随系统" }, { value: "custom", title: "自定义颜色" }]}
-          onChange={v => void props.settings.update({ menubarLyricHighlight: v === "system" ? "system" : "#007AFF" })} />
-        <If when={settings().menubarLyricHighlight !== "system"}>
-          <SettingCardBlock divider>
-            <View class="flex-row items-end gap-2">
-              <View class="min-w-0 flex-1">
-                <Field label="菜单栏高亮颜色" value={highlightDraft() || settings().menubarLyricHighlight}
-                  onChange={v => highlightDraft.set(v)} placeholder="#RRGGBB" />
-              </View>
-              <Button label="保存高亮颜色" onPress={() => {
-                const color = highlightDraft() || settings().menubarLyricHighlight;
-                if (!/^#[0-9a-f]{6}$/i.test(color)) { highlightError.set("请输入 #RRGGBB 格式的颜色"); return; }
-                highlightError.set(""); void props.settings.update({ menubarLyricHighlight: color });
-              }} />
-            </View>
-            <If when={!!highlightError()}><Text class="text-sm text-destructive">{highlightError()}</Text></If>
-          </SettingCardBlock>
-        </If>
+        <SettingCardBlock divider>
+          <Text class="text-foreground" style={{ fontSize: token("sidebar-text-size") }}>菜单栏逐字高亮</Text>
+          <ColorPresets label="菜单栏逐字高亮" presets={menubarHighlights} value={settings().menubarLyricHighlight}
+            onSelect={menubarLyricHighlight => void props.settings.update({ menubarLyricHighlight })} />
+        </SettingCardBlock>
+        <SettingRow divider title="菜单栏高亮颜色"
+          description={settings().menubarLyricHighlight === "system" ? "跟随系统强调色" : settings().menubarLyricHighlight.toUpperCase()}>
+          <ColorPickerButton label="菜单栏高亮颜色" value={settings().menubarLyricHighlight} fallback="#007AFF"
+            onChange={menubarLyricHighlight => void props.settings.update({ menubarLyricHighlight })} />
+        </SettingRow>
       </SettingSection>
     </If>
     <If when={platform.os === "macos"}><DesktopLyricsSettings settings={props.settings} /></If>
