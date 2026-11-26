@@ -14,3 +14,18 @@ export function searchableSources(snapshot: PluginSnapshot) {
     return pkg && kinds.length ? [{...s,title:s.displayName || pkg.name,kinds}] : [];
   });
 }
+/** Source highlight markup (`<em>…</em>`) split into plain and matched runs; other tags are dropped. */
+export function highlightRuns(text: string): { text: string; match: boolean }[] {
+  const runs: { text: string; match: boolean }[] = [];
+  const pattern = /<em>([\s\S]*?)<\/em>/gi;
+  let at = 0;
+  const plain = (s: string) => s.replace(/<\/?[a-z][^>]*>/gi, "");
+  for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
+    if (m.index > at) runs.push({ text: plain(text.slice(at, m.index)), match: false });
+    runs.push({ text: plain(m[1]), match: true });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) runs.push({ text: plain(text.slice(at)), match: false });
+  return runs.filter((r) => r.text);
+}
+export const stripHighlight = (text: string) => highlightRuns(text).map((r) => r.text).join("");

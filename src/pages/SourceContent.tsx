@@ -1,4 +1,5 @@
 import { cleanup, Image, List, resource, signal, Text, token, View, type JSX } from "nsh";
+import { playInserted } from "../state/playback";
 import { CollectionsService, PluginService, TrackList, type Core } from "haiku/native";
 import type { EntityRef, Route } from "../shell/navigation";
 import { Button } from "../ui/Button";
@@ -33,7 +34,7 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
 
 /** Remote rows share the existing native menus for likes and adding to user playlists. */
 export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean; fit?: boolean;
-  detail?: boolean; fixedHeading?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void;
+  detail?: boolean; fixedHeading?: boolean; insertOnPlay?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void;
   onLoadMore?: () => void }) {
   const selected = signal<string[]>([]);
   const error = signal(""), creating = signal<any[] | null>(null);
@@ -71,7 +72,12 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onSelectionChange={e => selected.set(e.ids)} onScrollChange={e => props.onScrolled?.(e.scrolled)}
         onLoadMore={() => props.onLoadMore?.()}
-        onPlay={(e) => void act(() => props.core.collections.playSource(e.source, e.id))}
+        onPlay={(e) => void act(async () => {
+          // Search results play into the current queue instead of replacing it.
+          if (!props.insertOnPlay) return props.core.collections.playSource(e.source, e.id);
+          const [track] = await CollectionsService.selectedTracks(e.source, [e.id]) as any[];
+          if (track) await playInserted(props.core, track);
+        })}
         onAction={(e) => void act(async () => {
           const tracks = await CollectionsService.selectedTracks(handle()!, e.ids) as any[];
           if (e.command === "download") await props.core.downloads.enqueue(tracks);

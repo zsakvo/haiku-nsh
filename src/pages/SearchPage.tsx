@@ -2,7 +2,7 @@ import { cleanup, effect, Image, List, resource, Scroll, signal, Text, token, un
 import { Button as BaseButton } from "nsh/base";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
-import { searchableSources, type SearchKind, type SearchPageResult, type SearchRequest } from "../state/search";
+import { highlightRuns, searchableSources, stripHighlight, type SearchKind, type SearchPageResult, type SearchRequest } from "../state/search";
 import type { Route } from "../shell/navigation";
 import { Button, focus } from "../ui/Button";
 import { Spinner } from "../ui/Discovery";
@@ -424,6 +424,7 @@ export function SearchPage(props: {
             active={props.active && !confirm()}
             detail
             fixedHeading
+            insertOnPlay
             footer={paginationFooter()}
             onLoadMore={() => wantMore.set(true)}
           />
@@ -465,7 +466,7 @@ export function SearchPage(props: {
               return (
                 <View class="pl-(--content-inset-left) pr-(--content-inset-right)">
                   <BaseButton
-                    accessibilityLabel={entity().title}
+                    accessibilityLabel={stripHighlight(entity().title)}
                     disabled={!entity().reference}
                     onPress={() => openEntity(entityRoute(entity()))}
                     class={`flex-row items-center gap-3 px-4 h-(--detail-row-height) rounded-(--radius) active:bg-muted disabled:opacity-40 ${focus}`}
@@ -497,14 +498,15 @@ export function SearchPage(props: {
                           class="text-xs font-medium text-foreground"
                           style={{ numberOfLines: 1, textOverflow: "ellipsis" }}
                         >
-                          {entity().title}
+                          {highlightRuns(entity().title).map((run) => run.match
+                            ? <Text class="text-primary-soft-foreground">{run.text}</Text> : run.text)}
                         </Text>
                         <If when={!!subtitle()}>
                           <Text
                             class="text-(--detail-artist-size) text-muted-foreground"
                             style={{ numberOfLines: 1, textOverflow: "ellipsis" }}
                           >
-                            {subtitle()}
+                            {stripHighlight(subtitle())}
                           </Text>
                         </If>
                       </View>

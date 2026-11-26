@@ -20,6 +20,6 @@ export function CommandTrigger(props: { shortcut: string; onPress: () => void; c
     class={`group relative h-(--navigation-control-height) min-w-(--command-entry-min-width) flex-row items-center gap-2 overflow-hidden rounded-(--radius) border border-source-chip-border px-3 ${focus} ${props.class ?? ""}`}>
     <NavigationControlBackdrop />
     <Icon name="search" small color="muted-foreground" />
-    <Text class="flex-1 text-sm text-muted-foreground" style={{ numberOfLines: 1 }}>搜索或命令…</Text><Kbd sidebar label={props.shortcut} />
+    <Text class="flex-1 text-(--control-text-sm-size) text-muted-foreground" style={{ numberOfLines: 1 }}>搜索或命令…</Text><Kbd sidebar label={props.shortcut} />
   </Button>;
 }

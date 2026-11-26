@@ -1,12 +1,14 @@
-import { cleanup, computed, effect, Image, signal, Text, View } from "nsh";
+import { cleanup, computed, createMotion, effect, Image, signal, Text, View } from "nsh";
 import { Button, Command, type CommandEntry, type CommandItem, type CommandRef } from "nsh/base";
 import { CommandKeyboard, type Core } from "haiku/native";
 import { Dialog } from "../ui/Surfaces";
+import { focus } from "../ui/Button";
 import { Kbd } from "../ui/Navigation";
 import { Icon, type IconName } from "../ui/Icon";
 import { entityRoute } from "../pages/SourceContent";
 import type { Route } from "./navigation";
-import type { SearchPreview, SearchRequest } from "../state/search";
+import { highlightRuns, stripHighlight, type SearchPreview, type SearchRequest } from "../state/search";
+import { playInserted } from "../state/playback";
 
 export interface PaletteCommand extends CommandItem {
   icon?: IconName;
@@ -100,7 +102,7 @@ export function CommandPalette(props: {
       query.set(props.initialQuery ?? "");
       highlighted.set(null);
       const searches = (props.core?.history.list() as { searches?: string[] } | undefined)?.searches ?? [];
-      recentSearches.set(searches.slice(0, 3));
+      recentSearches.set(searches.slice(0, 8));
     }
   });
 
@@ -157,17 +159,6 @@ export function CommandPalette(props: {
     }
 
     if (!raw) {
-      const recent = recentSearches();
-      for (const term of recent) {
-        const id = JSON.stringify(["history", term]);
-        list.push({ id, label: term, group: "最近搜索" });
-        meta.set(id, {
-          title: term,
-          icon: "clock",
-          badge: "搜索",
-          actionLabel: "填入搜索",
-        });
-      }
       return { items: list, meta };
     }
 
@@ -176,25 +167,13 @@ export function CommandPalette(props: {
     }
 
     for (const g of groups()) {
-      for (const p of g.playlists.slice(0, 3)) {
-        const id = JSON.stringify(["playlist", g.source, p.reference.id]);
-        list.push({ id, label: p.title, group: g.title });
-        meta.set(id, {
-          title: p.title,
-          icon: "playlist",
-          cover: typeof p.cover === "string" && p.cover ? p.cover : undefined,
-          mediaKind: "playlist",
-          badge: "歌单",
-          actionLabel: "查看歌单",
-        });
-      }
       for (const t of g.tracks.slice(0, 3)) {
         const id = JSON.stringify(["track", g.source, t.id]);
         const artists = (t.artists ?? [])
           .map((a: string | { name: string }) => (typeof a === "string" ? a : a.name))
           .filter(Boolean)
           .join("、");
-        const label = artists ? `${t.title} · ${artists}` : t.title;
+        const label = artists ? `${stripHighlight(t.title)} · ${stripHighlight(artists)}` : stripHighlight(t.title);
         list.push({ id, label, group: g.title });
         meta.set(id, {
           title: t.title,
@@ -204,6 +183,18 @@ export function CommandPalette(props: {
           mediaKind: "track",
           badge: formatDuration(t.duration) ?? "曲目",
           actionLabel: "播放",
+        });
+      }
+      for (const p of g.playlists.slice(0, 3)) {
+        const id = JSON.stringify(["playlist", g.source, p.reference.id]);
+        list.push({ id, label: stripHighlight(p.title), group: g.title });
+        meta.set(id, {
+          title: p.title,
+          icon: "playlist",
+          cover: typeof p.cover === "string" && p.cover ? p.cover : undefined,
+          mediaKind: "playlist",
+          badge: "歌单",
+          actionLabel: "查看歌单",
         });
       }
       for (let i = 0; i < g.errors.length; i++) {
@@ -227,6 +218,16 @@ export function CommandPalette(props: {
     });
 
     return { items: list, meta };
+  });
+
+  // New results take the highlight to the first result and scroll the list back to the top;
+  // otherwise it stays on "在搜索页查看全部", the only row shown while searching.
+  effect(() => {
+    if (!groups().length) return;
+    const first = resolved().items.find((item) => !item.disabled && item.id.startsWith("["));
+    if (!first) return;
+    const timer = setTimeout(() => commandRef?.highlight(first.id), 0);
+    return () => clearTimeout(timer);
   });
 
   const actionHint = () => {
@@ -256,11 +257,6 @@ export function CommandPalette(props: {
     }
     const parsed = JSON.parse(id) as string[];
     const [kind, sourceOrTerm, key] = parsed;
-    if (kind === "history") {
-      query.set(sourceOrTerm);
-      commandRef?.focus();
-      return;
-    }
     const group = groups().find((g) => g.source === sourceOrTerm);
     if (!group) return;
     if (kind === "playlist") {
@@ -274,7 +270,7 @@ export function CommandPalette(props: {
       if (index < 0) return;
       try {
         props.core.history.search(query().trim());
-        await props.core.player.play(group.tracks, index);
+        await playInserted(props.core, group.tracks[index]);
         props.onClose();
       } catch (e) {
         error.set(String(e));
@@ -303,11 +299,13 @@ export function CommandPalette(props: {
       </If>
       <View class="flex-1 min-w-0 flex-row items-center">
         <Text
-          class={`flex-1 min-w-0 text-sm ${info()?.error ? "text-destructive" : "text-popover-foreground group-focus:text-selection-foreground"}`}
+          class={`flex-1 min-w-0 text-xs ${info()?.error ? "text-destructive" : "text-popover-foreground group-focus:text-selection-foreground"}`}
           style={{ numberOfLines: 1, textOverflow: "ellipsis" }}
         >
-          {info()?.title ?? item.label}
-          {info()?.subtitle ? <Text class="text-muted-foreground">{` · ${info()!.subtitle}`}</Text> : null}
+          {highlightRuns(info()?.title ?? item.label).map((run) => run.match
+            ? <Text class="font-medium text-primary-soft-foreground">{run.text}</Text>
+            : run.text)}
+          {info()?.subtitle ? <Text class="text-(--sidebar-hint-size) text-muted-foreground/70">{`  ${stripHighlight(info()!.subtitle!)}`}</Text> : null}
         </Text>
       </View>
       <View class="shrink-0 flex-row items-center gap-2">
@@ -329,6 +327,30 @@ export function CommandPalette(props: {
     </View>;
   }
 
+  function forget(term: string) {
+    props.core?.history.remove("searches", term);
+    recentSearches.set(recentSearches().filter((t) => t !== term));
+    commandRef?.focus();
+  }
+  const showRecent = () => !query() && recentSearches().length > 0;
+  // Recent searches lead the palette: searching is its first job, commands come after.
+  const recentChips = () => <View testID="recent-searches" class="w-full flex-row flex-wrap items-center gap-1.5 pb-3">
+    {recentSearches().map((term) => <View class="flex-row items-center rounded-full bg-muted">
+      <Button accessibilityLabel={`搜索 ${term}`} onPress={() => { query.set(term); commandRef?.focus(); }}
+        class={`h-6 justify-center rounded-full pl-2.5 pr-1 active:opacity-70 ${focus}`}>
+        <Text class="text-xs text-foreground" style={{ numberOfLines: 1 }}>{term}</Text>
+      </Button>
+      <Button accessibilityLabel={`删除搜索记录 ${term}`} onPress={() => forget(term)}
+        class={`size-6 items-center justify-center rounded-full active:opacity-70 ${focus}`}>
+        <Icon name="close" class="size-2.5" color="muted-foreground" />
+      </Button>
+    </View>)}
+  </View>;
+  function SearchGlyph() {
+    const motion = createMotion({ enter: "spin" });
+    return <View style={motion.style}><Icon name="sync" small color="primary" /></View>;
+  }
+
   return <Dialog open={props.open} placement="top" class="w-144 overflow-hidden"
     onCancel={props.onClose}
     onOpenChange={(event) => { if (!event.open) props.onClose(); }}>
@@ -347,13 +369,12 @@ export function CommandPalette(props: {
         placeholder="搜索歌曲、歌单或命令…"
         onCancel={props.onClose}
         onSelect={(event) => void choose(event.id)}
-        searchPrefix={<View class="size-6 shrink-0 items-center justify-center"><Icon name="search" small color="muted-foreground" /></View>}
-        searchSuffix={<View class="shrink-0 flex-row items-center gap-2">
+        searchPrefix={<View accessibilityLabel={loading() ? "搜索中" : undefined} class="size-6 shrink-0 items-center justify-center">
+          <If when={loading()} else={<Icon name="search" small color="muted-foreground" />}><SearchGlyph /></If>
+        </View>}
+        searchSuffix={showRecent() ? recentChips() : <View class="shrink-0 flex-row items-center gap-2">
           <If when={!!error()}>
             <Text class="max-w-44 text-xs text-destructive" style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{error()}</Text>
-          </If>
-          <If when={!error() && loading()}>
-            <Text class="text-xs text-muted-foreground">搜索中…</Text>
           </If>
           <If when={query().length > 0}>
             <Button accessibilityLabel="清空搜索" onPress={clearQuery}
@@ -362,7 +383,7 @@ export function CommandPalette(props: {
             </Button>
           </If>
         </View>}
-        searchBarClass="min-h-12 flex-row items-center gap-2.5 px-4 border-b border-border"
+        searchBarClass="min-h-12 flex-row flex-wrap items-center gap-x-2.5 px-4 border-b border-border"
         searchClass="flex-1 min-w-0 py-3 text-base text-foreground placeholder:text-muted-foreground"
         listClass="max-h-96 p-1.5"
         itemClass="group min-h-9 rounded-(--radius) px-2.5 py-1.5 focus:bg-selection active:bg-muted disabled:opacity-40 text-sm text-popover-foreground"
