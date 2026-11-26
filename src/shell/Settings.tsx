@@ -52,7 +52,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
       <Scroll class="flex-1" contentClass="flex-col gap-(--navigation-row-gap) px-2.5 pb-3">
         {categories.map((category) => <View class="flex-col"
           style={{ display: category.label.includes(query()) ? "flex" : "none" }}>
-          <SidebarItem icon={category.icon} label={category.label} neutral
+          <SidebarItem icon={category.icon} label={category.label}
             selected={selected() === category.label} onPress={() => selected.set(category.label)} />
         </View>)}
       </Scroll>

@@ -49,7 +49,7 @@
 - 标准角色覆盖背景、前景、卡片、popover、sidebar、muted、primary、secondary、accent、destructive、border、input、ring。
 - 应用角色覆盖 success、warning、进度、底栏、歌词和 now-playing；封面数据颜色日后经 token 覆盖进入。
 - 品牌色是唯一颜色种子：palette.ts 在 OKLCH 中取其色相，生成整套中性色（背景、侧栏、卡片、muted、边框、输入、文字）——低彩度（浅色 C≈0.01、深色 C≈0.014）带品牌色相的灰，参考 Linear 的 base/accent/contrast 模型与 Radix 的染色灰阶；选中态（selection、sidebar-accent）为品牌色浅染，正在播放/封面等沉浸表面同色相深色。各品牌共用同一亮度结构，对比度一致。不以深浅色专用 class 代替 token。
-- 17 种品牌色为等亮度 OKLCH 色票，默认 orange；另有「素」（neutral）：无彩色种子生成纯灰阶，浅色背景为纯白、primary 为墨黑，深色为中性黑，沉浸表面同样去色；primary 浅色取 L 0.58、深色取 L 0.76 并降低彩度。haiku.json 中的浅/深 token 为默认品牌的生成结果，调整 palette.ts 后需重新生成。
+- 17 种品牌色为等亮度 OKLCH 色票，默认 orange；另有「素」（neutral）：无彩色种子生成纯灰阶，浅色背景为纯白，深色为中性黑，沉浸表面同样去色；primary、tonal、选中态等点缀色固定使用 macOS 系统蓝（浅 #007AFF / 深 #0A84FF），不走种子逻辑；primary 浅色取 L 0.58、深色取 L 0.76 并降低彩度。haiku.json 中的浅/深 token 为默认品牌的生成结果，调整 palette.ts 后需重新生成。
 - primary-foreground 在饱和中间色上取白、仅浅色填充取黑；主色仅用于默认提交与持久选择。
 - 页面内的主要动作（如详情页「播放全部」）用色调按钮：primary-soft 浅品牌色底 + primary-soft-foreground 品牌色文字与图标，不用实心 primary。
 - 外观模式与品牌色由 Rust 设置服务原子持久化，TSX 订阅已提交镜像；Rust set_tokens 与 NSH setColorScheme 同步所有消费者。
