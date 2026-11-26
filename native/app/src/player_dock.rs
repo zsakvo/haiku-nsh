@@ -47,6 +47,7 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
     let c = p.bridge.controller.clone();
     let empty = move || state.with(|s| s.tracks.is_empty());
     let (volume, queue) = crate::player_popovers::controls();
+    let mode = computed(move || state.with(|s| s.mode));
     let mode_c = c.clone();
     let previous_c = c.clone();
     let next_c = c.clone();
@@ -118,9 +119,24 @@ pub fn PlayerDock(cx: Scope<PlayerDockEvent>) -> impl IntoElement {
             .on_seek(move |seconds: &f64| send(&seek_c,Command::Seek(*seconds)))
             .w_full().min_w_0()))
         .child(view().flex_1().min_w_0().flex_row().items_center().justify_end().gap(px(10.))
-            .child(compact_surface_control(move || -> SharedString {format!("切换播放模式：{}",match state.with(|s|s.mode) {
-                    Mode::Sequential=>"顺序播放",Mode::RepeatAll=>"列表循环",Mode::RepeatOne=>"单曲循环",Mode::Shuffle=>"随机播放",
-                }).into()},"repeat",false.into()).disabled(empty)
+            .child(compact_surface_control(
+                move || -> SharedString {
+                    let label = match mode.get() {
+                        Mode::Sequential => "顺序播放",
+                        Mode::RepeatAll => "列表循环",
+                        Mode::RepeatOne => "单曲循环",
+                        Mode::Shuffle => "随机播放",
+                    };
+                    format!("切换播放模式，当前为{label}").into()
+                },
+                move || match mode.get() {
+                    Mode::Sequential => "order-play",
+                    Mode::RepeatAll => "repeat",
+                    Mode::RepeatOne => "repeat-one",
+                    Mode::Shuffle => "shuffle",
+                },
+                false.into(),
+            ).disabled(empty)
                 .on_press(move ||send(&mode_c,Command::SetMode(match state.with_untracked(|s|s.mode) {
                     Mode::Sequential=>Mode::RepeatAll,Mode::RepeatAll=>Mode::RepeatOne,Mode::RepeatOne=>Mode::Shuffle,Mode::Shuffle=>Mode::Sequential,
                 }))))

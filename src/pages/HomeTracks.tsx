@@ -24,11 +24,14 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
   const error = signal(""), pending = signal(""), creating = signal<HomeTrack[] | null>(null);
   const liked = signal(new Set(props.core.collections.likedKeys() as string[]));
   const playlists = signal(props.core.collections.list() as Collection[]);
+  const playingKey = (snapshot: any) => snapshot?.current ? trackKey(snapshot.current as HomeTrack) : "";
+  const playing = signal(playingKey(props.core.player.snapshot()));
   let scroll: ListRef | undefined;
   // The page an arrow press is animating to, so repeated presses advance from it rather than
   // from the page the animation has not reached yet. Any touch on the shelf drops it.
   let goal: number | null = null;
   cleanup(props.core.collections.onLiked(keys => liked.set(new Set(keys as string[]))));
+  cleanup(props.core.player.onState(snapshot => playing.set(playingKey(snapshot))));
   cleanup(props.core.collections.onChange(() => playlists.set(props.core.collections.list() as Collection[])));
   const pages = () => Array.from({ length: Math.ceil(props.tracks.length / pageSize) },
     (_, index) => props.tracks.slice(index * pageSize, (index + 1) * pageSize));
@@ -146,7 +149,7 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
           <Each of={[0, 1]}>{column => <View class="flex-1 min-w-0">
             <Each of={items().slice(column() * rowsPerColumn, (column() + 1) * rowsPerColumn)} key={trackKey}>
               {track => <HomeTrackCard track={track()} liked={liked().has(trackKey(track()))}
-                busy={pending() === trackKey(track())} disabled={!props.active || !!pending()}
+                busy={pending() === trackKey(track())} playing={playing() === trackKey(track())} disabled={!props.active || !!pending()}
                 play={() => void play(track())}
                 like={() => void run(() => props.core.collections.setLiked(track()))}
                 download={() => void run(() => props.core.downloads.enqueue([track()]))}
@@ -179,7 +182,7 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
 }
 
 function HomeTrackCard(props: {
-  track: HomeTrack; liked: boolean; busy: boolean; disabled: boolean;
+  track: HomeTrack; liked: boolean; busy: boolean; playing: boolean; disabled: boolean;
   play: () => void; like: () => void; download: () => void;
   commands: () => JSX.Element;
   nativeMenuItems: () => DesktopMenuItem[];
@@ -210,7 +213,7 @@ function HomeTrackCard(props: {
   const card = <View class="group flex-row items-center gap-1 rounded-(--radius-panel) focus-within:bg-card"
     style={{ height: token("home-track-row-height") }}
     onContextMenu={nativeMenu ? event => void openNativeMenu(event.pagePosition) : undefined}>
-    <BaseButton accessibilityLabel={props.track.title} disabled={props.disabled} onPress={props.play}
+    <BaseButton accessibilityLabel={props.track.title} selected={props.playing} disabled={props.disabled} onPress={props.play}
       class={`flex-1 min-w-0 flex-row items-center gap-3 h-full rounded-(--radius) ${focus}`}>
       <View class="relative size-(--home-track-cover-size) shrink-0 rounded-(--radius-inset) bg-muted overflow-hidden items-center justify-center">
         <If when={!!props.track.cover}><Image src={props.track.cover!}
@@ -221,14 +224,14 @@ function HomeTrackCard(props: {
         </View>
       </View>
       <View class="flex-1 min-w-0 gap-1 items-start">
-        <Text class="w-full text-sm font-semibold text-foreground"
+        <Text class={`w-full text-sm font-semibold ${props.playing ? "text-primary" : "text-foreground"}`}
           style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{props.track.title}</Text>
         <View class="w-full flex-row items-center gap-1">
           <If when={props.liked}><Text accessibilityLabel="已喜欢" class="shrink-0 text-sm text-primary">♥</Text></If>
           <If when={!!quality()}><View class="shrink-0 rounded-sm border border-warning px-1">
             <Text class="text-xs text-warning">{quality()}</Text>
           </View></If>
-          <Text class="flex-1 min-w-0 text-xs text-muted-foreground"
+          <Text class={`flex-1 min-w-0 text-xs ${props.playing ? "text-primary" : "text-muted-foreground"}`}
             style={{ numberOfLines: 1, textOverflow: "ellipsis" }}>{artists()}</Text>
         </View>
       </View>

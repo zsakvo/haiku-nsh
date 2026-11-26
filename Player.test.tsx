@@ -38,10 +38,11 @@ test("persistent dock, commands through Core, retained navigation and local lyri
     await app.waitFor("text:player:paused;track:Song Alpha");
     expect(app.count("label:显示歌词")).toBe(0);
     for (const mode of ["顺序播放", "列表循环", "单曲循环", "随机播放"]) {
-      await app.waitFor(`label:切换播放模式：${mode}`);
-      await app.press(`label:切换播放模式：${mode}`);
+      const label = `切换播放模式，当前为${mode}`;
+      await app.waitFor(`label:${label}`);
+      await app.press(`label:${label}`);
     }
-    await app.waitFor("label:切换播放模式：顺序播放");
+    await app.waitFor("label:切换播放模式，当前为顺序播放");
     expect(app.spanStyle("id:dock-title >> text:/^.+$/").color).toBe("#272522ff");
     expect(app.spanStyle("id:seek-time >> text:/^.+$/").color).toBe("#716b64ff");
     expect(app.spanStyle("id:seek-duration >> text:/^.+$/").color).toBe("#716b64ff");

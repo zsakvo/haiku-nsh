@@ -2,15 +2,11 @@
 use nsh_base::{ButtonElement, button, theme};
 use nsh_core::{element::ImageSrc, prelude::*};
 
-pub(crate) fn icon(name: &str, primary: bool) -> impl IntoElement {
+pub(crate) fn icon(name: &'static str, primary: bool) -> impl IntoElement {
     surface_icon(name, primary, false.into())
 }
-pub(crate) fn surface_icon(
-    name: &str,
-    primary: bool,
-    dark: Prop<bool>,
-) -> nsh_core::element::Image {
-    let markup = match name {
+fn icon_markup(name: &str) -> &'static str {
+    match name {
         "pause" => include_str!("../../../assets/icons/pause.svg"),
         "previous" => include_str!("../../../assets/icons/skip-prev.svg"),
         "next" => include_str!("../../../assets/icons/skip-next.svg"),
@@ -20,8 +16,10 @@ pub(crate) fn surface_icon(
         "next-solid" => include_str!("../../../assets/icons/skip-next-solid.svg"),
         "volume" => include_str!("../../../assets/icons/sound-high.svg"),
         "queue" => include_str!("../../../assets/icons/playlist.svg"),
-        "shuffle" => include_str!("../../../assets/icons/shuffle.svg"),
-        "repeat" => include_str!("../../../assets/icons/repeat.svg"),
+        "order-play" => include_str!("../../../assets/icons/harmonyos-order-play.svg"),
+        "repeat" => include_str!("../../../assets/icons/harmonyos-repeat.svg"),
+        "repeat-one" => include_str!("../../../assets/icons/harmonyos-repeat-1.svg"),
+        "shuffle" => include_str!("../../../assets/icons/harmonyos-shuffle.svg"),
         "lyrics" => include_str!("../../../assets/icons/closed-captions-tag.svg"),
         "edit" => include_str!("../../../assets/icons/edit-pencil.svg"),
         "down" => include_str!("../../../assets/icons/nav-arrow-down.svg"),
@@ -32,8 +30,17 @@ pub(crate) fn surface_icon(
         "trash" => include_str!("../../../assets/icons/trash.svg"),
         "music" => include_str!("../../../assets/icons/music-double-note.svg"),
         _ => include_str!("../../../assets/icons/play.svg"),
-    };
-    image(ImageSrc::svg_markup(markup))
+    }
+}
+pub(crate) fn surface_icon(
+    name: impl IntoReactive<SharedString>,
+    primary: bool,
+    dark: Prop<bool>,
+) -> nsh_core::element::Image {
+    let source = name
+        .into_reactive()
+        .map(|name| ImageSrc::svg_markup(icon_markup(name.as_ref())));
+    image(source)
         .size_5()
         .tint_color(move || {
             if primary {
@@ -54,7 +61,7 @@ pub(crate) fn control(
 }
 pub(crate) fn compact_surface_control(
     label: impl IntoReactive<SharedString>,
-    icon_name: &'static str,
+    icon_name: impl IntoReactive<SharedString>,
     dark: Prop<bool>,
 ) -> ButtonElement {
     sized_surface_control(label, icon_name, false, dark, 32., 16.)
@@ -79,7 +86,7 @@ pub(crate) fn surface_control(
 }
 fn sized_surface_control(
     label: impl IntoReactive<SharedString>,
-    icon_name: &'static str,
+    icon_name: impl IntoReactive<SharedString>,
     primary: bool,
     dark: Prop<bool>,
     size: f32,
@@ -104,11 +111,16 @@ fn sized_surface_control(
         .app_class("focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40")
         .child(
             view()
+                .size_full()
+                .items_center()
+                .justify_center()
                 .tooltip(hint(move || label.get()))
                 .child(surface_icon(icon_name, primary, dark).size(px(icon_size))),
         )
 }
-pub(crate) fn hint(label: impl IntoReactive<SharedString>) -> AnyElement {
+/// The app's tooltip. Kept as nsh-base's own element: erased to `AnyElement`, `.tooltip(..)`
+/// wraps it in a second hint overlay of the core's, and the inner one never hears the pointer.
+pub(crate) fn hint(label: impl IntoReactive<SharedString>) -> nsh_base::TooltipElement {
     nsh_base::tooltip()
         .app_class("rounded-(--radius-surface) border border-border bg-popover shadow-lg px-2 py-1")
         .child(
@@ -116,7 +128,6 @@ pub(crate) fn hint(label: impl IntoReactive<SharedString>) -> AnyElement {
                 .text_xs()
                 .text_color(move || theme().popover_foreground),
         )
-        .into_element()
 }
 pub(crate) fn close_on_dark(on_press: impl Fn() + 'static) -> ButtonElement {
     now_playing_control("收起正在播放 · Esc", "down", 36., 20., false)
