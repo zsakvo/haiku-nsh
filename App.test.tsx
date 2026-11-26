@@ -18,8 +18,8 @@ test("sidebar reaches every destination", async () => {
   await app.waitFor("id:nav-home");
   for (const page of destinations.filter((entry) => entry.id !== "downloads")) {
     await app.press(`id:nav-${page.id}`);
-    await app.waitFor(["home", "categories", "radio", "search", "history", "statistics", "downloads"].includes(page.id) ? `id:page-${page.id}` : `text:${page.title}`);
-    if (!["home", "categories", "radio", "search", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)) expect(app.texts()).toContain(page.description);
+    await app.waitFor(["home", "categories", "search", "downloads"].includes(page.id) ? `id:page-${page.id}` : `text:${page.title}`);
+    if (!["home", "categories", "search", "favorites", "playlists", "downloads"].includes(page.id)) expect(app.texts()).toContain(page.description);
   }
 });
 test("back and forward retain page input; new navigation truncates forward history", async () => {
@@ -27,12 +27,12 @@ test("back and forward retain page input; new navigation truncates forward histo
   await app.waitFor("id:nav-home");
   await app.press("id:nav-search");
   await app.type("label:搜索词", "坂本龙一");
-  await app.press("id:nav-library");
+  await app.press("id:nav-categories");
   await app.press("id:nav-back");
   expect(app.value("label:搜索词")).toBe("坂本龙一");
   expect(app.enabled("id:nav-refresh")).toBe(false);
   await app.keyboard.press("mod+]");
-  expect(app.texts()).toContain("你的音乐，放在这里");
+  await app.waitFor("id:page-categories");
   await app.keyboard.press("mod+[");
   await app.press("id:nav-favorites");
   await app.keyboard.press("mod+]");
@@ -42,16 +42,16 @@ test("Cmd+K opens the real Command and navigates", async () => {
   const app = await open("./AppFixture.tsx", options);
   await app.waitFor("id:nav-home");
   await app.keyboard.press("mod+k");
-  await app.type("label:查找命令", "下载");
+  await app.type("label:查找命令", "分类");
   await app.keyboard.press("enter");
-  await app.waitFor("id:page-downloads");
+  await app.waitFor("id:page-categories");
 });
 test("settings theme changes live; Escape preserves original page and history", async () => {
   const app = await open("./AppFixture.tsx", options);
   await app.waitFor("id:nav-home");
   await app.press("id:nav-search");
   await app.type("label:搜索词", "保留的搜索词");
-  await app.press("id:nav-library");
+  await app.press("id:nav-categories");
   await app.keyboard.press("mod+,");
   await app.waitFor("id:settings-heading");
   await app.press("role:radio[浅色]");
@@ -61,9 +61,9 @@ test("settings theme changes live; Escape preserves original page and history", 
   await app.press("label:品牌色：蓝");
   await app.keyboard.press("escape");
   await app.waitUntil(() => !app.shows("id:settings-heading"));
-  expect(app.texts()).toContain("你的音乐，放在这里");
+  await app.waitFor("id:page-categories");
   await app.keyboard.press("mod+[");
   expect(app.value("label:搜索词")).toBe("保留的搜索词");
   await app.keyboard.press("mod+]");
-  expect(app.texts()).toContain("你的音乐，放在这里");
+  await app.waitFor("id:page-categories");
 });

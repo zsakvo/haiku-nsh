@@ -5,7 +5,7 @@ import type { EntityRef, Route } from "../../shell/navigation";
 import { Button } from "../../ui/Button";
 
 /** Explicit, isolated loopback source for Headless and read-only native screenshots. */
-export function NetworkFixture(props: { page?: "library" | "album" | "artist" | "dock" | "statistics"; controls?: boolean }) {
+export function NetworkFixture(props: { page?: "library" | "album" | "artist" | "dock"; controls?: boolean }) {
   const status = signal("");
   const ready = resource(async () => {
     const core = await Core.openIsolated();
@@ -18,11 +18,10 @@ export function NetworkFixture(props: { page?: "library" | "album" | "artist" | 
       await core.player.play(detail.tracks.items,0);
       core.collections.setLiked(detail.tracks.items[0],true);
     }
-    if (props.page === "statistics") await core.history.seedFixture(detail.tracks.items);
     console.log(`M4-01 isolated loopback fixture ready: ${props.page ?? "library"} source=${fixture.sourceId}; quality=high`);
     const route: Route = props.page === "album" || props.page === "dock" ? {kind:"album",ref:album}
       : props.page === "artist" ? {kind:"artist",ref:artist}
-      : props.page === "statistics" ? {kind:"statistics"} : {kind:"source",source:fixture.sourceId};
+      : {kind:"source",source:fixture.sourceId};
     return {core,fixture,route};
   });
   return <View class="flex-1">

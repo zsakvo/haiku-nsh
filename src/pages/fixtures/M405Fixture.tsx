@@ -21,7 +21,7 @@ export function M405Fixture(props: {
         .map((s: any) => s.sourceId),
       scraperOrder: [fixture.sourceId], scrapeMode: "replace",
     });
-    let route: Route = { kind: "library" };
+    let route: Route = { kind: "home" };
     if (props.page === "favorite" || props.page === "offline") {
       const id = core.collections.favorite({
         sourceId: fixture.sourceId, remoteId: "playlist/夜", sourceLabel: "回声音乐库",

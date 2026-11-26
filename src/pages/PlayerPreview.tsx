@@ -23,7 +23,7 @@ export function PlayerPreview(props: { mode: AppearanceMode; artifacts: string; 
   return <View class="flex-1">
     <If when={!!ready()}>
       <PlaybackLog core={ready()!} />
-      <AppShell initialMode={props.mode} initialRoute={{ kind: "library" }} initialNowPlaying={props.expanded}
+      <AppShell initialMode={props.mode} initialRoute={{ kind: "home" }} initialNowPlaying={props.expanded}
         initialOverlay={props.settings ? "settings" : undefined}
         onLyricChange={(index) => console.log("M1-04 real lyric cursor", index)} />
     </If>

@@ -41,7 +41,7 @@ export function DownloadsFixture(props: { page?: "library" | "downloads" | "sett
         </View>
       </If>
       <AppShell initialMode="light"
-        initialRoute={{ kind: props.page === "library" ? "library" : "downloads" }}
+        initialRoute={{ kind: "downloads" }}
         initialOverlay={props.page === "settings" ? "settings" : undefined}
         initialSettingsCategory="下载" />
     </If>

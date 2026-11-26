@@ -473,7 +473,7 @@ pub fn TrackList(props: TrackListProps, cx: Scope<TrackListEvent>) -> impl IntoE
     });
     let initial = source(props).map(|s| s.scroll.get_untracked()).unwrap_or(0);
     if props.detail.get_untracked() {
-        return detail_list(props, cx, list, initial).into_element();
+        return detail_list(props, cx, list).into_element();
     }
     view()
         .flex_1()
@@ -748,7 +748,6 @@ fn detail_list(
     props: TrackListProps,
     cx: Scope<TrackListEvent>,
     list: ElementRef,
-    initial: usize,
 ) -> impl IntoElement {
     let bridge = crate::presentation::get().map(|p| p.bridge.clone());
     let scrolled = std::rc::Rc::new(std::cell::Cell::new(false));
@@ -854,7 +853,6 @@ fn detail_list(
     .on_load_more(move || cx.emit(TrackListEvent::LoadMore))
     .footer(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.footer.place(|s| s)))
     .keys(move || source(props).map(|s| s.ids.get()).unwrap_or_default())
-    .initial_scroll_index(initial)
     .content_padding_bottom(move || px(props.bottom_inset.get()))
     .estimated_item_size(move || px(theme().tokens().number("detail-row-height").unwrap_or(58.)))
     .empty(text("没有符合条件的歌曲").app_class("p-4 text-sm text-muted-foreground"));

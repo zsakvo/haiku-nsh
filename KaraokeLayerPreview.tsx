@@ -33,7 +33,7 @@ function Preview() {
   });
   return <View class="flex-1">
     <If when={!!ready()}>
-      <AppShell initialMode="dark" initialRoute={{ kind: "library" }} initialNowPlaying />
+      <AppShell initialMode="dark" initialRoute={{ kind: "home" }} initialNowPlaying />
     </If>
     <If when={!!ready.error()}><Text>{String(ready.error())}</Text></If>
   </View>;

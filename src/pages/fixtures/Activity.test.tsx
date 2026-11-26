@@ -1,30 +1,7 @@
 import { expect, open, test } from "nsh/test";
 
-test("real playback history, clear confirmation, stats ranges, diagnostic filtering and notices", async () => {
+test("diagnostic filtering and notices", async () => {
   const app = await open("../../../ActivityFixture.tsx", { platform: "macos", width: 1200, height: 800 });
-  await app.waitFor("id:page-history");
-  await app.waitFor("text:留下听过的旋律");
-  await app.press("播放历史夹具");
-  await app.waitFor("label:Song Alpha");
-  await app.waitFor("text:今天");
-  await app.press("暂停历史夹具");
-  await app.press("清空历史…");
-  await app.waitFor("text:清空历史？");
-  await app.press("取消");
-  expect(app.shows("label:Song Alpha")).toBe(true);
-  await app.press("清空历史…");
-  await app.press("确认清空历史");
-  await app.waitFor("text:留下听过的旋律");
-  await app.press("填充统计夹具");
-  await app.waitFor("text:activity-seeded");
-  await app.press("id:nav-statistics");
-  await app.waitFor("text:56 次");
-  await app.press("今日");
-  await app.waitUntil(() => !app.shows("text:56 次"));
-  await app.press("全部");
-  await app.waitFor("text:56 次");
-  expect(app.shows("id:stats-calendar")).toBe(true);
-  expect(app.shows("id:stats-hours")).toBe(true);
   await app.keyboard.press("ctrl+alt+shift+m");
   await app.chooseMenuItem("视图 > 通知中心…");
   await app.waitFor("text:通知中心");

@@ -85,7 +85,7 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     : { destructive: oklch(0.55, 0.19, 25), success: oklch(0.54, 0.13, 152), warning: oklch(0.56, 0.12, 62) };
 
   const s = dark ? {
-    background: g(0.2), foreground: g(0.96, 0.5), card: g(0.23), popover: g(0.25), sidebar: g(0.215),
+    background: g(0.2), foreground: g(0.96, 0.5), card: g(0.23), popover: plain ? g(0.25) : tint(0.25, 0.1), sidebar: g(0.215),
     sidebarForeground: g(0.87, 0.7), muted: g(0.25), mutedForeground: g(0.72, 1.2),
     secondary: g(0.28), secondaryForeground: g(0.91, 0.6), accent: g(0.3, 1.2),
     chip: g(0.235), chipActive: g(0.29, 1.3), chipForeground: g(0.77, 1),
@@ -94,7 +94,7 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     selection: plain ? g(0.32) : tint(0.33, 0.32), selectionForeground: plain ? g(0.96) : tint(0.9, 0.4),
     overlay: oklch(0.1, 0.01 * k, h, 0.55), navAlpha: 0.66, chipAlpha: 0.65,
   } : {
-    background: plain ? "#ffffff" : g(0.988, 0.4), foreground: g(0.22, 1.6), card: oklch(1, 0, h), popover: oklch(1, 0, h),
+    background: plain ? "#ffffff" : g(0.988, 0.4), foreground: g(0.22, 1.6), card: oklch(1, 0, h), popover: plain ? "#ffffff" : tint(0.982, 0.06),
     sidebar: g(plain ? 0.97 : 0.963), sidebarForeground: g(0.38, 1.6), muted: g(0.957), mutedForeground: g(0.53, 2),
     secondary: g(0.948), secondaryForeground: g(0.3, 1.6), accent: g(0.935, 1.4),
     chip: g(0.96), chipActive: g(0.925, 1.6), chipForeground: g(0.47, 1.8),
@@ -119,8 +119,11 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     "progress-buffered": s.buffered, "progress-played": s.foreground,
     "navigation-backdrop-tint": s.background + Math.round(s.navAlpha * 255).toString(16),
     "dock-surface": s.background + Math.round(s.navAlpha * 255).toString(16),
-    "source-chip-tint": (dark ? s.muted : s.card) + Math.round(s.chipAlpha * 255).toString(16),
-    "source-chip-border": oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09),
+    // Toolbar glass (back, refresh, search): a faint brand-tinted wash and hairline, quieter than the source chip.
+    "source-chip-tint": (plain ? (dark ? s.muted : s.card) : dark ? tint(0.27, 0.13) : tint(0.955, 0.11))
+      + Math.round(s.chipAlpha * 255).toString(16),
+    "source-chip-border": plain ? oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09)
+      : oklch(dark ? 0.62 : 0.55, vivid * 0.5, h, dark ? 0.26 : 0.18),
     // Source chip: the tonal wash, translucent over the live blur, with a brand-tinted hairline.
     "source-chip-accent-tint": soft + Math.round(s.chipAlpha * 255).toString(16),
     "source-chip-accent-border": plain ? oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09) : oklch(dark ? 0.6 : 0.55, vivid * 0.6, h, dark ? 0.3 : 0.18),

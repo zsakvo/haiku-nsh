@@ -10,12 +10,9 @@ import { SidebarChrome, ShellFrame, ShellSidebar, NavigationBar, NavigationLayou
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { CollectionPage } from "../pages/CollectionPage";
 import { CollectionsBrowser, PlaylistSidebar } from "../pages/CollectionsBrowser";
-import { LibraryPage } from "../pages/LibraryPage";
 import { DownloadsPage } from "../pages/DownloadsPage";
-import { HistoryPage } from "../pages/HistoryPage";
-import { StatsPage } from "../pages/StatsPage";
 import { SourceLibraryPage } from "../pages/SourceLibraryPage";
-import { HomePage, CategoriesPage, RadioPage } from "../pages/DiscoveryPages";
+import { HomePage, CategoriesPage } from "../pages/DiscoveryPages";
 import { SearchPage } from "../pages/SearchPage";
 import type { SearchRequest } from "../state/search";
 import { SourceDetailPage } from "../pages/SourceDetailPage";
@@ -38,7 +35,7 @@ import { SourceChip } from "../ui/SourceChip";
 export function AppShell(props: {
   initialMode?: AppearanceMode; initialOverlay?: "settings" | "command";
   initialDownloadDirectory?: string;
-  initialSettingsCategory?: string; initialShortcutConflict?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; injectedLibraryFolders?: string[]; initialNowPlaying?: boolean;
+  initialSettingsCategory?: string; initialShortcutConflict?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialRoute?: Route; initialNowPlaying?: boolean;
   onLyricChange?: (index: number | null) => void;
   initialNotifications?: boolean; initialLogs?: boolean; initialSearch?: SearchRequest; initialCommandQuery?: string;
   backupPath?: string; initialBackupDialog?: "export" | "import";
@@ -162,14 +159,7 @@ export function AppShell(props: {
   const destinationKeywords: Record<string, string[]> = {
     home: ["首页", "发现", "home", "discover"],
     categories: ["流派", "歌单分类", "categories", "genres"],
-    radio: ["FM", "私人电台", "radio"],
-    search: ["查找", "search"],
-    library: ["曲库", "本地", "音乐", "library", "local"],
     favorites: ["收藏", "红心", "favorites", "liked"],
-    playlists: ["播放列表", "playlists"],
-    history: ["播放历史", "最近", "history"],
-    statistics: ["聆听统计", "数据", "stats", "statistics"],
-    downloads: ["离线", "下载管理", "downloads"],
   };
   const modeKeywords: Record<AppearanceMode, string[]> = {
     system: ["外观", "主题", "自动", "system", "auto", "theme"],
@@ -181,7 +171,8 @@ export function AppShell(props: {
     const playback = player();
     const playing = playback?.status === "playing" || playback?.status === "loading";
     const list: PaletteCommand[] = [
-      ...destinations.map((page): PaletteCommand => ({
+      // 歌单、下载、搜索不作为命令面板入口（搜索由面板本身承担）。
+      ...destinations.filter((page) => !["playlists", "downloads", "search"].includes(page.id)).map((page): PaletteCommand => ({
         id: page.id,
         label: page.label,
         group: "页面",
@@ -301,7 +292,7 @@ export function AppShell(props: {
       <View class="flex-1 min-h-0 gap-(--navigation-group-gap) px-2 pb-4">
         <View class="gap-(--navigation-row-gap)">
           <SectionLabel label="发现" />
-          {destinations.filter((page) => page.group === "发现" && page.id !== "radio" && page.id !== "search").map((page) =>
+          {destinations.filter((page) => page.group === "发现" && page.id !== "search").map((page) =>
             <SidebarItem testID={`nav-${page.id}`} icon={page.icon} label={page.label}
               selected={nav.current().kind === page.id}
               onPress={() => nav.navigate({ kind: page.id })} />)}
@@ -316,15 +307,12 @@ export function AppShell(props: {
     <WindowPanel>
       <If when={!floatingNavigation}>{navigationBar()}</If>
       <View class="flex-1 min-h-0" style={{ paddingTop: navigationLayout.inset() }}>
-        {destinations.filter((page) => !["home", "categories", "radio", "search", "library", "favorites", "playlists", "history", "statistics", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
+        {destinations.filter((page) => !["home", "categories", "search", "favorites", "playlists", "downloads"].includes(page.id)).map((page) => <PlaceholderPage page={page} active={nav.current().kind === page.id} />)}
         <If when={!!core()}>
           <HomePage core={core()!} active={nav.current().kind==="home"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <CategoriesPage core={core()!} active={nav.current().kind==="categories"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
-          <RadioPage core={core()!} active={nav.current().kind==="radio"} snapshot={plugins.value()} route={nav.current()} navigate={nav.navigate} settings={showSettings} />
           <SearchPage core={core()!} active={nav.current().kind==="search"} snapshot={plugins.value()} request={searchRequest()} navigate={nav.navigate} settings={showSettings} />
           <DownloadsPage core={core()!} active={nav.current().kind === "downloads"} />
-          <HistoryPage core={core()!} active={nav.current().kind === "history"} navigate={nav.navigate} />
-          <StatsPage core={core()!} active={nav.current().kind === "statistics"} />
           <CollectionPage core={core()!} id="__liked__" active={nav.current().kind === "favorites"} onDeleted={() => nav.navigate({ kind: "favorites" })} />
           <CollectionsBrowser core={core()!} active={nav.current().kind === "playlists"} navigate={nav.navigate} />
           <Each of={nav.history().filter((route, index, routes) => route.kind === "playlist"
@@ -334,18 +322,6 @@ export function AppShell(props: {
               id={core()!.collections.idForKey((route() as Extract<Route, {ref: unknown}>).ref)}
               active={routeKey(nav.current()) === routeKey(route())}
               onDeleted={() => nav.navigate({ kind: "playlists" })} />}
-          </Each>
-          <LibraryPage core={core()!} active={nav.current().kind === "library"}
-            injectedFolders={props.injectedLibraryFolders} navigate={nav.navigate} />
-          <Each of={nav.history().filter((route, index, routes) => "ref" in route
-            && ["album", "artist"].includes(route.kind)
-            && !PluginService.isRemote(route.ref)
-            && routes.findIndex((other) => routeKey(route) === routeKey(other)) === index)}
-            key={routeKey}>
-            {(route) => <LibraryPage core={core()!}
-              active={routeKey(nav.current()) === routeKey(route())}
-              group={"ref" in route() ? (route() as Extract<Route, { ref: unknown }>).ref : undefined}
-              groupKind={route().kind as "album" | "artist"} navigate={nav.navigate} />}
           </Each>
           <Each of={nav.history().filter((route, index, routes) => route.kind === "source"
             && routes.findIndex((other) => routeKey(route) === routeKey(other)) === index)} key={routeKey}>
@@ -360,9 +336,6 @@ export function AppShell(props: {
               active={routeKey(nav.current()) === routeKey(route())} navigate={nav.navigate} />}
           </Each>
         </If>
-        <If when={nav.current().kind === "library" && !core()}>
-          <Text class="px-5 text-sm text-muted-foreground">{core.error() ? String(core.error()) : "正在加载曲库…"}</Text>
-        </If>
       </View>
       <If when={floatingNavigation}>{navigationBar()}</If>
       <If when={!!core()}>
@@ -372,7 +345,7 @@ export function AppShell(props: {
         }} />
       </If>
     </WindowPanel>
-    <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
+    <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} />
     <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />

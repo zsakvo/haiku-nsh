@@ -33,7 +33,7 @@ function normalizeCategory(category?: string, fallback = "外观") {
   return next === "来源" ? "插件" : next;
 }
 
-export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; categoryRequest?: number; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import"; onLibrary?: () => void }) {
+export function Settings(props: { open: boolean; onClose: () => void; appearance: ReturnType<typeof createAppearance>; initialCategory?: string; categoryRequest?: number; initialShortcutConflict?: string; initialDownloadDirectory?: string; initialPluginLogin?: string; initialPluginResult?: unknown; initialLogs?: boolean; backupPath?: string; initialBackupDialog?: "export" | "import" }) {
   const selected = signal(normalizeCategory(props.initialCategory));
   const settings = createSettings();
   const plugins = createPlugins();
@@ -78,7 +78,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
           <If when={selected() === "歌词"}><View class="w-full flex-col"><LyricsSettings settings={settings} /></View></If>
           <View class="w-full flex-col" style={{ display: selected() === "播放" ? "flex" : "none" }}><PlaybackSettings settings={settings} /></View>
           <View class="w-full flex-col gap-5" style={{ display: selected() === "存储" ? "flex" : "none" }}>
-            <StorageSettings settings={settings} onLibrary={() => { props.onClose(); props.onLibrary?.(); }} />
+            <StorageSettings settings={settings} />
             <ScrapeSettings settings={settings} plugins={plugins} />
           </View>
         </If>

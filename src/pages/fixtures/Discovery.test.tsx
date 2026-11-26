@@ -21,13 +21,6 @@ test("home shelves play, navigate cards/entries/more and categories page sorts a
   await app.press("id:nav-home");await app.hover("id:shelf-entries >> label:推荐：林间频道");
   await app.press("id:shelf-entries >> role:button[播放林间频道]");
   await app.waitFor("text:队列 4 首 · 林间频道 · 1");
-  await app.press("id:nav-radio");
-  await app.waitFor("id:page-radio");await app.waitFor("id:radio-channels >> role:button[林间频道]");await app.waitFor("text:队列 4 首 · 林间频道 · 1");
-  const selectedRadioColor=app.spanStyle("id:radio-channels >> role:button[林间频道] >> text:林间频道").color;
-  expect(app.spanStyle("role:button[私人 FM] >> text:私人 FM").color).not.toBe(selectedRadioColor);
-  await app.press("下一首夹具");await app.waitFor("text:持续播放 · 队列 8 首");
-  await app.press("role:button[私人 FM]");await app.waitFor("text:队列 4 首 · 私人 FM · 9");
-  expect(app.spanStyle("role:button[私人 FM] >> text:私人 FM").color).toBe(selectedRadioColor);
 });
 test("home source error retries without poisoning other pages",async()=>{
   const app=await open("../../../DiscoveryFailureFixture.tsx",options);

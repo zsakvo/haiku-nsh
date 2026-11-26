@@ -187,7 +187,7 @@ export function HomePage(props:Props) {
   function link(link:any) {
     const ref=link.reference;
     if(ref.kind==="category"){props.navigate({kind:"categories",source:ref.source,category:ref.id});return;}
-    if(ref.kind==="radio") {props.navigate({kind:"radio",source:ref.source});return;}
+    if(ref.kind==="radio") {void props.core.player.startRadio(ref.source,ref.id??null).catch(console.error);return;}
     props.navigate(entityRoute(link));
   }
   function section(s:()=>Section){
@@ -311,39 +311,5 @@ export function CategoriesPage(props:Props) {
         />
       </If>
     </NavigationScrollArea>
-  </View>;
-}
-export function RadioPage(props:Props) {
-  const state=useSource(props,"radio.next","radioSourceId"),error=signal(""),player=signal<any>(props.core.player.snapshot());
-  useToolbarSource(()=>props.active,state);
-  effect(()=>{
-    if(!props.active)return;
-    player.set(props.core.player.snapshot());
-    const stop=props.core.player.onState(s=>player.set(s));
-    return stop;
-  });
-  effect(()=>{const r=props.route;if(r.kind==="radio"&&r.source)state.selected.set(r.source);});
-  const channels=resource(()=>props.active&&state.available().some(p=>
-    p.id===state.selected()&&p.caps.includes("radio.channels"))?state.selected():undefined,
-    async s=>await props.core.sources.radioChannels(s) as any[]);
-  async function start(id?:string){error.set("");try{await props.core.player.startRadio(state.selected(),id??null);}catch(e){error.set(String(e));}}
-  const radio=()=>player().radio?.source===state.selected()?player().radio:null;
-  usePageRefresh(() => props.active, {
-    run: () => channels.refetch(),
-    disabled: () => channels.loading() || !state.available().some(p => p.id === state.selected() && p.caps.includes("radio.channels")),
-  });
-  return <View testID="page-radio" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
-    <View class="pl-(--content-inset-left) pr-(--content-inset-right) pb-3 flex-row items-center justify-between gap-3"><Text role="header" class="text-xl font-semibold text-foreground">电台</Text></View>
-    <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-    <If when={!!state.available().length}><View class="pl-(--content-inset-left) pr-(--content-inset-right) gap-3"><Shelf id="private-fm" title="为你播放"><View class="flex-row"><Button label="私人 FM" selected={!!radio()&&!radio().channel}
-      variant={!!radio()&&!radio().channel?"primary":"secondary"} onPress={()=>void start()} /></View></Shelf>
-      <If when={!!error()||!!channels.error()}><ErrorState message={error()||String(channels.error())} retry={()=>channels.refetch()} /></If>
-      <If when={!!radio()?.error}><ErrorState message={radio().error} retry={()=>void start(radio().channel??undefined)} /></If>
-      <If when={!!radio()}><Text class="text-sm text-muted-foreground">{radio().loading?"正在获取下一批曲目…":`持续播放 · 队列 ${player().tracks.length} 首`}</Text></If>
-      <Text role="header" class="text-lg font-semibold text-foreground">频道</Text>
-      <If when={channels.loading()}><Skeleton label="正在加载频道…" /></If>
-    </View><List contentStyle={{paddingBottom:token("dock-scroll-clearance")}} testID="radio-channels" each={channels()??[]} keyExtractor={c=>c.id} estimatedItemSize={44} class="flex-1">
-      {c=><View class="pl-(--content-inset-left) pr-(--content-inset-right) py-1 items-start"><Button label={c().title} selected={radio()?.channel===c().id} variant={radio()?.channel===c().id?"primary":"secondary"} onPress={()=>void start(c().id)} /></View>}
-    </List></If>
   </View>;
 }
