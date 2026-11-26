@@ -151,9 +151,18 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                 p.lyrics.set(Arc::new(state.lyrics.unwrap_or_default()));
             }
         });
+        // Artwork depends on the track identity and its cover only. Duration arrives from
+        // metadata and from the decoder while the stream buffers; rerunning on those updates
+        // cancelled the pending cover and restarted it after buffering finished.
+        let artwork_track = computed(move || {
+            track.get().map(|mut t| {
+                t.duration = None;
+                t
+            })
+        });
         let weak = Rc::downgrade(&p);
         effect(move || {
-            let selected = track.get();
+            let selected = artwork_track.get();
             let Some(p) = weak.upgrade() else { return };
             let version = p.request.borrow_mut().advance();
             p.artwork.set(String::new());
@@ -163,18 +172,34 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             let weak = Rc::downgrade(&p);
             spawn(async move {
                 let Some(track) = selected else { return };
+                let show = |key: String, cover: Cover| {
+                    let Some(p) = weak.upgrade() else { return false };
+                    if !p.request.borrow().accepts(version) {
+                        return false;
+                    }
+                    p.remember(key, cover.clone());
+                    p.artwork.set(cover.uri);
+                    p.artwork_path.set(Some(cover.path));
+                    *p.cover_theme.borrow_mut() = Some(cover.theme.clone());
+                    crate::player_theme::apply(Some(&cover.theme));
+                    true
+                };
+                // The track's own artwork needs no plugin call, so it is shown at once instead of
+                // queueing behind stream resolution in the source's serial runtime.
+                let mut shown = None;
+                if let Some((key, cover)) = direct_cover(weak.clone(), track.clone()).await {
+                    if !show(key.clone(), cover) {
+                        return;
+                    }
+                    shown = Some(key);
+                }
+                // A source may still provide larger artwork through track.cover.
                 let Some((key, cover)) = prepared_cover(weak.clone(), track).await else {
                     return;
                 };
-                let Some(p) = weak.upgrade() else { return };
-                if !p.request.borrow().accepts(version) {
-                    return;
+                if shown.as_ref() != Some(&key) {
+                    show(key, cover);
                 }
-                p.remember(key, cover.clone());
-                p.artwork.set(cover.uri);
-                p.artwork_path.set(Some(cover.path));
-                *p.cover_theme.borrow_mut() = Some(cover.theme.clone());
-                crate::player_theme::apply(Some(&cover.theme));
             });
         });
         // Cursor publishes line changes only. Word fills read the same Rust clock directly.
@@ -202,12 +227,20 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             });
         });
         // The controller supplies the actual planned successor for shuffle/repeat-one.
-        let weak = Rc::downgrade(&p);
-        effect(move || {
+        // Every state publish (status, buffering, duration) used to rerun this and enqueue
+        // another track.cover call; only a different successor needs prewarming.
+        let next_track = computed(move || {
             revision.get();
             let next = state.with(|s| s.next_index.and_then(|i| s.tracks.get(i as usize).cloned()));
-            let next = next.map(|t| library.track(&t.id).unwrap_or(t));
-            let Some(track) = next else { return };
+            next.map(|t| {
+                let mut t = library.track(&t.id).unwrap_or(t);
+                t.duration = None;
+                t
+            })
+        });
+        let weak = Rc::downgrade(&p);
+        effect(move || {
+            let Some(track) = next_track.get() else { return };
             let weak = weak.clone();
             spawn(async move {
                 if let Some((key, cover)) = prepared_cover(weak.clone(), track).await {
@@ -224,15 +257,28 @@ async fn prepared_cover(
     weak: std::rc::Weak<Presentation>,
     mut track: Track,
 ) -> Option<(String, Cover)> {
+    let host = weak.upgrade()?.bridge.source_host.clone();
+    let input = track.clone();
+    let url = background(async move { crate::sources::playback_cover(&host, &input).await })
+        .await
+        .ok()??;
+    track.cover = Some(url);
+    load_artwork(weak, track).await
+}
+/// The track's own artwork only, without asking the source for a larger image.
+async fn direct_cover(weak: std::rc::Weak<Presentation>, mut track: Track) -> Option<(String, Cover)> {
+    let image = track.cover.clone()?;
+    let host = weak.upgrade()?.bridge.source_host.clone();
+    track.cover = Some(crate::sources::cover_url(&host, &track.source, &image, 1600));
+    load_artwork(weak, track).await
+}
+/// Fetch (or reuse) and decode `track.cover`, already resolved to its final URL.
+async fn load_artwork(weak: std::rc::Weak<Presentation>, track: Track) -> Option<(String, Cover)> {
+    let url = track.cover.clone()?;
     let p = weak.upgrade()?;
     let host = p.bridge.source_host.clone();
     let root = p.bridge.artwork_root.clone();
     drop(p);
-    let lookup = host.clone();
-    let input = track.clone();
-    let url = background(async move { crate::sources::playback_cover(&lookup, &input).await })
-        .await
-        .ok()??;
     let key = format!("{}:{}", track.source, cover_key(&url));
     let cached = weak
         .upgrade()?
@@ -244,7 +290,6 @@ async fn prepared_cover(
     if let Some(cover) = cached {
         return Some((key, cover));
     }
-    track.cover = Some(url);
     let path = background(crate::sources::artwork(host, root, track))
         .await
         .ok()??;

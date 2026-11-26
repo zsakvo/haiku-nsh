@@ -42,9 +42,12 @@ impl HomeCache {
         self.load(&source, refresh, now, || api.home(None, refresh, None)).await
     }
     /// Live pages keep every supported item. Only the disk snapshot is bounded.
-    pub async fn page(&self, host: Arc<Host>, source: String, cursor: String) -> Result<serde_json::Value> {
+    pub async fn page(
+        &self, host: Arc<Host>, source: String, cursor: String,
+        cancel: Option<&haiku_plugins::Cancellation>,
+    ) -> Result<serde_json::Value> {
         let api = SourceApi::new(host.source(&source)?);
-        let mut home = api.home(Some(&cursor), false, None).await?;
+        let mut home = api.home(Some(&cursor), false, cancel).await?;
         let next = home.next.take();
         home.shelves.retain(|s| !s.items.is_empty() || !s.entries.is_empty());
         Ok(presentation(&home, false, next.as_deref()))

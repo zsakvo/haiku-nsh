@@ -1,4 +1,4 @@
-import { cleanup, effect, Scroll, signal, View } from "nsh";
+import { cleanup, effect, Scroll, signal, untracked, View } from "nsh";
 import { PluginService, type Core } from "haiku/native";
 import { Button } from "../ui/Button";
 import { ErrorState, RecommendationCard, type RecommendationPreview } from "../ui/Discovery";
@@ -16,10 +16,13 @@ export function HomeEntries(props:{
   const pending=signal(""),error=signal(""),failed=signal<HomeEntry|null>(null);
   const previews=signal<Record<string,RecommendationPreview>>({});
   let generation=0,previewGeneration=0,closed=false;
-  cleanup(()=>{closed=true;generation++;});
+  cleanup(()=>{closed=true;});
+  // New entries (a refreshed feed replacing its cached copy) or leaving the page only discard
+  // previews. A play in progress is the user's explicit request and still replaces the queue.
   effect(()=>{
     props.entries;props.active;
-    generation++;previewGeneration++;pending.set("");error.set("");failed.set(null);previews.set({});
+    previewGeneration++;previews.set({});
+    untracked(()=>{if(!pending()){error.set("");failed.set(null);}});
   });
   const cards=()=>props.entries.filter(playable);
   const shortcuts=()=>props.entries.filter(e=>!playable(e));
@@ -60,7 +63,8 @@ export function HomeEntries(props:{
   async function play(entry:HomeEntry) {
     if(pending())return;
     const version=++generation;
-    const valid=()=>!closed&&version===generation&&props.active;
+    // A shelf rebuilt by a feed refresh unmounts this view; the requested playback still starts.
+    const valid=()=>version===generation;
     const ref=entry.to.reference;
     pending.set(JSON.stringify(ref));error.set("");failed.set(null);
     try {

@@ -169,6 +169,10 @@ impl PluginService {
         .await
         .map_err(|e| e.to_string())?
     }
+    /// Cancellation shared by the home continuation pages of one source, replaced on refresh.
+    fn home_pages_key(source: &str) -> String {
+        format!("home-pages:{source}")
+    }
     pub(crate) async fn changed(this: &Instance<Self>) -> Result<JsonValue, String> {
         let value = Self::snapshot(Self::host(this)).await?;
         Self::notify(this, &value);
@@ -194,6 +198,14 @@ impl PluginService {
         let projection_host = Self::host(&this);
         let projection_source = source.clone();
         let projection_size = 192;
+        // A source runs plugin calls one at a time. A refresh discards every continuation of the
+        // old feed, so it cancels those still queued or running instead of waiting behind them.
+        if refresh {
+            let key = Self::home_pages_key(&source);
+            if let Some(pages) = this.with(|s| s.cancellations.lock().unwrap().remove(&key)) {
+                pages.cancel();
+            }
+        }
         let result: Result<JsonValue, String> = async {
             let host = Self::host(&this);
             let cache = this.with(|s| s.home.clone());
@@ -223,7 +235,11 @@ impl PluginService {
         let projection_source = source.clone();
         let host = Self::host(&this);
         let cache = this.with(|s| s.home.clone());
-        let value = background(async move { cache.page(host, source, cursor).await })
+        let key = Self::home_pages_key(&source);
+        let cancel = this.with(|s| {
+            s.cancellations.lock().unwrap().entry(key.clone()).or_default().clone()
+        });
+        let value = background(async move { cache.page(host, source, cursor, Some(&cancel)).await })
             .await
             .map_err(|e| e.to_string())?
             .map_err(|e| e.to_string())?;

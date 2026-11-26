@@ -273,6 +273,23 @@ impl Source {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let abort = call.abort.clone();
         self.active.lock().unwrap().insert(id, abort.clone());
+        // The VM runs calls one at a time. A caller that stops waiting (a dropped task, an
+        // outer timeout) aborts its call, so an abandoned request cannot hold up later ones.
+        struct Pending<'a> {
+            active: &'a Mutex<BTreeMap<u64, AbortHandle>>,
+            id: u64,
+            abort: AbortHandle,
+            done: bool,
+        }
+        impl Drop for Pending<'_> {
+            fn drop(&mut self) {
+                if !self.done {
+                    self.abort.abort();
+                }
+                self.active.lock().unwrap().remove(&self.id);
+            }
+        }
+        let mut pending = Pending { active: &self.active, id, abort: abort.clone(), done: false };
         let response = call.result();
         tokio::pin!(response);
         let result = if let Some(cancel) = cancel {
@@ -280,7 +297,8 @@ impl Source {
         } else {
             response.await.map_err(Into::into)
         };
-        self.active.lock().unwrap().remove(&id);
+        pending.done = true;
+        drop(pending);
         result
     }
     /// Invoke one SDK handler. Authentication refresh is single-flight with one replay.

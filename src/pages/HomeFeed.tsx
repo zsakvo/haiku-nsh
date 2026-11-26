@@ -6,18 +6,20 @@ import { Icon } from "../ui/Icon";
 import type { HomeTrack } from "./HomeTracks";
 
 /** One waterfall item in feed order: a song, or a collection card (playlist, album, entry…). */
-export type FeedItem = { key: string; kind: string; item: any };
+export type FeedItem = { key: string; kind: string; item: any; queue?: HomeTrack[] };
 export const feedGap = 16;
 
 /** A recycled grid row. Network page boundaries never determine visual rows. */
 export function FeedRow(props: { core: Core; items: FeedItem[]; columns: number; open: (item: FeedItem) => void }) {
   const error = signal("");
   effect(()=>{props.items;error.set("");});
-  const tracks = () => props.items.filter(i => i.kind === "tracks").map(i => i.item as HomeTrack);
-  async function play(track: HomeTrack) {
+  // A song replaces the queue with its whole shelf; a visual row holds only a few of its songs.
+  async function play(entry: FeedItem) {
     error.set("");
-    const list = tracks();
-    try { await props.core.player.play(list, list.indexOf(track)); } catch (e) { error.set(String(e)); }
+    const list = entry.queue ?? props.items.filter(i => i.kind === "tracks").map(i => i.item as HomeTrack);
+    const track = entry.item as HomeTrack;
+    const index = list.findIndex(t => t.source === track.source && t.id === track.id);
+    try { await props.core.player.play(list, Math.max(0, index)); } catch (e) { error.set(String(e)); }
   }
   return <View testID="home-feed" class="w-full gap-2">
     <View class="flex-row items-start" style={{ gap: feedGap }}>
@@ -26,7 +28,7 @@ export function FeedRow(props: { core: Core; items: FeedItem[]; columns: number;
           <If when={!!props.items[column()]}><FeedCard
             title={props.items[column()].item.title} cover={props.items[column()].item.cover}
             track={props.items[column()].kind==="tracks"?props.items[column()].item:undefined}
-            onPress={()=>{const entry=props.items[column()];if(entry.kind==="tracks")void play(entry.item);else props.open(entry);}} /></If>
+            onPress={()=>{const entry=props.items[column()];if(entry.kind==="tracks")void play(entry);else props.open(entry);}} /></If>
         </View>}
       </Each>
     </View>

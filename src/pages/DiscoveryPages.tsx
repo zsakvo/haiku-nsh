@@ -1,4 +1,4 @@
-import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, untracked, View } from "nsh";
+import { cleanup, computed, effect, List, resource, Scroll, signal, Text, token, untracked, View, type ListRef } from "nsh";
 import type { Core } from "haiku/native";
 import type { PluginSnapshot } from "../state/plugins";
 import type { Route } from "../shell/navigation";
@@ -49,6 +49,8 @@ export function HomePage(props:Props) {
   const rowEstimate=()=>feedWidth()>0?Math.round((feedWidth()-feedGap*(columns()-1))/columns())+42:200;
   let ahead:{source:string;cursor:string;version:number;page:Promise<HomeFeed>}|null=null;
   let version=0,lastRefresh=0,closed=false;cleanup(()=>{closed=true;version++;});
+  let list:ListRef|undefined;
+  const refreshing=signal(false);
   const current=()=>feeds()[state.selected()];
   // Load once the page is first shown; afterwards only a manual refresh (or a new source) reloads,
   // so entering and leaving the page never refetches the feed.
@@ -63,16 +65,31 @@ export function HomePage(props:Props) {
     const v=++version;errors.set({...errors(),[source]:""});
     ahead=null;loadingMore.set(false);moreError.set("");
     const valid=()=>!closed&&v===version&&identity()===key;
+    // A refresh starts over: the old feed is cleared and the list returns to the top, so the
+    // fresh first page is shown from its start instead of loading pages back to the old offset.
+    // A failed refresh restores the old feed under the error.
+    const previous=force?feeds()[source]:undefined;
+    refreshing.set(force);
+    if(force){
+      const {[source]:_,...rest}=feeds();feeds.set(rest);
+      wantMore.set(false);
+      list?.scrollToOffset({offset:0,animated:false});scrolled(false);
+    }
     try {
       const first=await props.core.sources.home(source,force) as HomeFeed;
-      if(!valid())return;feeds.set({...feeds(),[source]:first});
-      // A refreshed feed with as many rows as before does not raise onLoadMore again.
-      if(force)wantMore.set(true);
+      if(!valid())return;
+      // A load-more raised while the list was empty belongs to no page; the fresh page decides.
+      if(force)wantMore.set(false);
+      feeds.set({...feeds(),[source]:first});
       if(first.cached) {
         const fresh=await props.core.sources.home(source,true) as HomeFeed;
         if(valid())feeds.set({...feeds(),[source]:fresh});
       }
-    }catch(e){if(valid())errors.set({...errors(),[source]:String(e)});}
+    }catch(e){if(valid()){
+      if(previous&&!feeds()[source])feeds.set({...feeds(),[source]:previous});
+      errors.set({...errors(),[source]:String(e)});
+    }}
+    finally{if(v===version)refreshing.set(false);}
   });
   const refresh=()=>revision.set(revision()+1);
   // Keep each virtual row bounded. A single unbounded waterfall would defeat recycling.
@@ -83,7 +100,8 @@ export function HomePage(props:Props) {
   function itemsOf(s:HomeShelf){
     let items=feedItems.get(s);
     if(!items){
-      items=(s.kind==="entries"?s.entries:s.items).map((item,index)=>({key:`${s.id}:${index}`,kind:s.kind,item}));
+      const queue=s.kind==="tracks"?s.items:undefined;
+      items=(s.kind==="entries"?s.entries:s.items).map((item,index)=>({key:`${s.id}:${index}`,kind:s.kind,item,queue}));
       feedItems.set(s,items);
     }
     return items;
@@ -184,13 +202,14 @@ export function HomePage(props:Props) {
   }
   return <View testID="page-home" class="flex-1 min-h-0" style={{display:props.active?"flex":"none",flexDirection:"column"}}>
     <NavigationScrollArea>
-    <List testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id} onScroll={e=>scrolled(e.offset.y>0)}
+    <List ref={node=>{list=node;}} testID="home-scroll" class="flex-1" each={rest()} keyExtractor={s=>s.id} onScroll={e=>scrolled(e.offset.y>0)}
       onLayout={e=>feedWidth.set(Math.max(0,e.bounds.size.width-token("content-inset-left")-token("content-inset-right")))}
       estimatedItemSize={rowEstimate()} loadMoreThreshold={2} onLoadMore={()=>wantMore.set(true)}
       contentClass="pl-(--content-inset-left) pr-(--content-inset-right) pb-(--dock-scroll-clearance)"
       header={<NavigationScrollHeader>
         <If when={!state.available().length}><MissingSource settings={props.settings} /></If>
-        <If when={home.loading()&&!current()}><Skeleton label="正在加载推荐…" /></If>
+        <If when={home.loading()&&!current()&&refreshing()}><Spinner label="正在刷新推荐…" /></If>
+        <If when={home.loading()&&!current()&&!refreshing()}><Skeleton label="正在加载推荐…" /></If>
         <If when={!!errors()[state.selected()]}><ErrorState cached={!!current()} message={errors()[state.selected()]} retry={refresh} /></If>
         <If when={!!current()&&!current().shelves.length}><Text class="text-sm text-muted-foreground">此来源暂无推荐内容</Text></If>
         <Each of={lead()} key={s=>s.id}>{section}</Each>

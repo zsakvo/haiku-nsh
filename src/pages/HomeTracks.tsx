@@ -25,69 +25,45 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
   const liked = signal(new Set(props.core.collections.likedKeys() as string[]));
   const playlists = signal(props.core.collections.list() as Collection[]);
   let scroll: ListRef | undefined;
-  let snapTimer: ReturnType<typeof setTimeout> | undefined;
-  let releaseTimer: ReturnType<typeof setTimeout> | undefined;
-  let lastOffset = 0;
-  let snapping = false;
-  cleanup(() => { clearTimeout(snapTimer); clearTimeout(releaseTimer); });
+  // The page an arrow press is animating to, so repeated presses advance from it rather than
+  // from the page the animation has not reached yet. Any touch on the shelf drops it.
+  let goal: number | null = null;
   cleanup(props.core.collections.onLiked(keys => liked.set(new Set(keys as string[]))));
   cleanup(props.core.collections.onChange(() => playlists.set(props.core.collections.list() as Collection[])));
   const pages = () => Array.from({ length: Math.ceil(props.tracks.length / pageSize) },
     (_, index) => props.tracks.slice(index * pageSize, (index + 1) * pageSize));
   const lastPage = () => Math.max(0, pages().length - 1);
+  const clampPage = (value: number) => Math.max(0, Math.min(lastPage(), value));
   const height = () => token("home-track-row-height") * rowsPerColumn;
-  function scrollToPage(next: number, animated: boolean) {
-    const clamped = Math.max(0, Math.min(lastPage(), next));
-    page.set(clamped);
+  // Paging is the scroll view's own: trackpad releases snap one page per flick from the release
+  // velocity, mouse wheels snap once they settle, and edges rubber-band like any macOS view.
+  // JS only follows the offset for the arrows; it never moves the content during a gesture.
+  function follow(offsetX: number) {
     const w = width();
     if (!w) return;
-    clearTimeout(snapTimer);
-    clearTimeout(releaseTimer);
-    snapping = animated;
-    scroll?.scrollToOffset({ offset: clamped * w, animated });
-    if (animated) releaseTimer = setTimeout(() => { snapping = false; }, 320);
+    if (goal !== null && Math.abs(offsetX - goal * w) < 1) goal = null;
+    if (goal === null) page.set(clampPage(Math.round(offsetX / w)));
   }
-  function snapToNearest(offsetX: number) {
+  function scrollToPage(next: number, animated: boolean) {
+    const target = clampPage(next);
     const w = width();
-    if (!w || pages().length <= 1) return;
-    const current = page();
-    const raw = offsetX / w;
-    const delta = raw - current;
-    const candidate = Math.abs(delta) >= 0.8
-      ? Math.round(raw)
-      : delta > 0.18 ? current + 1
-      : delta < -0.18 ? current - 1
-      : current;
-    const next = Math.max(0, Math.min(lastPage(), candidate));
-    const target = next * w;
-    page.set(next);
-    if (Math.abs(offsetX - target) > 1) {
-      scrollToPage(next, !reduceMotion());
-    }
-  }
-  function scheduleSnap(offsetX: number) {
-    lastOffset = offsetX;
-    if (snapping) return;
-    clearTimeout(snapTimer);
-    snapTimer = setTimeout(() => snapToNearest(lastOffset), 140);
+    page.set(target);
+    if (!w) return;
+    goal = animated ? target : null;
+    scroll?.scrollToOffset({ offset: target * w, animated });
   }
   effect(() => {
     props.tracks;
-    clearTimeout(snapTimer);
-    clearTimeout(releaseTimer);
-    snapping = false;
-    lastOffset = 0;
+    goal = null;
     page.set(0);
     scroll?.scrollToOffset({ offset: 0, animated: false });
   });
   function move(delta: number) {
-    scrollToPage(page() + delta, !reduceMotion());
+    scrollToPage((goal ?? page()) + delta, !reduceMotion());
   }
   function resize(next: number) {
     if (next <= 0 || next === width()) return;
-    clearTimeout(snapTimer);
-    clearTimeout(releaseTimer);
-    snapping = false;
+    goal = null;
     width.set(next);
     scroll?.scrollToOffset({ offset: page() * next, animated: false });
   }
@@ -156,21 +132,15 @@ export function HomeTracks(props: { core: Core; tracks: HomeTrack[]; active: boo
       style={{ height: height(), marginLeft: -token("content-inset-left"), marginRight: -token("content-inset-right") }}
       onMouseEnter={() => hovered.set(true)} onMouseLeave={() => hovered.set(false)}>
       <List ref={node => { scroll = node; }} testID="home-tracks-scroll" horizontal pagingEnabled
-        snapToInterval={width() || undefined} snapToAlignment="start" decelerationRate="fast" disableIntervalMomentum
-        bounces={false} scrollbar={{ horizontal: { class: "hidden pointer-events-none", thumbClass: "hidden" } }}
+        disableIntervalMomentum
+        scrollbar={{ horizontal: { class: "hidden pointer-events-none", thumbClass: "hidden" } }}
         class="flex-1 min-w-0 ml-(--content-inset-left) mr-(--content-inset-right)"
         each={pages()} keyExtractor={items => items.map(trackKey).join(",")}
         estimatedItemSize={Math.max(1, width())}
         onLayout={event => resize(event.bounds.size.width)}
-        onScroll={event => scheduleSnap(event.offset.x)}
-        onMomentumEnd={event => {
-          clearTimeout(snapTimer);
-          if (!snapping) snapToNearest(event.offset.x);
-        }}
-        onScrollEnd={event => {
-          clearTimeout(snapTimer);
-          if (!snapping) snapToNearest(event.offset.x);
-        }}>
+        onScroll={event => follow(event.offset.x)}
+        onScrollDragStart={() => { goal = null; }}
+        onScrollEnd={event => { goal = null; follow(event.offset.x); }}>
         {items => <View class="flex-row shrink-0 gap-6"
           style={{ width: Math.max(1, width()), height: height() }}>
           <Each of={[0, 1]}>{column => <View class="flex-1 min-w-0">
