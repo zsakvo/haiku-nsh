@@ -651,6 +651,7 @@ impl Core {
     pub async fn apply_theme(json: String) -> Result<(), String> {
         let mut tokens: nsh_core::element::Tokens =
             nsh_base::Theme::from_json(&json).map_err(|e| e.to_string())?.into();
+        crate::player_theme::set_base(tokens.clone());
         crate::presentation::apply_cover_into(&mut tokens);
         set_tokens(tokens);
         Ok(())

@@ -172,7 +172,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       tracks={Array.isArray(editor()) ? editor() as unknown[] : undefined} onClose={() => editor.set(null)} />
     </If>
     <If when={!!trackEditor()}><TrackEditor core={props.core} ids={trackEditor()!} onClose={() => trackEditor.set(null)} /></If>
-    <Dialog open={deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(false); }} class="w-112 max-w-full m-auto p-5 gap-4">
+    <Dialog open={deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(false); }} class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">{collection()?.kind === "plugin" ? "取消收藏歌单？" : "删除歌单？"}</Text>
       <Text class="text-sm text-muted-foreground">{collection()?.kind === "plugin"
         ? "仅移除此设备的收藏与离线快照，远端歌单保持不变。"

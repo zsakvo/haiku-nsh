@@ -40,7 +40,7 @@ export function StatsPage(props: { core: Core; active: boolean }) {
         <Text role="header" class="flex-1 text-xl font-semibold text-foreground">统计</Text>
         {[["day", "今日"], ["month", "本月"], ["year", "今年"], ["all", "全部"]].map(([id, label]) =>
           <Button label={label} size="sm" variant={range() === id ? "primary" : "secondary"} onPress={() => range.set(id)} />)}
-        <Button label="清除本地统计…" size="sm" onPress={() => confirming.set(true)} />
+        <Button label="清除本地统计…" size="sm" variant="destructive" onPress={() => confirming.set(true)} />
       </View>
       <If when={!!aggregate.error()}><Text class="text-sm text-destructive">{String(aggregate.error())}</Text></If>
       <If when={!!data()}>
@@ -116,7 +116,7 @@ export function StatsPage(props: { core: Core; active: boolean }) {
         </View>
       </If>
     </Scroll>
-    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 max-w-full self-center mt-24 p-5 gap-4">
+    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 p-5 gap-4">
       <Text class="text-lg font-semibold text-foreground">清除本地统计？</Text>
       <Text class="text-sm text-muted-foreground">本机聆听记录将被清除，云端数据不受影响。</Text>
       <View class="flex-row justify-end gap-2">

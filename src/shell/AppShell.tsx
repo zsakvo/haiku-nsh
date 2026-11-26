@@ -373,7 +373,7 @@ export function AppShell(props: {
       </If>
     </WindowPanel>
     <Settings categoryRequest={settingsRequest()} initialDownloadDirectory={props.initialDownloadDirectory} open={overlay() === "settings"} onClose={closeOverlay} appearance={appearance} initialCategory={settingsCategory()} initialShortcutConflict={props.initialShortcutConflict} initialPluginLogin={props.initialPluginLogin} initialPluginResult={props.initialPluginResult} initialLogs={props.initialLogs} backupPath={props.backupPath} initialBackupDialog={props.initialBackupDialog} onLibrary={() => nav.navigate({kind: "library"})} />
-    <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 max-w-full self-center mt-24 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
+    <Dialog open={about()} onOpenChange={(e)=>about.set(e.open)} class="w-160 p-5 gap-4"><AboutContent /><Button label="关闭关于" onPress={()=>about.set(false)} /></Dialog>
     <If when={!!core()}>
       <NotificationCenter core={core()!} open={notifications()} onClose={() => notifications.set(false)} />
       <If when={!!editingTrack()}><TrackEditor core={core()!} ids={editingTrack()!} onClose={() => editingTrack.set(null)} /></If>

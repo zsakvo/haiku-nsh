@@ -75,6 +75,7 @@ export function TrackEditor(props: { core: Core; ids: string[]; onClose: () => v
         <View class="flex-row gap-2">
           <Button label="取消" disabled={busy()} onPress={() => confirm.set(null)} />
           <Button label={confirm() === "write" ? "确认写回" : confirm() === "reset" ? "确认重置" : "放弃修改"}
+            variant={confirm() === "write" ? "primary" : "destructive"}
             disabled={busy()} onPress={() => void act(async () => {
               if (confirm() === "discard") { props.onClose(); return; }
               if (confirm() === "reset") { await props.core.library.reset(props.ids); props.onClose(); return; }
@@ -87,7 +88,7 @@ export function TrackEditor(props: { core: Core; ids: string[]; onClose: () => v
     </If>
     <If when={!confirm()}>
       <View class="flex-row gap-2 flex-wrap">
-        <Button label="重置…" size="sm" disabled={busy()} onPress={() => confirm.set("reset")} />
+        <Button label="重置…" size="sm" variant="destructive" disabled={busy()} onPress={() => confirm.set("reset")} />
         <Button label="写回文件标签…" size="sm" disabled={busy()} onPress={() => confirm.set("write")} />
         <View class="flex-1" />
         <Button label="取消" disabled={busy()} onPress={close} />

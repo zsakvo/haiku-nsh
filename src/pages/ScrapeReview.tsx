@@ -38,7 +38,7 @@ export function ScrapeReview(props: { core: Core; open: boolean; onClose: () => 
     try { await work(); } catch (e) { error.set(String(e)); } finally { busy.set(false); }
   }
   return <Dialog open={props.open} onOpenChange={e => { if (!e.open) props.onClose(); }}
-    class="w-240 max-w-full self-center mt-10 p-5 gap-4">
+    class="w-240 p-5 gap-4">
     <View class="flex-row items-center gap-3">
       <Text role="header" class="flex-1 text-lg font-semibold text-foreground">刮削审阅</Text>
       <Button label="关闭审阅" variant="ghost" size="sm" onPress={props.onClose} />

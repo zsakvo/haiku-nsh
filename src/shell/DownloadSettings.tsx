@@ -115,7 +115,7 @@ export function DownloadSettings(props: { settings: ReturnType<typeof createSett
     </If>
     <Dialog open={confirming()} onOpenChange={e => {
       if (!e.open && !busy()) { confirming.set(false); directory.set(value().downloadDir); }
-    }} class="w-128 max-w-full self-center mt-24 p-5 gap-4">
+    }} class="w-128 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">更换下载目录？</Text>
       <Text class="text-sm text-muted-foreground">{directory() || "~/Music/Haiku"}</Text>
       <Text class="text-sm text-muted-foreground">移动会暂停调度并等待下载释放文件，完成后恢复。失败文件保留原路径；保留只更改新任务的默认目录。</Text>

@@ -1,9 +1,9 @@
-import { Text } from "nsh";
+import { Text, token } from "nsh";
 import { Button as BaseButton } from "nsh/base";
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-primary active:bg-primary/80",
-  secondary: "border border-border bg-secondary active:bg-muted",
+  secondary: "border border-border bg-card shadow-sm active:bg-muted",
   ghost: "active:bg-muted selected:bg-accent",
   destructive: "bg-destructive active:bg-destructive/80",
 };
@@ -20,10 +20,11 @@ export function Button(props: {
   return <BaseButton testID={props.testID} disabled={props.disabled || props.loading}
     accessibilityLabel={props.accessibilityLabel}
     selected={props.selected} onPress={props.onPress}
-    class={`items-center justify-center rounded-(--radius) ${focus} disabled:opacity-40
-      ${props.size === "sm" ? "min-h-7 px-2 py-1" : "min-h-8 px-3 py-1.5"}
+    class={`items-center justify-center rounded-(--radius-inset) ${focus} disabled:opacity-40
+      ${props.size === "sm" ? "min-h-5 px-2 py-0.5" : "min-h-6 px-3 py-0.5"}
       ${variants[props.variant ?? "secondary"]} ${props.class??""}`}>
-    <Text class={`text-sm ${foregrounds[props.variant ?? "secondary"]}`}>
+    <Text class={foregrounds[props.variant ?? "secondary"]}
+      style={{ fontSize: token(props.size === "sm" ? "control-text-sm-size" : "control-text-size") }}>
       {props.loading ? `${props.label}…` : props.label}
     </Text>
   </BaseButton>;

@@ -51,7 +51,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       <View class="flex-row gap-2">
         <Button label="曲目历史" size="sm" variant={tab() === "tracks" ? "primary" : "secondary"} onPress={() => tab.set("tracks")} />
         <Button label="歌单历史" size="sm" variant={tab() === "playlists" ? "primary" : "secondary"} onPress={() => tab.set("playlists")} />
-        <Button label="清空历史…" size="sm" onPress={() => confirming.set(true)} />
+        <Button label="清空历史…" size="sm" variant="destructive" onPress={() => confirming.set(true)} />
         <If when={tab() === "tracks" && selected().length > 0}>
           <Button label="下载" accessibilityLabel="下载所选曲目" size="sm" onPress={() => void action("download", selected())} />
           <Button label="删除所选历史" size="sm" onPress={() => selected().forEach((key) => service.remove("tracks", key))} />
@@ -94,7 +94,7 @@ export function HistoryPage(props: { core: Core; active: boolean; navigate: (rou
       </List>
       <If when={!playlists().length}><EmptyState title="还没有浏览歌单" description="打开歌单后，会在这里留下记录。" /></If>
     </If>
-    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 max-w-full self-center mt-24 p-5 gap-4">
+    <Dialog open={confirming()} onOpenChange={(e) => confirming.set(e.open)} class="w-96 p-5 gap-4">
       <Text class="text-lg font-semibold text-foreground">清空历史？</Text>
       <Text class="text-sm text-muted-foreground">仅清空当前分类的记录，音乐文件会保留。</Text>
       <View class="flex-row justify-end gap-2">

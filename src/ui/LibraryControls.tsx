@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { Text, token, View } from "nsh";
 import { Input, ToggleGroup as BaseToggleGroup, Toggle } from "nsh/base";
 import { focus } from "./Button";
 
@@ -6,10 +6,10 @@ import { focus } from "./Button";
 export function ToggleGroup(props: {
   value: string; items: readonly { id: string; label: string }[]; onChange: (id: string) => void;
 }) {
-  return <BaseToggleGroup class="flex-row gap-1 rounded-(--radius) bg-muted p-1">
+  return <BaseToggleGroup class="flex-row gap-0.5 rounded-(--radius-inset) bg-muted p-0.5">
     {props.items.map((item) => <Toggle pressed={props.value === item.id} onChange={() => props.onChange(item.id)}
-      class={`min-h-7 rounded-(--radius-inset) px-3 py-1 active:bg-muted aria-pressed:bg-card ${focus}`}>
-      <Text class="text-sm text-foreground">{item.label}</Text>
+      class={`min-h-5 rounded-sm px-2.5 py-0.5 active:opacity-70 aria-pressed:bg-card aria-pressed:shadow-sm ${focus}`}>
+      <Text class="text-foreground" style={{ fontSize: token("control-text-size") }}>{item.label}</Text>
     </Toggle>)}
   </BaseToggleGroup>;
 }
@@ -20,6 +20,7 @@ export function Field(props: {
     <Text class="text-xs text-muted-foreground">{props.label}</Text>
     <Input accessibilityLabel={props.label} value={props.value} placeholder={props.placeholder} masked={props.secret}
       onChange={(event) => props.onChange(event.value)}
-      class={`min-h-8 rounded-(--radius) border border-input bg-card px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground ${focus}`} />
+      style={{ fontSize: token("control-text-size") }}
+      class={`min-h-6 rounded-(--radius-inset) border border-input bg-card px-2 py-0.5 text-foreground placeholder:text-muted-foreground ${focus}`} />
   </View>;
 }

@@ -10,8 +10,8 @@ export function SearchField(props: { value: string; label: string; placeholder?:
     <Icon name="search" small sidebar={props.sidebar} color="muted-foreground" />
     <Input accessibilityLabel={props.label} value={props.value} placeholder={props.placeholder}
       onChange={(event) => props.onChange(event.value)} onSubmit={props.onSubmit} autoFocus={props.autoFocus}
-      style={props.sidebar ? { fontSize: token(props.value ? "sidebar-text-size" : "sidebar-hint-size") } : {}}
-      class="flex-1 min-w-0 text-sm text-foreground placeholder:text-muted-foreground" />
+      style={{ fontSize: token(props.sidebar && !props.value ? "sidebar-hint-size" : "control-text-size") }}
+      class="flex-1 min-w-0 text-foreground placeholder:text-muted-foreground" />
   </View>;
 }
 export function CommandTrigger(props: { shortcut: string; onPress: () => void; class?: string }) {

@@ -164,7 +164,7 @@ export function AccountSettings(props: { settings: ReturnType<typeof createSetti
     <If when={!!notice()}><Text class="text-sm text-muted-foreground">{notice()}</Text></If>
     <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     <Dialog open={confirming()} onOpenChange={e => { if (!busy()) confirming.set(e.open); }}
-      class="w-112 max-w-full self-center mt-24 p-5 gap-4">
+      class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">登出 Haiku 账户？</Text>
       <Text class="text-sm text-muted-foreground">本机登录凭据将被清除，听歌统计停止同步。本地听歌记录与服务器上的数据会保留。</Text>
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>

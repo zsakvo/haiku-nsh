@@ -43,7 +43,7 @@ export function Settings(props: { open: boolean; onClose: () => void; appearance
     open={props.open}
     accessibilityLabel="设置"
     onOpenChange={(event) => { if (!event.open) props.onClose(); }}
-    class="w-224 h-160 self-center my-auto overflow-hidden flex-row bg-background"
+    class="w-224 h-160 overflow-hidden flex-row bg-background"
     style={{ maxWidth: "92%", maxHeight: "88%" }}>
     <ShellSidebar class="border-r border-sidebar-border">
       <View class="shrink-0 px-3 pt-3 pb-2.5">

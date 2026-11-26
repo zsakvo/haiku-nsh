@@ -47,7 +47,7 @@ export function PlaybackSettings(props: { settings: ReturnType<typeof createSett
           <Button
             label="重置音效"
             size="sm"
-            variant="ghost"
+            variant="destructive"
             onPress={() =>
               update({
                 bandGainsDb: Array(10).fill(0),

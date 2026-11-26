@@ -170,8 +170,8 @@ export function SourceLogin(props: { state: PluginsState; initialPlugin: string;
 /** Primary macOS-style import button opening the native menu on macOS and custom Menu elsewhere. */
 function ImportPluginMenu(props: { disabled?: boolean; onPick: (kind: string) => void; onUrl: () => void }) {
   const nativeMenu = platform.os === "macos" && desktopAvailable;
-  const triggerClass = `min-h-7 flex-row items-center justify-center rounded-(--radius) bg-primary px-3.5 py-1 active:bg-primary/80 selected:bg-primary/80 disabled:opacity-40 ${focus}`;
-  const label = () => <Text class="font-medium text-primary-foreground" style={{ fontSize: token("sidebar-text-size") }}>导入…</Text>;
+  const triggerClass = `min-h-6 flex-row items-center justify-center rounded-(--radius-inset) bg-primary px-3 py-0.5 active:bg-primary/80 selected:bg-primary/80 disabled:opacity-40 ${focus}`;
+  const label = () => <Text class="text-primary-foreground" style={{ fontSize: token("control-text-size") }}>导入…</Text>;
   const items = [
     { label: "ZIP 文件…", onSelect: () => props.onPick("zip") },
     { label: "本地目录…", onSelect: () => props.onPick("directory") },
@@ -355,12 +355,12 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
         </View>
       </>}</Each>
     </SettingSection>
-    <Dialog open={loggingIn()} onOpenChange={e => loggingIn.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
+    <Dialog open={loggingIn()} onOpenChange={e => loggingIn.set(e.open)} class="w-96 gap-4 p-5">
       <If when={loggingIn()}><SourceLogin state={props.state} initialPlugin={loginPlugin()}
         initialSource={loginSource()} lockedPlugin={loginLocked()}
         onClose={() => loggingIn.set(false)} /></If>
     </Dialog>
-    <Dialog open={importing()} onOpenChange={e => importing.set(e.open)} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
+    <Dialog open={importing()} onOpenChange={e => importing.set(e.open)} class="w-96 gap-4 p-5">
       <Text role="header" class="text-lg font-semibold text-foreground">导入插件</Text>
       <Field label="文件、目录或 HTTPS URL" value={location()} onChange={value => location.set(value)} />
       <View class="flex-row justify-end gap-2"><Button label="取消" onPress={() => importing.set(false)} />
@@ -368,7 +368,7 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
           await c.plugins.importPackage(location()); importing.set(false);
         })} /></View>
     </Dialog>
-    <Dialog open={!!removing()} onOpenChange={e => { if (!e.open) removing.set(null); }} class="w-96 max-w-full self-center mt-24 gap-4 p-5">
+    <Dialog open={!!removing()} onOpenChange={e => { if (!e.open) removing.set(null); }} class="w-96 gap-4 p-5">
       <Text role="header" class="text-lg font-semibold text-foreground">删除插件？</Text>
       <Text class="text-sm text-muted-foreground">
         {uses(removing() ?? "").length > 0
@@ -503,9 +503,9 @@ export function DeveloperSettings(props: { state: PluginsState; initialResult?: 
               onPress={() => void props.state.run(async c => result.set(await c.plugins.testContract(plugin()!)))} />
             <Button label="查看存储" size="sm" disabled={!activeSource()}
               onPress={() => void props.state.run(async c => result.set(await c.plugins.storage(activeSource())))} />
-            <Button label="清除 KV" size="sm" disabled={!activeSource()}
+            <Button label="清除 KV" size="sm" variant="destructive" disabled={!activeSource()}
               onPress={() => void props.state.run(c => c.plugins.clearStorage(activeSource()))} />
-            <Button label="清除凭据" size="sm" disabled={!activeSource()}
+            <Button label="清除凭据" size="sm" variant="destructive" disabled={!activeSource()}
               onPress={() => void props.state.run(c => c.sources.logout(activeSource()))} />
           </View>
         </SettingCardBlock>

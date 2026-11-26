@@ -35,9 +35,22 @@ pub(crate) fn apply_into(tokens: &mut nsh_core::element::Tokens, cover: Option<&
     );
 }
 
+thread_local! {
+    /// The app theme (brand, light/dark) last applied, without cover colors. `set_tokens` is
+    /// queued, so composing from `tokens()` could resurrect a theme a pending write replaced.
+    static BASE: std::cell::RefCell<Option<nsh_core::element::Tokens>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Records the app theme every later cover update composes onto.
+pub(crate) fn set_base(tokens: nsh_core::element::Tokens) {
+    BASE.with(|base| *base.borrow_mut() = Some(tokens));
+}
+
 pub(crate) fn apply(cover: Option<&CoverTheme>) {
     untracked(|| {
-        let mut tokens = (*nsh_core::element::tokens()).clone();
+        let mut tokens = BASE
+            .with(|base| base.borrow().clone())
+            .unwrap_or_else(|| (*nsh_core::element::tokens()).clone());
         apply_into(&mut tokens, cover);
         set_tokens(tokens);
     });

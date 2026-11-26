@@ -14,7 +14,8 @@
 - 页面与顶栏共享左 24pt、右 48pt 水平边距，由 content-inset-left/content-inset-right 提供；两种侧栏共用分组间距 24pt、导航条目间距 4pt；分组标题与首条目间距 8pt（标题底距 4pt 加行间距 4pt），设置搜索框与首分类间距 12pt；控件间距 8pt。
 - 间距刻度：2、4、8、12、16、20、24、32、48pt；用 Tailwind 刻度或共享 token，不在页面发明偏移值。
 - 侧栏条目最小高 32pt，图标 15pt、正文 13pt、图文间距 8pt，左右距侧栏边缘 8pt；鼠标悬浮不添加背景色，选中只用 medium 字重。
-- 按钮 sm 最小高 28pt、md 32pt；图标按钮与顶栏搜索入口同为 28pt，图标 16/20pt。
+- 表单控件贴近 macOS 标准尺寸，轻量精致：按钮 md 最小高 24pt、文字 13pt（control-text-size），sm 最小高 20pt、文字 12pt（control-text-sm-size），圆角 radius-inset 6pt；secondary 为 card 底 + 细边框 + shadow-sm。开关轨道 32×18pt、滑块 14pt；分段控件总高约 24pt、内缩 2pt；输入框最小高 24pt、文字 13pt；滑杆点击区 16pt、滑块 12pt。图标按钮与顶栏搜索入口仍为 28pt，图标 16/20pt。
+- 下拉选择统一用 SettingSelect：macOS 弹出系统原生 NSMenu（当前项打勾），其余平台使用自绘 Select。设置行内（inline）为无边框弹出按钮，值使用 setting-value-size 12pt、muted 前景，比 13pt 行标题低一级以体现主次。
 - 侧栏搜索入口最小宽 176pt、填满侧栏内宽；“前往…”与快捷键提示、设置搜索 placeholder 同为 11pt；设置搜索输入正文为 13pt。
 - 内容顶栏不显示页面标题；macOS 固定顶栏使用整宽模糊背景与底部细分隔线，导航胶囊可拖动；其他桌面平台保留至少 48pt 的导航行。设置顶栏保留 40pt 拖动区和右侧关闭按钮。
 - 主内容导航组依次为后退、前进、刷新、当前页面来源 chip；推荐页不再重复提供“刷新推荐”按钮。
@@ -70,6 +71,8 @@
 - disabled：降低到 35–40% 强度，由基础组件阻止输入；loading 保留原标签并禁用重复提交。
 - 异步失败就近说明原因与恢复操作；即时可逆设置以控件状态反馈，不弹成功提示。
 - Button 只保留 primary/secondary/ghost/destructive 与 sm/md；primary 用于默认确认。
+- 重置、清除、清空等会丢弃用户数据或配置的按钮（包括打开确认框的入口按钮和确认按钮）一律用 destructive 实心样式。
+- 所有 Dialog 由 Surfaces 的 Dialog 统一在窗口内水平垂直居中，调用处只给宽度与内边距，不写 self-center/mt-*/m-auto；仅命令面板用 placement="top" 靠上。
 - 所有交互包装 nsh/base，不用裸 View 重做按钮、焦点、菜单或 modal 生命周期。
 - Esc 关闭最上层；Dialog 负责焦点约束和返回。设置与命令面板互斥，不叠加。
 - 后退、前进、刷新、设置与命令面板共享命令函数；原生菜单与应用内提示使用同一快捷键定义。

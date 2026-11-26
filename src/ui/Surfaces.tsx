@@ -6,14 +6,16 @@ import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/deskto
 import { focus } from "./Button";
 import { Icon } from "./Icon";
 export const popupSurface = "rounded-(--radius-surface) border border-border bg-popover shadow-lg";
-export const popupItem = "rounded-(--radius) min-h-8 px-3 py-1.5 text-sm text-popover-foreground active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
+export const popupItem = "rounded-(--radius-inset) min-h-6 px-2.5 py-1 text-sm text-popover-foreground active:bg-muted focus:bg-accent checked:bg-accent disabled:opacity-40";
 export function Tooltip(props: { label: string }) {
   return <BaseTooltip class={`${popupSurface} px-2 py-1`}>
     <Text class="text-xs text-popover-foreground">{props.label}</Text>
   </BaseTooltip>;
 }
-export function Dialog(props: DialogProps) {
-  return <BaseDialog {...props} animation="none" class={`${popupSurface} ${props.class ?? ""}`}
+/** Dialogs center in the window; `placement="top"` anchors a Spotlight-style palette near the top. */
+export function Dialog(props: DialogProps & { placement?: "center" | "top" }) {
+  return <BaseDialog {...props} animation="none"
+    class={`${props.placement === "top" ? "mx-auto mt-20" : "m-auto"} max-h-full max-w-full ${popupSurface} ${props.class ?? ""}`}
     backdropClass="bg-overlay-backdrop" />;
 }
 /** Modal state is independent of the retained page tree and navigation. */
@@ -46,6 +48,30 @@ export function ContextMenu(props: ContextMenuProps) {
 }
 export function MenuItem(props: MenuItemProps) {
   return <BaseMenuItem {...props} class={popupItem} />;
+}
+/** Whether menus should open as the system NSMenu instead of a drawn popover. */
+export const nativeMenus = platform.os === "macos" && desktopAvailable;
+/** Opens a native menu below an anchor view; `open()` drives the trigger's selected state. */
+export function nativePopup() {
+  const open = signal(false);
+  let anchor: ViewRef | undefined;
+  return {
+    open,
+    ref: (node: ViewRef) => { anchor = node; },
+    async show(items: Parameters<typeof DesktopMenu.popup>[0]) {
+      if (open()) return;
+      open.set(true);
+      try {
+        const measured = await anchor?.measure();
+        const at = measured
+          ? { x: measured.pagePosition.x, y: measured.pagePosition.y + measured.bounds.size.height + 4 }
+          : undefined;
+        await DesktopMenu.popup(items, at);
+      } finally {
+        open.set(false);
+      }
+    },
+  };
 }
 export type ActionMenuItem = {
   label: string;

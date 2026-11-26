@@ -85,7 +85,7 @@ export function LyricsSearch(props: { core: Core; open: boolean; onClose: () => 
   }
   return <Dialog open={props.open} onOpenChange={e => {
     if (!e.open) { cancel(); props.onClose(); }
-  }} class="w-224 max-w-full self-center mt-12 p-5 gap-4">
+  }} class="w-224 p-5 gap-4">
     <View class="flex-row items-center justify-between">
       <Text role="header" class="text-lg font-semibold text-foreground">查找歌词</Text>
       <Button label="关闭查找" size="sm" variant="ghost" onPress={() => { cancel(); props.onClose(); }} />

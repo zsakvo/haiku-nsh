@@ -7,7 +7,7 @@ import { Dialog } from "../ui/Surfaces";
 export function AboutContent(props: { grouped?: boolean }) {
   const info = Core.aboutInfo() as { version: string; framework: string; license: string; notices: string };
   const legal = signal<"license" | "notices" | null>(null);
-  const dialog = <Dialog open={!!legal()} onOpenChange={(e) => { if (!e.open) legal.set(null); }} class="w-192 max-w-full self-center mt-16 p-5 gap-4">
+  const dialog = <Dialog open={!!legal()} onOpenChange={(e) => { if (!e.open) legal.set(null); }} class="w-192 p-5 gap-4">
     <Text role="header" class="text-lg font-semibold text-foreground">{legal() === "license" ? "许可证" : "第三方声明"}</Text>
     <Scroll class="h-96" contentClass="gap-3"><Text class="text-sm text-foreground">{legal() === "license" ? info.license : info.notices}</Text></Scroll>
     <Button label="关闭声明" onPress={() => legal.set(null)} />

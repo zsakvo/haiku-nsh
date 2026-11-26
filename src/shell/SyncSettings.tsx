@@ -60,7 +60,7 @@ export function SyncSettings(props: { settings: ReturnType<typeof createSettings
             onPress={() => void run(async () => {
               try { await sync().setToken(token()); } finally { token.set(""); }
             }, "PAT 已保存。")} />
-          <Button label="清除 PAT" size="sm" disabled={busy() || !value()?.connected}
+          <Button label="清除 PAT" size="sm" variant="destructive" disabled={busy() || !value()?.connected}
             onPress={() => void run(async () => {
               await sync().clearToken(); token.set("");
             }, "PAT 已清除，Gist 绑定保留。")} />
@@ -120,7 +120,7 @@ export function SyncSettings(props: { settings: ReturnType<typeof createSettings
     <If when={!!notice()}><Text class="text-sm text-muted-foreground">{notice()}</Text></If>
     <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     <Dialog open={confirming()} onOpenChange={e => { if (!busy()) confirming.set(e.open); }}
-      class="w-112 max-w-full self-center mt-24 p-5 gap-4">
+      class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">断开 Gist 同步？</Text>
       <Text class="text-sm text-muted-foreground">清除本机 PAT 和 Gist 绑定。本地歌单与远端 Gist 均会保留。</Text>
       <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>

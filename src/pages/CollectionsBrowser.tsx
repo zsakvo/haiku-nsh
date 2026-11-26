@@ -312,7 +312,7 @@ export function PlaylistSidebar(props: {
       onSaved={(id) => props.navigate(collectionRoute(props.core, id))} /></If>
     <If when={!!editing()}><PlaylistEditor core={props.core} collection={editing()!}
       onClose={() => editing.set(null)} /></If>
-    <Dialog open={!!deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(null); }} class="w-112 max-w-full m-auto p-5 gap-4">
+    <Dialog open={!!deleting()} onOpenChange={(event) => { if (!event.open) deleting.set(null); }} class="w-112 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">删除歌单？</Text>
       <Text class="text-sm text-muted-foreground">
         {`“${deleting()?.title ?? ""}”将被删除，原始音乐文件会保留。`}

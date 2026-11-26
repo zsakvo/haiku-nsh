@@ -324,7 +324,7 @@ export function SearchPage(props: {
               <Button
                 label="清空搜索历史…"
                 size="sm"
-                variant="ghost"
+                variant="destructive"
                 onPress={() => confirm.set(true)}
               />
             </If>
@@ -530,7 +530,7 @@ export function SearchPage(props: {
       <Dialog
         open={confirm()}
         onOpenChange={(e) => confirm.set(e.open)}
-        class="w-96 max-w-full self-center mt-24 p-5 gap-4"
+        class="w-96 p-5 gap-4"
       >
         <Text class="text-lg font-semibold text-foreground">清空搜索历史？</Text>
         <Text class="text-sm text-muted-foreground">删除所有搜索记录。</Text>

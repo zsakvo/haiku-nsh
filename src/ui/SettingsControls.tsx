@@ -1,7 +1,8 @@
 import { Text, token, View, type JSX } from "nsh";
-import { Select as BaseSelect, Slider as BaseSlider, Switch as BaseSwitch } from "nsh/base";
+import { Button as BaseButton, Select as BaseSelect, Slider as BaseSlider, Switch as BaseSwitch } from "nsh/base";
 import { focus } from "./Button";
-import { popupItem, popupSurface } from "./Surfaces";
+import { Icon } from "./Icon";
+import { nativeMenus, nativePopup, popupItem, popupSurface } from "./Surfaces";
 
 export function SettingSection(props: {
   title?: string;
@@ -87,12 +88,12 @@ export function SettingSwitch(props: {
       checked={props.checked}
       onChange={(e) => props.onChange(e.checked)}
       accessibilityLabel={props.label}
-      class={`min-h-7 flex-row items-center gap-3 ${focus}`}
-      trackClass="h-6 w-10 justify-center rounded-full bg-settings-switch-track p-0.5 checked:bg-primary disabled:opacity-40"
-      thumbClass="size-5 rounded-full bg-settings-switch-thumb checked:translate-x-4"
+      class={`flex-row items-center gap-2 rounded-full ${focus}`}
+      trackClass="h-4.5 w-8 justify-center rounded-full bg-settings-switch-track p-0.5 transition-colors duration-200 ease-out motion-reduce:transition-none checked:bg-primary disabled:opacity-40"
+      thumbClass="size-3.5 rounded-full bg-settings-switch-thumb shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none checked:translate-x-3.5"
     >
       <If when={!props.hideLabel}>
-        <Text class="text-sm text-foreground">{props.label}</Text>
+        <Text class="text-foreground" style={{ fontSize: token("control-text-size") }}>{props.label}</Text>
       </If>
     </BaseSwitch>
   );
@@ -140,65 +141,77 @@ export function SettingSlider(props: {
           if (typeof e.value === "number") props.onChange(e.value);
         }}
         class="w-full disabled:opacity-40"
-        trackClass="h-6 justify-center"
+        trackClass="h-4 justify-center"
         indicatorClass="h-1 rounded-full bg-settings-switch-track"
         rangeClass="rounded-full bg-foreground"
-        thumbClass={`size-3 rounded-full border border-border bg-card active:bg-muted ${focus}`}
+        thumbClass={`size-3 rounded-full border border-border bg-card shadow-sm active:bg-muted ${focus}`}
       />
     </View>
   );
 }
 
+/**
+ * A pop-up button: the system NSMenu on macOS, a drawn Select elsewhere.
+ * `inline` is the borderless System Settings form whose value reads one step below the row title.
+ */
 export function SettingSelect(props: {
   label: string;
   value: string;
   items: { value: string; title: string }[];
   onChange: (value: string) => void;
   inline?: boolean;
+  disabled?: boolean;
 }) {
   const currentTitle = () => props.items.find((i) => i.value === props.value)?.title ?? "自定义";
-  if (props.inline) {
-    return (
+  const triggerClass = props.inline
+    ? `min-h-6 flex-row items-center gap-1 rounded-(--radius-inset) px-1.5 py-0.5 active:bg-muted selected:bg-muted disabled:opacity-40 ${focus}`
+    : `min-h-6 min-w-32 flex-row items-center justify-between gap-2 rounded-(--radius-inset) border border-border bg-card px-2 py-0.5 shadow-sm active:bg-muted selected:bg-muted disabled:opacity-40 ${focus}`;
+  const triggerBody = () => <>
+    <Text class={props.inline ? "text-muted-foreground" : "text-foreground"} style={{
+      numberOfLines: 1, fontSize: token(props.inline ? "setting-value-size" : "control-text-size"),
+    }}>{currentTitle()}</Text>
+    <Icon name="down" class="size-3" color="muted-foreground" />
+  </>;
+
+  let trigger: JSX.Element;
+  if (nativeMenus) {
+    const menu = nativePopup();
+    trigger = (
+      <View ref={menu.ref} class="shrink-0">
+        <BaseButton accessibilityLabel={props.label} disabled={props.disabled} selected={menu.open()}
+          onPress={() => void menu.show(props.items.map((item) => ({
+            label: item.title,
+            checked: item.value === props.value,
+            onSelect: () => { if (item.value !== props.value) props.onChange(item.value); },
+          })))}
+          class={triggerClass}>
+          {triggerBody()}
+        </BaseButton>
+      </View>
+    );
+  } else {
+    trigger = (
       <BaseSelect
         accessibilityLabel={props.label}
         value={props.value}
         items={props.items}
+        disabled={props.disabled}
         onChange={(e) => {
           if (e.value !== null) props.onChange(e.value);
         }}
+        align={props.inline ? "end" : undefined}
         popupClass={`${popupSurface} min-w-40 p-1`}
         listClass="max-h-64"
         itemClass={popupItem}
-        trigger={
-          <View class={`min-h-7 flex-row items-center gap-1.5 rounded-(--radius) px-2 py-0.5 active:bg-muted ${focus}`}>
-            <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-text-size") }}>{currentTitle()}</Text>
-            <Text class="text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>⌄</Text>
-          </View>
-        }
+        trigger={<View class={triggerClass}>{triggerBody()}</View>}
       />
     );
   }
+  if (props.inline) return trigger;
   return (
     <View class="flex-row items-center justify-between gap-4">
-      <Text class="text-sm text-foreground">{props.label}</Text>
-      <BaseSelect
-        accessibilityLabel={props.label}
-        value={props.value}
-        items={props.items}
-        onChange={(e) => {
-          if (e.value !== null) props.onChange(e.value);
-        }}
-        class="min-w-40"
-        popupClass={`${popupSurface} p-1`}
-        listClass="max-h-64"
-        itemClass={popupItem}
-        trigger={
-          <View class={`min-h-8 flex-row items-center justify-between gap-3 rounded-(--radius) border border-input bg-card px-3 py-1.5 ${focus}`}>
-            <Text class="text-sm text-foreground">{currentTitle()}</Text>
-            <Text class="text-xs text-muted-foreground">⌄</Text>
-          </View>
-        }
-      />
+      <Text class="text-foreground" style={{ fontSize: token("control-text-size") }}>{props.label}</Text>
+      {trigger}
     </View>
   );
 }

@@ -80,7 +80,7 @@ export function BackupSettings(props: {
     </SettingSection>
     <If when={!!error()}><Text class="text-sm text-destructive">{error()}</Text></If>
     <Dialog open={exporting()} onOpenChange={e => { if (!busy()) exporting.set(e.open); }}
-      class="w-128 max-w-full self-center mt-24 p-5 gap-4">
+      class="w-128 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">导出 Haiku 备份</Text>
       <Text class="text-sm text-destructive">包含明文登录凭据</Text>
       <Text class="text-sm text-muted-foreground">
@@ -102,7 +102,7 @@ export function BackupSettings(props: {
       </View>
     </Dialog>
     <Dialog open={!!preview()} onOpenChange={e => { if (!busy() && !e.open) preview.set(null); }}
-      class="w-144 max-w-full self-center mt-24 p-5 gap-4">
+      class="w-144 p-5 gap-4">
       <Text role="header" class="text-lg font-semibold text-foreground">恢复备份预览</Text>
       <View class="flex-col gap-2">
         <Text class="text-sm text-foreground">{`创建时间：${localDateTime(preview()?.meta.createdAt ?? "")}`}</Text>

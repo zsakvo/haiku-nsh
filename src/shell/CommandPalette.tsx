@@ -329,7 +329,7 @@ export function CommandPalette(props: {
     </View>;
   }
 
-  return <Dialog open={props.open} class="w-144 max-w-full self-center mt-20 overflow-hidden"
+  return <Dialog open={props.open} placement="top" class="w-144 overflow-hidden"
     onCancel={props.onClose}
     onOpenChange={(event) => { if (!event.open) props.onClose(); }}>
     <CommandKeyboard open={props.open} onCancel={props.onClose}>

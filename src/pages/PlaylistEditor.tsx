@@ -25,7 +25,7 @@ export function PlaylistEditor(props: {
     } catch (e) { error.set(String(e)); } finally { busy.set(false); }
   }
   return <Dialog open onOpenChange={(event) => { if (!event.open) props.onClose(); }}
-    class="w-112 max-w-full m-auto p-5 gap-4">
+    class="w-112 p-5 gap-4">
     <Text role="header" class="text-lg font-semibold text-foreground">
       {props.collection ? "编辑歌单" : "新建歌单"}
     </Text>
