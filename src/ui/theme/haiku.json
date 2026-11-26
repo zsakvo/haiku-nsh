@@ -68,7 +68,7 @@
       "navigation-backdrop-tint": "#fefaf99e",
       "navigation-backdrop-border": "#00000012",
       "source-chip-tint": "#ffffffb8",
-      "source-chip-border": "#00000018",
+      "source-chip-border": "#00000017",
       "background": "#fefaf9",
       "foreground": "#211814",
       "card": "#ffffff",
@@ -160,7 +160,10 @@
       "now-playing-progress-buffered": "#ffffff38",
       "brand-neutral": "#2b2b2b",
       "primary-soft": "#ffe5da",
-      "primary-soft-foreground": "#a24100"
+      "primary-soft-foreground": "#a24100",
+      "source-chip-foreground": "#a24100",
+      "source-chip-accent-tint": "#ffe5dab8",
+      "source-chip-accent-border": "#a55b372e"
     },
     "dark": {
       "navigation-backdrop-tint": "#1c1411a8",
@@ -258,7 +261,10 @@
       "now-playing-progress-buffered": "#ffffff38",
       "brand-neutral": "#e4e4e4",
       "primary-soft": "#442415",
-      "primary-soft-foreground": "#ffae89"
+      "primary-soft-foreground": "#ffae89",
+      "source-chip-foreground": "#ffae89",
+      "source-chip-accent-tint": "#442415a6",
+      "source-chip-accent-border": "#b669464d"
     }
   }
 }

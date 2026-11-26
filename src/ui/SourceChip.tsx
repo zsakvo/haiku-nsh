@@ -8,7 +8,7 @@ import { popupItem, popupSurface } from "./Surfaces";
 
 function SourceMark(props: { logo?: string; testID?: string }) {
   return <Image testID={props.testID} src={props.logo || "asset:/ui/icons/antenna.svg"}
-    class="size-(--source-icon-size) shrink-0 rounded-sm" style={props.logo ? {} : {tintColor:token("foreground")}} />;
+    class="size-(--source-icon-size) shrink-0 rounded-sm" style={props.logo ? {} : {tintColor:token("source-chip-foreground")}} />;
 }
 
 /** A glass capsule source selector sharing the navigation toolbar's control height. */
@@ -17,11 +17,11 @@ export function SourceChip(props: {
 }) {
   const selected = () => props.items.find((item) => item.id === props.value) ?? props.items[0];
   const nativeMenu = platform.os === "macos" && desktopAvailable;
-  const triggerClass = `group relative h-(--source-chip-height) max-w-56 flex-row items-center gap-1.5 overflow-hidden rounded-full border border-source-chip-border pl-1.5 pr-2.5 disabled:opacity-35 ${focus}`;
+  const triggerClass = `group relative h-(--source-chip-height) max-w-56 flex-row items-center gap-1.5 overflow-hidden rounded-full border border-source-chip-accent-border pl-1.5 pr-2.5 disabled:opacity-35 ${focus}`;
   const triggerBody = () => <>
     <NavigationControlBackdrop pill />
     <SourceMark testID="source-chip-icon" logo={selected()?.logo} />
-    <Text testID="source-chip-label" class="text-foreground" style={{numberOfLines:1,fontSize:token("source-label-size")}}>{selected()?.title ?? "选择来源"}</Text>
+    <Text testID="source-chip-label" class="text-source-chip-foreground" style={{numberOfLines:1,fontSize:token("source-label-size")}}>{selected()?.title ?? "选择来源"}</Text>
   </>;
 
   if (nativeMenu) {

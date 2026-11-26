@@ -34,12 +34,12 @@ export const GlassSurface = nativeComponent<{ radius: number; dark: boolean; mat
 export function NavigationControlBackdrop(props: { pill?: boolean }) {
   const macos = platform.os === "macos";
   const radiusClass = props.pill ? "rounded-full" : "rounded-(--radius)";
-  const radius = () => props.pill ? token("navigation-control-height") / 2 : token("radius");
+  const radius = () => props.pill ? token("source-chip-height") / 2 : token("radius");
   return <View class={`absolute inset-0 overflow-hidden ${radiusClass} pointer-events-none`}>
     <If when={macos}>
       <GlassSurface class="absolute inset-0 pointer-events-none" radius={radius()} material="popover" dark={colorScheme() === "dark"} />
     </If>
-    <View class="absolute inset-0 bg-source-chip-tint transition-colors duration-200 ease-out motion-reduce:transition-none group-active:bg-muted group-selected:bg-accent" />
+    <View class={`absolute inset-0 ${props.pill ? "bg-source-chip-accent-tint" : "bg-source-chip-tint"} transition-colors duration-200 ease-out motion-reduce:transition-none group-active:bg-muted group-selected:bg-accent`} />
   </View>;
 }
 export const NavigationLayoutContext = context<{

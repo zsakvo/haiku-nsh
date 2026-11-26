@@ -120,6 +120,11 @@ export function brandPalette(seed: string, dark: boolean): Record<string, string
     "navigation-backdrop-tint": s.background + Math.round(s.navAlpha * 255).toString(16),
     "dock-surface": s.background + Math.round(s.navAlpha * 255).toString(16),
     "source-chip-tint": (dark ? s.muted : s.card) + Math.round(s.chipAlpha * 255).toString(16),
+    "source-chip-border": oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09),
+    // Source chip: the tonal wash, translucent over the live blur, with a brand-tinted hairline.
+    "source-chip-accent-tint": soft + Math.round(s.chipAlpha * 255).toString(16),
+    "source-chip-accent-border": plain ? oklch(dark ? 1 : 0, 0, 0, dark ? 0.12 : 0.09) : oklch(dark ? 0.6 : 0.55, vivid * 0.6, h, dark ? 0.3 : 0.18),
+    "source-chip-foreground": onSoft,
     "overlay-backdrop": s.overlay,
     primary, "primary-foreground": onPrimary, ring: primary, "primary-soft": soft, "primary-soft-foreground": onSoft,
     "sidebar-primary": primary, "sidebar-primary-foreground": onPrimary, "sidebar-ring": primary,
