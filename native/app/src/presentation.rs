@@ -16,6 +16,12 @@ struct Cover {
     path: String,
 }
 
+struct TrackCover {
+    identity: String,
+    key: String,
+    theme: CoverTheme,
+}
+
 pub(crate) struct Presentation {
     _owner: Owner,
     pub bridge: Rc<CoreBridge>,
@@ -29,7 +35,10 @@ pub(crate) struct Presentation {
     cache: RefCell<VecDeque<(String, Cover)>>,
     /// Best cover known per track identity, so a switch to a prewarmed track resolves
     /// synchronously instead of waiting on a key that needs a plugin call to compute.
-    by_track: RefCell<VecDeque<(String, String)>>,
+    /// The palette is locked to the first cover resolved for the track: the small and
+    /// large renditions of one cover can quantize to different colors, and a second
+    /// palette change for the same track reads as a glitch.
+    by_track: RefCell<VecDeque<TrackCover>>,
     request: RefCell<RequestVersion>,
 }
 pub(crate) fn get() -> Option<Rc<Presentation>> {
@@ -279,8 +288,8 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
                     let Some((key, cover)) = cover else { continue };
                     let _ = prefetch_image(cover.uri.clone()).await;
                     let Some(p) = weak.upgrade() else { return };
-                    p.remember(key.clone(), cover);
-                    p.associate(&identity, key);
+                    p.remember(key.clone(), cover.clone());
+                    p.associate(&identity, key, &cover.theme);
                 }
             });
         });
@@ -365,11 +374,15 @@ impl Presentation {
     }
     fn show(&self, identity: &str, key: String, cover: Cover) {
         self.remember(key.clone(), cover.clone());
-        self.associate(identity, key);
+        let theme = self.associate(identity, key, &cover.theme);
         self.artwork.set(cover.uri);
         self.artwork_path.set(Some(cover.path));
-        *self.cover_theme.borrow_mut() = Some(cover.theme.clone());
-        crate::player_theme::apply(Some(&cover.theme));
+        // Same palette (e.g. the larger rendition of the same track): swap only the image.
+        if self.cover_theme.borrow().as_ref() == Some(&theme) {
+            return;
+        }
+        crate::player_theme::apply(Some(&theme));
+        *self.cover_theme.borrow_mut() = Some(theme);
     }
     fn clear_cover(&self) {
         self.artwork.set(String::new());
@@ -383,8 +396,8 @@ impl Presentation {
             .by_track
             .borrow()
             .iter()
-            .find(|(id, _)| id == identity)
-            .map(|(_, key)| key.clone())?;
+            .find(|t| t.identity == identity)
+            .map(|t| t.key.clone())?;
         let cover = self
             .cache
             .borrow()
@@ -393,12 +406,21 @@ impl Presentation {
             .map(|(_, c)| c.clone())?;
         Some((key, cover))
     }
-    /// The later (larger, source-provided) cover replaces the direct one for the track.
-    fn associate(&self, identity: &str, key: String) {
+    /// Points the track at its best cover (the later, larger one replaces the direct one)
+    /// and returns the track's locked palette: the first one recorded for it wins.
+    fn associate(&self, identity: &str, key: String, theme: &CoverTheme) -> CoverTheme {
         let mut tracks = self.by_track.borrow_mut();
-        tracks.retain(|(id, _)| id != identity);
-        tracks.push_front((identity.to_owned(), key));
+        let theme = match tracks.iter().position(|t| t.identity == identity) {
+            Some(i) => tracks.remove(i).unwrap().theme,
+            None => theme.clone(),
+        };
+        tracks.push_front(TrackCover {
+            identity: identity.to_owned(),
+            key,
+            theme: theme.clone(),
+        });
         tracks.truncate(24);
+        theme
     }
     fn remember(&self, key: String, cover: Cover) {
         let mut cache = self.cache.borrow_mut();
