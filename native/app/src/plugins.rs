@@ -1196,7 +1196,9 @@ impl PluginService {
                         break;
                     }
                     timer(std::time::Duration::from_millis(150)).await;
-                    while rx.try_recv().is_ok() {}
+                    // try_recv only exists in futures-channel >= 0.3.32; NSH's host lock may pin 0.3.31.
+                    #[allow(deprecated)]
+                    while let Ok(Some(())) = rx.try_next() {}
                 }
             })
         });

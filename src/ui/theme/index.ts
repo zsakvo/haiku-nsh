@@ -24,9 +24,11 @@ export function brandTheme(brand: Brand | string) {
   return { cssVars: { theme: base.cssVars.theme, light: palette(false), dark: palette(true) } };
 }
 export function createAppearance(initialMode?: AppearanceMode) {
-  const mode = signal<AppearanceMode>(initialMode ?? "light");
-  const brand = signal<Brand>("orange");
-  const detailSky = signal(false);
+  // Seed from the persisted file synchronously; Core.open() takes seconds and would flash the default theme.
+  const saved = Core.appearance() as { themeMode: AppearanceMode; brandColor: string; detailSky: boolean };
+  const mode = signal<AppearanceMode>(initialMode ?? saved.themeMode);
+  const brand = signal<Brand>(normalizeBrand(saved.brandColor));
+  const detailSky = signal(saved.detailSky);
   const error = signal("");
   let core: Core | undefined;
   let stop: (() => void) | undefined;

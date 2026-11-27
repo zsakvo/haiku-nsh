@@ -648,6 +648,22 @@ impl Core {
             "license":"应用许可证尚未声明。",
             "notices":include_str!("../assets/THIRD_PARTY_NOTICES.txt")})
     }
+    /// Persisted `{themeMode, brandColor, detailSky}` read straight from settings.json, so the
+    /// first frame already wears the saved theme instead of waiting for the slow `open()`.
+    /// Read-only: corrupt or missing files fall back to defaults; `open()` owns recovery.
+    /// Must not touch `global()`: that is reactive state, unavailable to this synchronous call.
+    pub fn appearance() -> JsonValue {
+        let root = haiku_store::data_root();
+        let raw: JsonValue = std::fs::read(root.join("settings.json")).ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default();
+        let defaults = haiku_store::settings::Settings::default();
+        let text = |key: &str, fallback: &str| raw.get(key).and_then(|v| v.as_str()).unwrap_or(fallback).to_owned();
+        serde_json::json!({
+            "themeMode": text("themeMode", &defaults.theme_mode),
+            "brandColor": text("brandColor", &defaults.brand_color),
+            "detailSky": raw.get("detailSky").and_then(|v| v.as_bool()).unwrap_or(defaults.detail_sky),
+        })
+    }
     /// Replace semantic tokens shared by TSX and Rust.
     pub async fn apply_theme(json: String) -> Result<(), String> {
         let mut tokens: nsh_core::element::Tokens =
