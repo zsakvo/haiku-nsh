@@ -25,6 +25,7 @@ import type {
   Format,
   Lyrics,
   Detail,
+  Json,
 } from 'haiku';
 import { api, batch, request, checkCode, credential, cookies } from './api.ts';
 import { auth } from './auth.ts';
@@ -369,6 +370,16 @@ function classify(card: Card) {
   if (jump === 10005 || type === 1000) return 'toplist';
   if (jump === 20001) return 'radio-entry';
 }
+const RADIO_SEED = 'radioSeed';
+async function radioTracks(ctx: Context, songIds: number[]) {
+  const value = await api<{ tracks: Song[] }>(
+    ctx,
+    'music.radioProxy.MbTrackRadioSvr',
+    'get_radio_track',
+    { id: 99, num: 5, from: 0, scene: 0, song_ids: songIds },
+  );
+  return value.tracks ?? [];
+}
 async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
   const position = feedPosition(ctx.cursor);
   const feed = await api<Feed>(ctx, 'music.recommend.RecommendFeed', 'get_recommend_feed', {
@@ -463,7 +474,16 @@ async function home(ctx: Context & { cursor?: string; refresh: boolean }) {
         if (feedLayout) add('toplists', { id, title, cover: art });
         else tops.push({ id, title, cover: art });
       } else if (kind === 'radio-entry') {
-        const item = { title, cover: art, to: { radio: '99' } };
+        // The radio card carries no cover of its own, and every radio request returns new songs.
+        // Fetch one batch now, show its first song, and keep it as the station's opening batch so
+        // the card preview and playback start from the same songs.
+        const seed = (
+          c.card_extra_info?.Tracks?.length
+            ? c.card_extra_info.Tracks
+            : await radioTracks(ctx, []).catch(() => [] as Song[])
+        ).map(track);
+        if (seed.length) ctx.storage.set(RADIO_SEED, seed as unknown as Json);
+        const item = { title, cover: seed[0]?.cover || art, to: { radio: '99' } };
         if (feedLayout) add('entries', item);
         else entries.push(item);
       }
@@ -718,14 +738,12 @@ export default definePlugin({
       const songIds = ctx.history
         .map((t) => (t.extra as { songId?: number } | undefined)?.songId)
         .filter((id): id is number => !!id);
-      const value = await api<{ tracks: Song[] }>(
-        ctx,
-        'music.radioProxy.MbTrackRadioSvr',
-        'get_radio_track',
-        { id: 99, num: 5, from: 0, scene: 0, song_ids: songIds },
-      );
+      // A station that has not played yet opens with the batch whose first song is the card cover.
+      const seed = ctx.storage.get<Json>(RADIO_SEED) as unknown as Track[] | null;
+      if (!ctx.history.length && seed?.length) return seed.slice(0, ctx.count);
+      if (seed) ctx.storage.delete(RADIO_SEED);
       const seen = new Set(ctx.history.map((t) => t.id));
-      return value.tracks
+      return (await radioTracks(ctx, songIds))
         .map(track)
         .filter((t) => !seen.has(t.id))
         .slice(0, ctx.count);
