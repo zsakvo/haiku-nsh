@@ -860,6 +860,28 @@ impl PluginService {
         .map_err(|e| e.to_string())??;
         Self::changed(&this).await
     }
+    /// Create the single instance of a plugin that needs no account or connection (public
+    /// content and scrapers), enabling the package first. Libraries use `connect`, plugins
+    /// with login methods a login draft. An existing instance is reopened with the new code.
+    pub async fn activate_package(this: Instance<Self>, plugin: String) -> Result<JsonValue, String> {
+        let host = Self::host(&this);
+        background(async move {
+            let descriptor = host.package(&plugin).map_err(|e| e.to_string())?.descriptor;
+            if descriptor.kind == "library" || descriptor.connection.is_some() {
+                return Err("该插件需要填写连接信息，请使用“连接”".to_string());
+            }
+            if !descriptor.auth_methods.is_empty() {
+                return Err("该插件需要登录，请使用“登录”".to_string());
+            }
+            if !host.package_enabled(&plugin) {
+                host.set_package_enabled(&plugin, true).await.map_err(|e| e.to_string())?;
+            }
+            host.activate(&plugin).await.map(|_| ()).map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Self::changed(&this).await
+    }
     /// Persist a complete ordering of source ids.
     pub async fn reorder(this: Instance<Self>, ids: Vec<String>) -> Result<JsonValue, String> {
         let host = Self::host(&this);

@@ -28,7 +28,7 @@ export function closeDevTools() { Window.get(WINDOW_ID)?.close(); }
 /** No sidebar: the title bar carries a centered segmented tab list; each tab owns the full body.
  * Plugin HTTP traffic is recorded only while this window exists. */
 function DevTools() {
-  const selected = signal<Section>(sections[0]);
+  const selected = signal<Section>(sections[0]), debugSource = signal("");
   const plugins = createPlugins();
   effect(() => { const c = plugins.core(); if (c) startHttpCapture(c); });
   cleanup(stopHttpCapture);
@@ -50,8 +50,9 @@ function DevTools() {
     </View>
     <View class="flex-1 min-h-0 flex-col px-5 pt-2 pb-5">
       <If when={!!plugins.core()}>
-        <If when={selected() === "插件编写"}><AuthoringPanel core={plugins.core()!} /></If>
-        <If when={selected() === "插件调试"}><DebuggerPanel state={plugins} /></If>
+        <If when={selected() === "插件编写"}><AuthoringPanel core={plugins.core()!} plugins={plugins}
+          onDebug={(id) => { debugSource.set(id); selected.set("插件调试"); }} /></If>
+        <If when={selected() === "插件调试"}><DebuggerPanel state={plugins} initialSource={debugSource()} /></If>
         <If when={selected() === "网络请求"}><NetworkPanel /></If>
         <If when={selected() === "日志查看"}><LogsView core={plugins.core()!} sources={logSources()} fill /></If>
       </If>

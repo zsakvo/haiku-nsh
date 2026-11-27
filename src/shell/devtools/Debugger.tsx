@@ -12,8 +12,8 @@ const views = ["树形", "JSON"] as const;
 const modes = [{ id: "form", label: "表单" }, { id: "raw", label: "JSON" }];
 
 /** Invoke installed capabilities and inspect what they return; optionally hot load a local package. */
-export function DebuggerPanel(props: { state: PluginsState }) {
-  const source = signal(""), capability = signal("track.get"), args = signal("[]"), mode = signal("form");
+export function DebuggerPanel(props: { state: PluginsState; initialSource?: string }) {
+  const source = signal(props.initialSource ?? ""), capability = signal("track.get"), args = signal("[]"), mode = signal("form");
   const values = signal<Record<string, string>>({});
   const location = signal(""), watching = signal(""), watchStatus = signal("");
   const outcome = signal<Outcome | null>(null), view = signal<typeof views[number]>("树形");

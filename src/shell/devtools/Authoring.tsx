@@ -3,8 +3,10 @@ import { Button as BaseButton, Input } from "nsh/base";
 import type { Core } from "haiku/native";
 import { Button, focus } from "../../ui/Button";
 import { Field } from "../../ui/LibraryControls";
-import { ActionMenu } from "../../ui/Surfaces";
+import { ActionMenu, Dialog } from "../../ui/Surfaces";
 import type { PluginWorkspace, WorkspaceStatus } from "../../state/devtools";
+import type { PluginDescriptor, PluginsState, SourceRecord } from "../../state/plugins";
+import { SourceLogin } from "../PluginSettings";
 import { CodeView, Dot, Pane, Pill, Placeholder, type Tone } from "./Kit";
 
 const phases: Record<WorkspaceStatus["phase"], { label: string; tone: Tone; step: number }> = {
@@ -12,9 +14,9 @@ const phases: Record<WorkspaceStatus["phase"], { label: string; tone: Tone; step
   writing: { label: "编写中", tone: "primary", step: 1 },
   loaded: { label: "已热加载", tone: "success", step: 2 },
   failed: { label: "加载失败", tone: "destructive", step: 2 },
-  done: { label: "已完成", tone: "success", step: 3 },
+  done: { label: "已完成", tone: "success", step: 4 },
 };
-const steps = ["创建工作区", "Agent 编写", "热加载", "完成"];
+const steps = ["创建工作区", "Agent 编写", "热加载", "完成", "启用实例"];
 
 function Logo(props: { src?: string | null; size: "sm" | "lg" }) {
   const size = props.size === "lg" ? "size-12 rounded-(--radius-panel)" : "size-7 rounded-(--radius-inset)";
@@ -24,7 +26,7 @@ function Logo(props: { src?: string | null; size: "sm" | "lg" }) {
 }
 
 /** Create an agent workspace, hand its prompt over, and follow the STATUS file the agent writes. */
-export function AuthoringPanel(props: { core: Core }) {
+export function AuthoringPanel(props: { core: Core; plugins: PluginsState; onDebug: (sourceId: string) => void }) {
   const workspaces = signal<PluginWorkspace[]>([]), selected = signal(""), creating = signal(false);
   const status = signal<WorkspaceStatus | null>(null), error = signal(""), busy = signal(false);
   const current = () => workspaces().find((w) => w.path === selected());
@@ -83,7 +85,8 @@ export function AuthoringPanel(props: { core: Core }) {
           })} />
       </If>
       <If when={!showCreate() && !!current()}>
-        <WorkspaceDetail core={props.core} workspace={current()!} status={status()} error={error()}
+        <WorkspaceDetail core={props.core} plugins={props.plugins} onDebug={props.onDebug}
+          workspace={current()!} status={status()} error={error()}
           act={act} onRemoved={async () => { selected.set(""); await reload(); if (workspaces()[0]) selected.set(workspaces()[0].path); }} />
       </If>
     </Pane>
@@ -127,13 +130,15 @@ function CreateWorkspace(props: {
 }
 
 function WorkspaceDetail(props: {
-  core: Core; workspace: PluginWorkspace; status: WorkspaceStatus | null; error: string;
+  core: Core; plugins: PluginsState; onDebug: (sourceId: string) => void; workspace: PluginWorkspace; status: WorkspaceStatus | null; error: string;
   act: (work: () => Promise<unknown>) => Promise<void>; onRemoved: () => Promise<void>;
 }) {
   const copied = signal(false);
   const w = () => props.workspace;
   const phase = () => props.status ? phases[props.status.phase] : undefined;
   const plugin = () => props.status?.plugin;
+  const instances = () => props.plugins.value().sources.filter((s) => s.pluginId === w().pluginId);
+  const step = () => props.status?.phase === "done" && instances().some((s) => s.enabled && !s.needsLogin) ? 5 : phase()?.step ?? 1;
   return <Scroll class="flex-1 min-h-0" contentClass="gap-5 p-5" testID="workspace-status">
     <View class="flex-row items-center gap-3">
       <Logo src={w().logo} size="lg" />
@@ -157,7 +162,7 @@ function WorkspaceDetail(props: {
         }) },
       ]} />
     </View>
-    <Stepper step={phase()?.step ?? 1} failed={props.status?.phase === "failed"} />
+    <Stepper step={step()} failed={props.status?.phase === "failed"} />
     <If when={!!props.error}><Text class="text-xs text-destructive">{props.error}</Text></If>
     <Pane title="当前状态">
       <View class="gap-1 px-3 py-3">
@@ -187,8 +192,8 @@ function WorkspaceDetail(props: {
         <View selectable class="p-3"><Text class="text-sm text-foreground">{props.status!.summary}</Text></View>
       </Pane>
     </If>
-    <If when={props.status?.phase === "done"}>
-      <Text class="text-xs text-muted-foreground">插件已安装：在 设置 → 插件 中添加来源即可使用，或切换到“插件调试”调用它的能力。</Text>
+    <If when={!!props.status && props.status.phase !== "waiting"}>
+      <InstallPane plugins={props.plugins} workspace={w()} onDebug={props.onDebug} />
     </If>
     <View class="gap-1">
       <Text class="font-medium text-muted-foreground" style={{ fontSize: token("sidebar-hint-size") }}>工作区位置</Text>
@@ -201,7 +206,7 @@ function WorkspaceDetail(props: {
 function Stepper(props: { step: number; failed: boolean }) {
   return <View class="flex-row items-center gap-2">
     {steps.map((label, index) => {
-      const done = index < props.step || (index === props.step && index === steps.length - 1);
+      const done = index < props.step;
       const active = index === props.step && !done;
       const failed = active && props.failed;
       return <>
@@ -216,4 +221,78 @@ function Stepper(props: { step: number; failed: boolean }) {
       </>;
     })}
   </View>;
+}
+
+const kindLabels: Record<string, string> = { library: "曲库", platform: "平台", scraper: "刮削", lyrics: "歌词" };
+/** How an instance of this package comes to exist: connection fields, a login, or nothing at all. */
+function entry(pkg: PluginDescriptor) {
+  if (pkg.connection || pkg.kind === "library") return { label: "连接", needs: "填写连接信息后创建实例。", login: true, many: true };
+  if (pkg.authMethods.length) return { label: "登录", needs: "登录账号后创建实例。", login: true, many: false };
+  return { label: "激活实例", needs: "无需登录，激活后即可在应用中使用。", login: false, many: false };
+}
+
+/** Close the loop from authored code to a usable source: install, enable, instantiate, try it. */
+function InstallPane(props: { plugins: PluginsState; workspace: PluginWorkspace; onDebug: (sourceId: string) => void }) {
+  const loggingIn = signal(false);
+  const state = props.plugins;
+  const pkg = () => state.value().packages.find((p) => p.id === props.workspace.pluginId);
+  const instances = () => state.value().sources.filter((s) => s.pluginId === props.workspace.pluginId);
+  const install = () => void state.run((c) => c.plugins.importPackage(`${props.workspace.path}/plugin`));
+  async function create() {
+    const descriptor = pkg();
+    if (!descriptor) return;
+    if (!descriptor.enabled) await state.run((c) => c.sources.setPackageEnabled(descriptor.id, true));
+    if (entry(descriptor).login) loggingIn.set(true);
+    else await state.run((c) => c.sources.activatePackage(descriptor.id));
+  }
+  const instanceState = (s: SourceRecord): { tone: Tone; label: string } => !s.enabled ? { tone: "muted", label: "已禁用" }
+    : s.needsLogin ? { tone: "warning", label: "需重新登录" } : { tone: "success", label: "可用" };
+  return <Pane title="安装与实例" testID="workspace-install"
+    accessory={<If when={!!pkg()}><Button label="重新安装" size="sm" variant="ghost" loading={state.busy()} onPress={install} /></If>}>
+    <If when={!pkg()}>
+      <View class="flex-row items-center gap-3 px-3 py-3">
+        <View class="flex-1 gap-0.5">
+          <Text class="text-sm text-foreground">尚未安装</Text>
+          <Text class="text-xs text-muted-foreground">把工作区中的 plugin/ 安装到 Haiku；之后 Agent 的每次修改都会热更新已安装的插件。</Text>
+        </View>
+        <Button label="安装插件" variant="primary" loading={state.busy()} onPress={install} />
+      </View>
+    </If>
+    <If when={!!pkg()}>
+      <View class="flex-row items-center gap-3 px-3 py-3">
+        <Dot tone={pkg()!.enabled ? "success" : "muted"} />
+        <View class="flex-1 min-w-0 gap-0.5">
+          <Text class="text-sm text-foreground">{`已安装 ${pkg()!.name} ${pkg()!.version}`}</Text>
+          <Text class="text-xs text-muted-foreground">
+            {`${kindLabels[pkg()!.kind] ?? pkg()!.kind}插件 · ${pkg()!.enabled ? "已启用" : "已停用"}${instances().length ? ` · ${instances().length} 个实例` : ` · ${entry(pkg()!).needs}`}`}
+          </Text>
+        </View>
+        <If when={!pkg()!.enabled && !!instances().length}>
+          <Button label="启用" onPress={() => void state.run((c) => c.sources.setPackageEnabled(pkg()!.id, true))} />
+        </If>
+        <If when={!instances().length || entry(pkg()!).many}>
+          <Button label={instances().length ? `再${entry(pkg()!).label}一个…` : entry(pkg()!).login ? `${entry(pkg()!).label}…` : entry(pkg()!).label}
+            variant={instances().length ? "secondary" : "primary"} loading={state.busy()} onPress={() => void create()} />
+        </If>
+      </View>
+      {instances().map((s) => <View class="flex-row items-center gap-3 border-t border-border px-3 py-2">
+        <View class="flex-1 min-w-0 gap-0.5">
+          <Text class="text-sm text-foreground" style={{ numberOfLines: 1 }}>{s.user?.name || s.displayName || pkg()!.name}</Text>
+          <Text class="font-mono text-xs text-muted-foreground" style={{ numberOfLines: 1 }}>{s.sourceId}</Text>
+        </View>
+        <Pill tone={instanceState(s).tone} label={instanceState(s).label} />
+        <If when={s.needsLogin}><Button label="重新登录…" size="sm" onPress={() => loggingIn.set(true)} /></If>
+        <If when={!s.enabled}>
+          <Button label="启用" size="sm" onPress={() => void state.run((c) => pkg()!.enabled ? c.sources.setEnabled(s.sourceId, true) : c.sources.setPackageEnabled(pkg()!.id, true))} />
+        </If>
+        <Button label="调试" size="sm" variant="primary" disabled={!s.enabled} onPress={() => props.onDebug(s.sourceId)} />
+      </View>)}
+    </If>
+    <If when={!!state.error()}><Text class="border-t border-border px-3 py-2 text-xs text-destructive">{state.error()}</Text></If>
+    <Dialog open={loggingIn()} onOpenChange={(e) => loggingIn.set(e.open)} class="w-112 p-5">
+      <If when={loggingIn() && !!pkg()}>
+        <SourceLogin state={state} initialPlugin={pkg()!.id} lockedPlugin onClose={() => loggingIn.set(false)} />
+      </If>
+    </Dialog>
+  </Pane>;
 }
