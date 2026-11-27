@@ -2,9 +2,18 @@ import { Text, token } from "nsh";
 import { Button as BaseButton } from "nsh/base";
 import { Icon, type IconName } from "./Icon";
 import { focus } from "./Button";
-/** `fit`: as wide as its content, for items sharing a row. */
-export function SidebarItem(props: { icon: IconName; label: string; selected: boolean; onPress: () => void; testID?: string; fit?: boolean }) {
-  return <BaseButton testID={props.testID} selected={props.selected} onPress={props.onPress}
+/** `fit`: as wide as its content, for items sharing a row. `onLongPress`: a press held for
+ * about half a second runs it instead of `onPress` (a hidden entry, e.g. developer tools). */
+export function SidebarItem(props: { icon: IconName; label: string; selected: boolean; onPress: () => void; onLongPress?: () => void; testID?: string; fit?: boolean }) {
+  let timer: number | undefined, held = false;
+  const release = () => { if (timer !== undefined) clearTimeout(timer); timer = undefined; };
+  const down = () => {
+    held = false; release();
+    if (props.onLongPress) timer = setTimeout(() => { timer = undefined; held = true; props.onLongPress?.(); }, 500);
+  };
+  const press = () => { release(); if (held) { held = false; return; } props.onPress(); };
+  return <BaseButton testID={props.testID} selected={props.selected} onPress={press}
+    onPressDown={down} onPressUp={() => { if (!held) release(); }}
     class={`group flex-row items-center gap-2 rounded-(--radius) min-h-(--navigation-row-height) px-2.5 py-0.5 active:bg-muted selected:bg-selection ${focus}`}>
     <Icon name={props.icon} color={props.selected ? "selection-icon" : "sidebar-foreground"} sidebar />
     <Text style={{ fontSize: token("sidebar-text-size"), numberOfLines: 1, textOverflow: "ellipsis" }}

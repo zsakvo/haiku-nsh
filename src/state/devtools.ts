@@ -1,34 +1,68 @@
 import { signal } from "nsh";
 import type { Core } from "haiku/native";
 
-/** A redacted plugin HTTP trace event, stamped when the app heard it. */
-export interface HttpTrace {
-  seq: number; time: number; sourceId: string; phase: "request" | "response";
-  method: string; url: string; status?: number; headers: Record<string, string>;
+/** One plugin HTTP exchange: the request, then its response or failure, merged by request id. */
+export interface HttpExchange {
+  id: number; time: number; sourceId: string; method: string; url: string;
+  state: "pending" | "done" | "failed";
+  status?: number; elapsedMs?: number; error?: string;
+  requestHeaders: Record<string, string>; responseHeaders: Record<string, string>;
+  requestBody?: string; responseBody?: string; requestSize?: number; responseSize?: number;
 }
 export interface PluginWorkspace {
-  path: string; name: string; author: string; description: string;
-  pluginId: string; createdAt: number; done: boolean; prompt: string;
+  path: string; name: string; author: string; website?: string; description: string;
+  pluginId: string; createdAt: number; done: boolean; prompt: string; logo?: string | null;
 }
 export interface WorkspaceStatus {
-  phase: "waiting" | "failed" | "loaded" | "done"; message: string; summary?: string;
+  phase: "waiting" | "writing" | "failed" | "loaded" | "done"; message: string; summary?: string;
   plugin?: { id: string; name: string; version: string; kind: string; capabilities: string[] };
 }
 
-/** App-wide so traces keep accumulating while the developer tools window is closed. */
-const traces = signal<HttpTrace[]>([]);
-let stopCapture: (() => void) | undefined, seq = 0;
-export const httpTraces = traces;
-export function startTraceCapture(core: Core) {
-  if (stopCapture) return;
-  stopCapture = core.plugins.onEvent(value => {
-    const event = value as Partial<HttpTrace> & { kind?: string };
-    if (event.kind !== "http") return;
-    traces.set([...traces(), {
-      seq: ++seq, time: Date.now(), sourceId: event.sourceId ?? "", phase: event.phase ?? "request",
-      method: event.method ?? "GET", url: event.url ?? "", status: event.status ?? undefined, headers: event.headers ?? {},
-    }].slice(-500));
+interface HttpEvent {
+  kind?: string; id?: number; sourceId?: string; phase?: "request" | "response" | "error";
+  method?: string; url?: string; status?: number | null; headers?: Record<string, string>;
+  body?: string | null; size?: number | null; elapsedMs?: number | null; error?: string | null;
+}
+
+const LIMIT = 300;
+const exchanges = signal<HttpExchange[]>([]);
+let stop: (() => void) | undefined;
+export const httpExchanges = exchanges;
+
+function merge(event: HttpEvent) {
+  const id = event.id ?? 0;
+  const list = exchanges();
+  const index = list.findIndex((x) => x.id === id);
+  if (event.phase === "request" || index < 0) {
+    if (event.phase !== "request") return;
+    exchanges.set([...list, {
+      id, time: Date.now(), sourceId: event.sourceId ?? "", method: event.method ?? "GET", url: event.url ?? "",
+      state: "pending" as const, requestHeaders: event.headers ?? {}, responseHeaders: {},
+      requestBody: event.body ?? undefined, requestSize: event.size ?? undefined,
+    }].slice(-LIMIT));
+    return;
+  }
+  const next = list.slice();
+  next[index] = event.phase === "response"
+    ? { ...list[index], state: "done", status: event.status ?? undefined, url: event.url || list[index].url,
+      responseHeaders: event.headers ?? {}, responseBody: event.body ?? undefined,
+      responseSize: event.size ?? undefined, elapsedMs: event.elapsedMs ?? undefined }
+    : { ...list[index], state: "failed", error: event.error ?? "请求失败", elapsedMs: event.elapsedMs ?? undefined };
+  exchanges.set(next);
+}
+
+/** Record only while the developer tools window is open: the host traces HTTP only while
+ * someone listens to `onEvent`, and this is the only listener. */
+export function startHttpCapture(core: Core) {
+  if (stop) return;
+  stop = core.plugins.onEvent((value) => {
+    const event = value as HttpEvent;
+    if (event.kind === "http") merge(event);
   });
 }
-export function stopTraceCapture() { stopCapture?.(); stopCapture = undefined; }
-export function clearTraces() { traces.set([]); }
+/** Stop recording and drop what was recorded. */
+export function stopHttpCapture() {
+  stop?.(); stop = undefined;
+  exchanges.set([]);
+}
+export function clearHttpExchanges() { exchanges.set([]); }

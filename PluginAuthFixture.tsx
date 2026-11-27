@@ -40,7 +40,6 @@ function AuthPanel(props: { core: Core }) {
         )} />
       </View>
       <Text>{report()}</Text><Text>{`events:${events()}`}</Text>
-      <Each of={state.events()}>{event => <Text>{JSON.stringify(event())}</Text>}</Each>
       <Dialog open={opened()} onOpenChange={e => opened.set(e.open)}
         class="w-96 self-center mt-12 gap-4 p-5">
         <If when={opened()}><Each of={[method()]} key={value => value}>{value =>

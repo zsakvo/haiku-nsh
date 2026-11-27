@@ -120,6 +120,8 @@ pub struct RuntimeOptions {
     pub native_modules: BTreeMap<String, NativeModule>,
     pub log: Option<Arc<dyn Fn(LogRecord) + Send + Sync>>,
     pub http_hook: Option<Arc<dyn Fn(HttpEvent) + Send + Sync>>,
+    /// While set and false, `http_hook` is not called and no bodies are copied (capture off).
+    pub http_capture: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// Rewrite every fetch URL before transport (for isolated fixture replay).
     /// Redirects are returned to the caller when installed, never followed outside the hook.
     pub fetch_url: Option<Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>>,
@@ -135,6 +137,7 @@ impl Default for RuntimeOptions {
             native_modules: BTreeMap::new(),
             log: None,
             http_hook: None,
+            http_capture: None,
             fetch_url: None,
         }
     }

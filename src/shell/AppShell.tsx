@@ -26,7 +26,6 @@ import { createCoreState, type PlayerSnapshot } from "../state/core";
 import { createNavigation, destinations, routeKey, type Route } from "./navigation";
 import { Settings } from "./Settings";
 import { closeDevTools, openDevTools } from "./DevTools";
-import { startTraceCapture, stopTraceCapture } from "../state/devtools";
 import { createSettings } from "../state/settings";
 import { CommandPalette, type PaletteCommand } from "./CommandPalette";
 import { LyricsSearch } from "./LyricsSearch";
@@ -59,12 +58,7 @@ export function AppShell(props: {
   const plugins = createPlugins();
   const appSettings = createSettings();
   const developerMode = () => !!appSettings.value()?.developerMode;
-  effect(() => {
-    const c = core();
-    if (!appSettings.value()) return;
-    if (!developerMode()) { stopTraceCapture(); closeDevTools(); }
-    else if (c) startTraceCapture(c);
-  });
+  effect(() => { if (appSettings.value() && !developerMode()) closeDevTools(); });
   const librarySources = () => plugins.value().sources.filter((s) => s.enabled
     && plugins.value().packages.some((p) => p.id === s.pluginId && p.enabled && p.capabilities.includes("library.browse")));
   const nowPlaying = signal(props.initialNowPlaying ?? false);
@@ -310,14 +304,10 @@ export function AppShell(props: {
         </View>
         <If when={!!core()}><PlaylistSidebar core={core()!} snapshot={plugins.value()} current={nav.current()} navigate={nav.navigate} /></If>
       </View>
-      {/* Equal left and bottom insets; developer tools sit beside settings in the same row. */}
+      {/* Equal left and bottom insets; with developer mode on, a long press on settings opens developer tools. */}
       <View class="shrink-0 flex-row items-center gap-1 px-2 pb-2">
         <SidebarItem testID="nav-settings" icon="settings" label="设置" fit
-          selected={false} onPress={showSettings} />
-        <If when={developerMode()}>
-          <SidebarItem testID="nav-devtools" icon="code" label="开发工具" fit
-            selected={false} onPress={openDevTools} />
-        </If>
+          selected={false} onPress={showSettings} onLongPress={developerMode() ? openDevTools : undefined} />
       </View>
     </ShellSidebar>
     <WindowPanel>

@@ -1,4 +1,4 @@
-import { cleanup, effect, Image, platform, Scroll, signal, Text, token, View, type ViewRef } from "nsh";
+import { cleanup, effect, Image, platform, signal, Text, token, View, type ViewRef } from "nsh";
 import { PluginService } from "haiku/native";
 import { Button as BaseButton, Popover } from "nsh/base";
 import { isAvailable as desktopAvailable, Menu as DesktopMenu } from "nsh/desktop";
@@ -7,12 +7,9 @@ import { Icon } from "../ui/Icon";
 import { Field } from "../ui/LibraryControls";
 import { ActionMenu, Dialog, Menu, MenuItem, popupSurface } from "../ui/Surfaces";
 import {
-  SettingCardBlock,
   SettingDivider,
   SettingSection,
   SettingSelect,
-  SettingSelectRow,
-  SettingSwitchRow,
 } from "../ui/SettingsControls";
 import type { PluginDescriptor, PluginsState, SourceRecord } from "../state/plugins";
 
@@ -386,138 +383,5 @@ export function PluginsSettings(props: { state: PluginsState; initialLogin?: str
           removing.set(null);
         })} /></View>
     </Dialog>
-  </View>;
-}
-
-/** Recursive data inspector; branches can be collapsed without losing the result. */
-function JsonTree(props: { value: unknown; name?: string }) {
-  const expanded = signal(true);
-  const entries = () => props.value && typeof props.value === "object" && Object.keys(props.value).length
-    ? Object.entries(props.value) : null;
-  return <View class="gap-1 items-start">
-    <If when={!!entries()}>
-      <BaseButton accessibilityLabel={`${expanded() ? "收起" : "展开"}${props.name || "结果"}`}
-        class={`min-h-7 flex-row items-center gap-1 rounded-(--radius) ${focus}`}
-        onPress={() => expanded.set(!expanded())}>
-        <Text class="w-4 text-xs text-muted-foreground">{expanded() ? "▾" : "▸"}</Text>
-        <Text class="text-xs text-foreground">{props.name || "结果"}</Text>
-      </BaseButton>
-      <If when={expanded()}><View class="gap-1 ps-4 items-start">
-        <Each of={entries() || []} key={e => e[0]}>{entry => <JsonTree
-          name={entry()[0]} value={entry()[1]} />}</Each>
-      </View></If>
-    </If>
-    <If when={!entries()}><View class="min-h-7 flex-row items-center gap-1">
-      <View class="w-4 shrink-0" />
-      <Text class="text-xs text-foreground">{props.name}: {JSON.stringify(props.value)}</Text>
-    </View></If>
-  </View>;
-}
-
-/** Load a local package directory and invoke installed capabilities (developer tools window). */
-export function PluginDebugger(props: { state: PluginsState }) {
-  const source = signal(""), capability = signal("track.get"), args = signal("[]");
-  const raw = signal(false), values = signal<Record<string, string>>({});
-  const watching = signal(""), watchStatus = signal("");
-  let stopWatch: (() => void) | undefined;
-  cleanup(() => stopWatch?.());
-  const location = signal(""), result = signal<unknown>(null);
-  const activeSource = () => source() || props.state.value().sources[0]?.sourceId || "";
-  const plugin = () => props.state.value().sources.find(s => s.sourceId === activeSource())?.pluginId;
-  const descriptor = () => props.state.value().packages.find(p => p.id === plugin());
-  const fields = () => descriptor()?.parameters?.[capability()] || [];
-  effect(() => {
-    const path = capability();
-    const parameters = descriptor()?.parameters?.[path] || [];
-    values.set(Object.fromEntries(parameters.map(field => [field.key, field.default])));
-  });
-  function argumentsForCall() {
-    if (raw()) return { args: JSON.parse(args()), context: { limit: 20 } };
-    const argsValue: unknown[] = [], context: Record<string, unknown> = {};
-    for (const field of fields()) {
-      const input = values()[field.key] ?? field.default;
-      if (input === "" && field.key === "cursor") continue;
-      const value = field.type === "number" ? Number(input)
-        : field.type === "json" ? JSON.parse(input) : input;
-      if (field.target === "args") return { args: value as unknown[], context };
-      if (field.target === "context") context[field.key] = value;
-      else if (field.target === "arg") argsValue[field.index || 0] = value;
-      else {
-        const index = field.index || 0;
-        argsValue[index] = { ...(argsValue[index] as object || {}), [field.key]: value };
-      }
-    }
-    return { args: argsValue, context };
-  }
-  async function load() {
-    stopWatch?.(); watching.set("");
-    await props.state.run(async c => {
-      await c.plugins.importPackage(location());
-      stopWatch = await c.plugins.watchDirectory(location(), status => watchStatus.set(status));
-      watching.set(location()); watchStatus.set("正在监听文件变化");
-    });
-  }
-  return <View class="flex-row items-start gap-5 min-w-0" testID="plugin-debugger">
-    <View class="flex-1 min-w-0 flex-col gap-5">
-      <SettingSection title="本地插件调试">
-        <SettingCardBlock>
-          <Field label="本地插件目录" value={location()} onChange={value => location.set(value)} />
-          <View class="flex-row"><Button label="加载或重新加载" size="sm" loading={props.state.busy()}
-            onPress={() => void load()} /></View>
-          <If when={!!watching()}><View class="flex-row items-center gap-2">
-            <Text class="flex-1 text-xs text-muted-foreground">{watchStatus()}：{watching()}</Text>
-            <Button label="停止监听" size="sm" onPress={() => {
-              stopWatch?.(); watching.set(""); watchStatus.set("");
-            }} />
-          </View></If>
-        </SettingCardBlock>
-      </SettingSection>
-      <SettingSection title="能力调用">
-        <SettingSelectRow label="实例" value={activeSource()} items={props.state.value().sources.map(s => ({
-          value: s.sourceId, title: s.displayName || s.sourceId,
-        }))} onChange={value => source.set(value)} />
-        <SettingSelectRow divider label="能力" value={capability()} items={descriptor()?.capabilities.map(value => ({
-          value, title: value,
-        })) ?? []} onChange={value => capability.set(value)} />
-        <SettingSwitchRow divider label="原始 JSON" checked={raw()} onChange={value => raw.set(value)} />
-        <SettingCardBlock divider>
-          <If when={raw()}><Field label="参数（JSON 数组）" value={args()}
-            onChange={value => args.set(value)} /></If>
-          <If when={!raw()}><View class="gap-3" testID="plugin-parameter-form">
-            <Each of={fields()} key={field => field.key}>{field => <Field label={field().label}
-              value={values()[field().key] ?? field().default}
-              onChange={value => values.set({ ...values(), [field().key]: value })} />}</Each>
-            <If when={fields().length === 0}><Text class="text-xs text-muted-foreground">此能力无需参数。</Text></If>
-          </View></If>
-          <View class="flex-row flex-wrap gap-2">
-            <Button label="调用" variant="primary" size="sm" disabled={!activeSource()} loading={props.state.busy()}
-              onPress={() => void props.state.run(async c => {
-                const input = argumentsForCall();
-                result.set(await c.plugins.invoke(activeSource(), capability(), input.args, input.context));
-              })} />
-            <Button label="运行契约测试" size="sm" disabled={!plugin()} loading={props.state.busy()}
-              onPress={() => void props.state.run(async c => result.set(await c.plugins.testContract(plugin()!)))} />
-            <Button label="查看存储" size="sm" disabled={!activeSource()}
-              onPress={() => void props.state.run(async c => result.set(await c.plugins.storage(activeSource())))} />
-            <Button label="清除 KV" size="sm" variant="destructive" disabled={!activeSource()}
-              onPress={() => void props.state.run(c => c.plugins.clearStorage(activeSource()))} />
-            <Button label="清除凭据" size="sm" variant="destructive" disabled={!activeSource()}
-              onPress={() => void props.state.run(c => c.sources.logout(activeSource()))} />
-          </View>
-        </SettingCardBlock>
-      </SettingSection>
-    </View>
-    <View class="flex-1 min-w-0 flex-col gap-5">
-      <SettingSection title="返回结果" testID="plugin-call-result">
-        <SettingCardBlock>
-          <If when={result() !== null}>
-            <Scroll class="h-96 min-h-0" contentClass="items-start pb-2" testID="plugin-result-scroll">
-              <JsonTree value={result()} />
-            </Scroll>
-          </If>
-          <If when={result() === null}><Text class="text-xs text-muted-foreground">调用能力、运行契约测试或查看存储后，结果显示在这里。</Text></If>
-        </SettingCardBlock>
-      </SettingSection>
-    </View>
   </View>;
 }

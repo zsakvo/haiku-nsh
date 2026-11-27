@@ -749,13 +749,24 @@ impl PluginService {
         })
     }
     /// Hear redacted log/HTTP events from this host. Stop prevents further callbacks.
+    /// HTTP traffic (headers and body previews) is traced only while some listener exists,
+    /// across all windows: in practice, while the developer tools window is open.
     pub fn on_event(&mut self, #[args(event)] callback: Callback<JsonValue>) -> Stop {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static LISTENING: AtomicUsize = AtomicUsize::new(0);
         self.next += 1;
         let id = self.next;
         self.event_listeners.0.borrow_mut().insert(id, callback);
+        if LISTENING.fetch_add(1, Ordering::SeqCst) == 0 {
+            haiku_plugins::set_http_capture(true);
+        }
         let listeners = self.event_listeners.clone();
         Stop::new(move || {
-            listeners.0.borrow_mut().remove(&id);
+            if listeners.0.borrow_mut().remove(&id).is_some()
+                && LISTENING.fetch_sub(1, Ordering::SeqCst) == 1
+            {
+                haiku_plugins::set_http_capture(false);
+            }
         })
     }
     /// Start a loopback fixture server for an explicit offline developer preview.
@@ -1030,10 +1041,11 @@ impl PluginService {
         this: Instance<Self>,
         name: String,
         author: String,
+        website: String,
         description: String,
     ) -> Result<JsonValue, String> {
         let root = this.with(|s| s.workspaces.clone());
-        blocking(move || crate::plugin_workspace::create(&root, &name, &author, &description))
+        blocking(move || crate::plugin_workspace::create(&root, &name, &author, &website, &description))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -1051,6 +1063,23 @@ impl PluginService {
             .await
             .map_err(|e| e.to_string())?
     }
+    /// Put any text on the system clipboard natively (see `copy_workspace_prompt`).
+    pub async fn copy_text(text: String) -> Result<(), String> {
+        blocking(move || crate::plugin_workspace::copy_to_clipboard(&text))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    /// Put a workspace's agent prompt on the system clipboard. Native, because the developer
+    /// tools are a secondary window, where `Clipboard.writeText` does not reach the pasteboard.
+    pub async fn copy_workspace_prompt(this: Instance<Self>, path: String) -> Result<(), String> {
+        let root = this.with(|s| s.workspaces.clone());
+        blocking(move || {
+            let path = crate::plugin_workspace::resolve(&root, &path)?;
+            crate::plugin_workspace::copy_to_clipboard(&crate::plugin_workspace::prompt_of(&path)?)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
     /// Show a workspace directory in the system file manager.
     pub async fn reveal_workspace(this: Instance<Self>, path: String) -> Result<(), String> {
         let root = this.with(|s| s.workspaces.clone());
@@ -1063,78 +1092,93 @@ impl PluginService {
         .await
         .map_err(|e| e.to_string())?
     }
-    /// Watch a workspace once a second. Each content change of `plugin/` is installed
-    /// transactionally (keeping KV); `DONE` written by the agent after a successful load
-    /// completes it. Status: `{phase, message, plugin?, summary?}` with phase one of
-    /// waiting, failed, loaded or done; only changes are posted. Stop ends the watch.
+    /// Watch a workspace's `STATUS` file through file system events (no polling). Each
+    /// `ready`/`done` the agent writes installs `plugin/` transactionally (keeping KV) when its
+    /// content changed or the last load failed, and the outcome goes to `LOAD` for the agent.
+    /// Status: `{phase, message, plugin?, summary?}` with phase one of waiting, writing, failed,
+    /// loaded or done; only changes are posted. Stop drops the watcher, which ends the task.
     pub async fn watch_workspace(
         this: Instance<Self>,
         path: String,
         #[args(status)] callback: Callback<JsonValue>,
     ) -> Result<Stop, String> {
+        use crate::plugin_workspace::{STATUS, Status};
+        use futures::StreamExt;
+        use notify::Watcher;
         let root = this.with(|s| s.workspaces.clone());
         let path = blocking(move || crate::plugin_workspace::resolve(&root, &path))
             .await
             .map_err(|e| e.to_string())??;
-        let running = Rc::new(std::cell::Cell::new(true));
-        let active = running.clone();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<()>();
+        let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+            if event.is_ok_and(|e| e.paths.iter().any(|p| p.file_name().is_some_and(|n| n == STATUS))) {
+                let _ = tx.unbounded_send(());
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        watcher
+            .watch(&path, notify::RecursiveMode::NonRecursive)
+            .map_err(|e| e.to_string())?;
+        let watcher = Rc::new(RefCell::new(Some(watcher)));
         let host = Self::host(&this);
         Owner::detached().run(|| {
             spawn(async move {
-                let mut hash: Option<u64> = None;
+                let mut installed: Option<u64> = None;
                 let mut loaded: Option<Result<JsonValue, String>> = None;
                 let mut last = JsonValue::Null;
-                while active.get() {
-                    let (dir, host, previous) = (path.clone(), host.clone(), hash);
+                loop {
+                    let (dir, host, previous) = (path.clone(), host.clone(), installed);
                     let step = background(async move {
-                        let package = dir.join("plugin");
-                        if !package.join("plugin.ts").is_file() {
-                            return (None, None, crate::plugin_workspace::done(&dir));
+                        let status = crate::plugin_workspace::status(&dir);
+                        if !matches!(status, Some(Status::Ready(_) | Status::Done(_))) {
+                            return (status, None);
                         }
-                        let next = match crate::plugin_tools::directory_hash(&package) {
-                            Ok(next) => next,
-                            Err(error) => return (previous, Some(Err(error)), None),
-                        };
-                        let install = if Some(next) == previous {
-                            None
-                        } else {
-                            Some(host.install_directory(&package, false).await
+                        let package = dir.join("plugin");
+                        let (hash, result) = match crate::plugin_tools::directory_hash(&package) {
+                            Ok(hash) if Some(hash) == previous => return (status, None),
+                            Ok(hash) => (Some(hash), host.install_directory(&package, false).await
                                 .map(|d| json!({"id":d.id,"name":d.name,"version":d.version,
                                     "kind":d.kind,"capabilities":d.capabilities}))
-                                .map_err(|e| e.to_string()))
+                                .map_err(|e| e.to_string())),
+                            Err(error) => (None, Err(error)),
                         };
-                        (Some(next), install, crate::plugin_workspace::done(&dir))
+                        crate::plugin_workspace::write_load(&dir, &result);
+                        (status, Some((hash, result)))
                     })
                     .await;
-                    if !active.get() {
-                        break;
-                    }
-                    let Ok((next, install, done)) = step else { break };
-                    if next.is_none() {
-                        loaded = None;
-                    }
-                    hash = next;
-                    if let Some(result) = install {
+                    let Ok((status, install)) = step else { break };
+                    if let Some((hash, result)) = install {
+                        installed = if result.is_ok() { hash } else { None };
                         if result.is_ok() {
                             let _ = Self::changed(&this).await;
                         }
                         loaded = Some(result);
                     }
-                    let status = match (&loaded, done) {
-                        (None, _) => json!({"phase":"waiting","message":"等待 Agent 写入 plugin/plugin.ts"}),
-                        (Some(Err(error)), _) => json!({"phase":"failed","message":error}),
-                        (Some(Ok(plugin)), None) => json!({"phase":"loaded","message":"已加载最新代码，等待 Agent 写入 DONE","plugin":plugin}),
-                        (Some(Ok(plugin)), Some((_, summary))) => json!({"phase":"done","message":"插件已完成并安装","plugin":plugin,"summary":summary}),
+                    let plugin = loaded.as_ref().and_then(|r| r.as_ref().ok()).cloned();
+                    let value = match (&status, &loaded) {
+                        (None, _) => json!({"phase":"waiting","message":"等待 Agent 写入 STATUS"}),
+                        (Some(Status::Writing(message)), _) => json!({"phase":"writing",
+                            "message": if message.is_empty() { "Agent 正在编写" } else { message }, "plugin": plugin}),
+                        (Some(_), Some(Err(error))) => json!({"phase":"failed","message":error}),
+                        (Some(Status::Ready(message)), _) => json!({"phase":"loaded",
+                            "message": if message.is_empty() { "已热加载最新代码" } else { message }, "plugin": plugin}),
+                        (Some(Status::Done(summary)), _) => json!({"phase":"done","message":"插件已完成并安装",
+                            "plugin": plugin, "summary": summary}),
                     };
-                    if status != last {
-                        callback.post(status.clone());
-                        last = status;
+                    if value != last {
+                        callback.post(value.clone());
+                        last = value;
                     }
-                    timer(std::time::Duration::from_secs(1)).await;
+                    // Sleep until STATUS changes; one save emits a burst of events, so let it settle.
+                    if rx.next().await.is_none() {
+                        break;
+                    }
+                    timer(std::time::Duration::from_millis(150)).await;
+                    while rx.try_recv().is_ok() {}
                 }
             })
         });
-        Ok(Stop::new(move || running.set(false)))
+        Ok(Stop::new(move || drop(watcher.borrow_mut().take())))
     }
     /// Delete an unused third-party package; the host rejects builtins and referenced packages.
     pub async fn delete_package(this: Instance<Self>, plugin: String) -> Result<JsonValue, String> {

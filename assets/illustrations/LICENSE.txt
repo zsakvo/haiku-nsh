@@ -24,3 +24,11 @@ Any such use requires separate explicit written permission from unDraw.
 Regarding brand logos that are included:
 
 Are registered trademarks of their respected owners. Are included on a promotional basis and do not represent an association with unDraw or its users. Do not indicate any kind of endorsement of the trademark holder towards unDraw, nor vice versa. Are provided with the sole purpose to represent the actual brand/service/company that has registered the trademark and must not be used otherwise.
+
+Developer tools empty states (unDraw, default accent #6c63ff; dark variants recolor neutrals only)
+Source: https://cdn.undraw.co/illustration/dev-environment_n5by.svg (Dev Environment)
+Source: https://cdn.undraw.co/illustration/fixing-bugs_1ytu.svg (Fixing Bugs)
+Source: https://cdn.undraw.co/illustration/local-server_9izb.svg (Local Server)
+Source: https://cdn.undraw.co/illustration/document-search_2o7x.svg (Document Search)
+Downloaded: 2026-11-27
+License: https://undraw.co/license

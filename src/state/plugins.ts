@@ -29,15 +29,14 @@ export interface PluginSnapshot {
 /** The signals mirror Rust commits; drafts and selection belong to the current surface. */
 export function createPlugins() {
   const value = signal<PluginSnapshot>({ packages: [], sources: [], errors: {} });
-  const events = signal<unknown[]>([]), error = signal(""), busy = signal(false);
-  let stop: (() => void) | undefined, stopEvents: (() => void) | undefined;
+  const error = signal(""), busy = signal(false);
+  let stop: (() => void) | undefined;
   let closed = false;
-  cleanup(() => { closed = true; stop?.(); stopEvents?.(); });
+  cleanup(() => { closed = true; stop?.(); });
   const core = resource(async () => {
     const c = await Core.open();
     if (closed) return c;
     stop = c.plugins.onChange(next => value.set(next as PluginSnapshot));
-    stopEvents = c.plugins.onEvent(event => events.set([...events(), event].slice(-100)));
     value.set(await c.plugins.list() as PluginSnapshot);
     return c;
   });
@@ -47,6 +46,6 @@ export function createPlugins() {
     catch (e) { error.set(String(e)); }
     finally { busy.set(false); }
   }
-  return { value, events, error, busy, core, run };
+  return { value, error, busy, core, run };
 }
 export type PluginsState = ReturnType<typeof createPlugins>;

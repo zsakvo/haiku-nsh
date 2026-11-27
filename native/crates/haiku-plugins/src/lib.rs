@@ -9,6 +9,7 @@ mod sdk;
 mod source;
 pub use api::*;
 pub use descriptor::{Covers, Descriptor, describe_package, normalize_source_url, source_id};
+pub use events::set_http_capture;
 pub use host::{Host, Package, SourceRecord};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

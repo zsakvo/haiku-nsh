@@ -19,15 +19,34 @@ pub struct LogRecord {
     pub level: String,
     pub message: String,
 }
-/// Request or response metadata, never body bytes. Sensitive headers are redacted.
+/// One request's `request`, then `response` or `error`, sharing `id`. Sensitive headers are
+/// redacted; bodies are a bounded text preview, only produced while capture is on.
 #[derive(Clone, Debug)]
 pub struct HttpEvent {
+    pub id: u64,
     pub instance_id: String,
     pub phase: String,
     pub method: String,
     pub url: String,
     pub headers: BTreeMap<String, String>,
     pub status: Option<u16>,
+    pub body: Option<String>,
+    pub size: Option<usize>,
+    pub elapsed_ms: Option<u64>,
+    pub error: Option<String>,
+}
+const BODY_PREVIEW: usize = 256 * 1024;
+/// Text bodies as text (cut at 256 KiB); anything with NUL bytes is summarized as binary.
+fn preview(bytes: &[u8]) -> String {
+    let cut = &bytes[..bytes.len().min(BODY_PREVIEW)];
+    if cut.contains(&0) {
+        return format!("<二进制内容，{} 字节>", bytes.len());
+    }
+    let mut text = String::from_utf8_lossy(cut).into_owned();
+    if bytes.len() > BODY_PREVIEW {
+        text.push_str(&format!("\n…（已截断，共 {} 字节）", bytes.len()));
+    }
+    clean(&text)
 }
 fn secret(key: &str) -> bool {
     let key = key.to_ascii_lowercase();
@@ -205,7 +224,9 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
             }
         }),
     )?;
-    let hook = options.http_hook.clone();
+    let capture = options.http_capture.clone();
+    let hook = options.http_hook.clone().map(move |hook| (hook, capture));
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let fetch_url = options.fetch_url.clone();
     let id = options.instance_id.clone();
     // Separate policies keep redirect semantics explicit, sharing connection pools per instance.
@@ -233,6 +254,17 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                     if signal.borrow().aborted {
                         return Err(Exception::throw_message(&ctx, "AbortError"));
                     }
+                    // Decided once per request, so a request and its outcome are captured together.
+                    let hook = hook.filter(|(_, on)| on.as_ref().is_none_or(|on| on.load(std::sync::atomic::Ordering::Relaxed)))
+                        .map(|(hook, _)| hook);
+                    let trace = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    let started = std::time::Instant::now();
+                    let event = |phase: &str, method: &str, url: &str| HttpEvent {
+                        id: trace, instance_id: id.clone(), phase: phase.into(), method: method.into(),
+                        url: clean(url), headers: BTreeMap::new(), status: None, body: None, size: None,
+                        elapsed_ms: None, error: None,
+                    };
+                    let sent = hook.as_ref().and_then(|_| data.body.as_deref().map(|b| (preview(b), b.len())));
                     let method = reqwest::Method::from_bytes(data.method.as_bytes())
                         .map_err(|e| Exception::throw_type(&ctx, &e.to_string()))?;
                     let target = match &fetch_url {
@@ -256,12 +288,10 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                         .map_err(|e| Exception::throw_type(&ctx, &e.to_string()))?;
                     if let Some(hook) = &hook {
                         hook(HttpEvent {
-                            instance_id: id.clone(),
-                            phase: "request".into(),
-                            method: data.method.clone(),
-                            url: clean(&data.url),
                             headers: headers(request.headers()),
-                            status: None,
+                            size: sent.as_ref().map(|(_, size)| *size),
+                            body: sent.map(|(body, _)| body),
+                            ..event("request", &data.method, &data.url)
                         });
                     }
                     let operation = async {
@@ -275,16 +305,7 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                         } else {
                             response.url().to_string()
                         };
-                        if let Some(hook) = &hook {
-                            hook(HttpEvent {
-                                instance_id: id,
-                                phase: "response".into(),
-                                method: data.method,
-                                url: clean(&url),
-                                headers: headers(response.headers()),
-                                status: Some(status),
-                            });
-                        }
+                        let response_headers = hook.as_ref().map(|_| headers(response.headers()));
                         if data.redirect == "error" && response.status().is_redirection() {
                             return Err("Redirect rejected".to_string());
                         }
@@ -302,6 +323,16 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                             }
                             body.extend_from_slice(&chunk);
                         }
+                        if let (Some(hook), Some(response_headers)) = (&hook, response_headers) {
+                            hook(HttpEvent {
+                                headers: response_headers,
+                                status: Some(status),
+                                body: Some(preview(&body)),
+                                size: Some(body.len()),
+                                elapsed_ms: Some(started.elapsed().as_millis() as u64),
+                                ..event("response", &data.method, &url)
+                            });
+                        }
                         Ok(ResponseData {
                             status,
                             headers,
@@ -314,6 +345,13 @@ pub(crate) fn install<'js>(ctx: &Ctx<'js>, options: &RuntimeOptions) -> rquickjs
                         _ = cancelled.recv() => Err("AbortError".into()),
                         response = operation => response,
                     };
+                    if let (Some(hook), Err(error)) = (&hook, &result) {
+                        hook(HttpEvent {
+                            elapsed_ms: Some(started.elapsed().as_millis() as u64),
+                            error: Some(clean(error)),
+                            ..event("error", &data.method, &data.url)
+                        });
+                    }
                     serde_json::to_string(&result.map_err(|e| Exception::throw_message(&ctx, &e))?)
                         .map_err(|e| Exception::throw_message(&ctx, &e.to_string()))
                 }

@@ -3,8 +3,18 @@ use serde_json::Value;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock, atomic::{AtomicBool, Ordering}},
 };
+
+/// Process-wide: plugin HTTP traffic is traced (with body previews) only while this is on,
+/// i.e. while the developer tools window is open.
+pub(crate) fn http_capture() -> Arc<AtomicBool> {
+    static CAPTURE: OnceLock<Arc<AtomicBool>> = OnceLock::new();
+    CAPTURE.get_or_init(Default::default).clone()
+}
+pub fn set_http_capture(on: bool) {
+    http_capture().store(on, Ordering::Relaxed);
+}
 use tokio::sync::broadcast;
 
 pub(crate) fn sender(root: &Path) -> broadcast::Sender<Value> {

@@ -33,8 +33,10 @@ const sync = "asset:/ui/icons/refresh-double.svg";
 const keyboard = "asset:/ui/icons/key-command.svg";
 const code = "asset:/ui/icons/code-brackets.svg";
 const edit = "asset:/ui/icons/edit-pencil.svg";
+const more = "asset:/ui/icons/more-horiz.svg";
+const trash = "asset:/ui/icons/trash.svg";
 const icons = { home, grid, radio, search, music, heart, clock, stats, download, settings, left, right, down, close, plus, check, palette,
-  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code, edit,
+  user, play, pause, skipNext, skipPrev, playlist, captions, folder, plug, sync, keyboard, code, edit, more, trash,
   harmonyosDownload, harmonyosHeart, harmonyosHeartFill, harmonyosDotGrid1x2 };
 export type IconName = keyof typeof icons;
 export function Icon(props: {

@@ -112,10 +112,12 @@ pub(crate) async fn open_runtime(
     options.log = Some(Arc::new(move |record| {
         let _ = logs.send(json!({"kind":"log","sourceId":record.instance_id,"level":record.level,"message":record.message}));
     }));
+    options.http_capture = Some(crate::events::http_capture());
     options.http_hook = Some(Arc::new(move |event| {
         let _ = events.send(
-            json!({"kind":"http","sourceId":event.instance_id,"phase":event.phase,
-            "method":event.method,"url":event.url,"headers":event.headers,"status":event.status}),
+            json!({"kind":"http","id":event.id,"sourceId":event.instance_id,"phase":event.phase,
+            "method":event.method,"url":event.url,"headers":event.headers,"status":event.status,
+            "body":event.body,"size":event.size,"elapsedMs":event.elapsed_ms,"error":event.error}),
         );
     }));
     if let Some(base) = replay {
