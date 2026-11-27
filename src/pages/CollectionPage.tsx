@@ -11,7 +11,7 @@ import { PlaylistEditor } from "./PlaylistEditor";
 import { TrackEditor } from "./TrackEditor";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { SettingSelect } from "../ui/SettingsControls";
-import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
+import { navigationOffset, navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
 /** Retained likes/user playlist page with a Rust-owned virtual source and selection. */
 export function CollectionPage(props: { core: Core; id: string; active: boolean; onDeleted: () => void }) {
@@ -20,6 +20,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   const player = mirrorCore(props.core).player;
   const managing = signal(false);
   const scrolled = navigationScroll(() => props.active);
+  const offset = navigationOffset(() => props.active);
   const search = signal("");
   const filter = signal("");
   const sort = signal(props.id === "__liked__" ? "newest" : "manual");
@@ -89,8 +90,7 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
   }
   const cover = () => collection()?.cover || covers().find((cover):cover is string=>!!cover);
   const header = () => <NavigationScrollHeader class="gap-3 pb-2">
-      <DetailSky core={props.core} active={props.active} cover={cover()} source={sources()[0]}
-        insetLeft={token("content-inset-left")} insetRight={token("content-inset-right")} />
+      <DetailSky core={props.core} active={props.active} cover={cover()} source={sources()[0]} />
       <DetailHeader playlist title={collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}
         cover={cover()}
         description={collection()?.description} metadata={`${collection()?.trackCount ?? 0} 首`}>
@@ -169,7 +169,8 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onPlay={(event) => void act(() => service.playSource(event.source, event.id))}
         onAction={(event) => void command(event.command, event.ids)}
-        onSelectionChange={(event) => selected.set(event.ids)} onScrollChange={(event) => scrolled(event.scrolled)} /></NavigationScrollArea>
+        onSelectionChange={(event) => selected.set(event.ids)} onScrollChange={(event) => scrolled(event.scrolled)}
+        onScrollOffset={(event) => offset(event.offset)} /></NavigationScrollArea>
     </If>
     <If when={!!editor()}><PlaylistEditor core={props.core}
       collection={editor() === "edit" ? collection() : undefined}

@@ -34,7 +34,7 @@ export function SourceGrid(props: { items: any[]; navigate: (route: Route) => vo
 
 /** Remote rows share the existing native menus for likes and adding to user playlists. */
 export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean; fit?: boolean;
-  detail?: boolean; fixedHeading?: boolean; insertOnPlay?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void;
+  detail?: boolean; fixedHeading?: boolean; insertOnPlay?: boolean; header?: JSX.Element; footer?: JSX.Element; onScrolled?: (scrolled: boolean) => void; onScrollOffset?: (offset: number) => void;
   onLoadMore?: () => void }) {
   const selected = signal<string[]>([]);
   const error = signal(""), creating = signal<any[] | null>(null);
@@ -71,6 +71,7 @@ export function SourceTracks(props: { core: Core; tracks: any[]; active: boolean
         bottomInset={props.detail?token("dock-scroll-clearance"):0}
         currentId={player()?.current ? JSON.stringify([(player().current as any).source, "track", player().current!.id]) : null}
         onSelectionChange={e => selected.set(e.ids)} onScrollChange={e => props.onScrolled?.(e.scrolled)}
+        onScrollOffset={e => props.onScrollOffset?.(e.offset)}
         onLoadMore={() => props.onLoadMore?.()}
         onPlay={(e) => void act(async () => {
           // Search results play into the current queue instead of replacing it.

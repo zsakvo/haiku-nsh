@@ -269,6 +269,7 @@ export function AppShell(props: {
   const floatingNavigation = platform.os === "macos";
   const scrolledPages = new Set<object>(), contentScrolled = signal(false);
   const backdropPages = new Set<object>(), contentBackdrop = signal(false);
+  const offsets = new Map<object, number>(), contentOffset = signal(0);
   const navigationLayout = {
     inset: () => floatingNavigation ? token("navigation-bar-height") + token("navigation-content-gap") : 0,
     report: (page: object, scrolled: boolean) => {
@@ -279,9 +280,13 @@ export function AppShell(props: {
       if (shown) backdropPages.add(page); else backdropPages.delete(page);
       contentBackdrop.set(backdropPages.size > 0);
     },
+    offset: (page: object, offset: number) => {
+      if (offset > 0) offsets.set(page, offset); else offsets.delete(page);
+      contentOffset.set(Math.max(0, ...offsets.values()));
+    },
   };
   const hasSources = () => !!pageSource.current()?.items().length;
-  const navigationBar = () => <NavigationBar floating={floatingNavigation} scrolled={contentScrolled()} backdrop={contentBackdrop()}>
+  const navigationBar = () => <NavigationBar floating={floatingNavigation} scrolled={contentScrolled()} backdrop={contentBackdrop()} offset={contentOffset()}>
     <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
       disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />
     <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}

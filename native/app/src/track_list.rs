@@ -52,9 +52,15 @@ pub enum TrackListEvent {
     /// Detail lists only: whether content has moved off the top, sent when that changes.
     #[args(scrolled)]
     ScrollChange(bool),
+    /// Detail lists only: the scroll offset clamped to the first `SCROLL_TRACK` points, sent
+    /// only while it changes within them (the bar's glass follows it instead of toggling).
+    #[args(offset)]
+    ScrollOffset(f32),
     /// Reached near the end of the list; consumer may append the next page.
     LoadMore,
 }
+/** How far `ScrollOffset` follows the scroll; beyond it the offset stays at this value. */
+const SCROLL_TRACK: f32 = 64.;
 fn source(props: TrackListProps) -> Option<Source> {
     track_source::get(props.source.get())
 }
@@ -751,6 +757,7 @@ fn detail_list(
 ) -> impl IntoElement {
     let bridge = crate::presentation::get().map(|p| p.bridge.clone());
     let scrolled = std::rc::Rc::new(std::cell::Cell::new(false));
+    let tracked = std::rc::Rc::new(std::cell::Cell::new(0f32));
     let fixed_heading = props.fixed_heading.get_untracked();
     let vlist = virtual_list(
         move || source(props).map(|s| s.ids.with(Vec::len)).unwrap_or(0),
@@ -783,7 +790,8 @@ fn detail_list(
                 .bg(move || {
                     let selected = source(props).is_some_and(|s| id_at(props, at)
                         .is_some_and(|id| s.selected.with(|set| set.contains(&id))));
-                    if selected { theme().color("selection").unwrap_or(theme().accent) } else { theme().background }
+                    // Unselected rows stay clear so the playlist backdrop (DetailSky) shows through.
+                    if selected { theme().color("selection").unwrap_or(theme().accent) } else { theme().background.opacity(0.) }
                 })
                 .accessibility_state(move || nsh_core::AccessibilityState {
                     selected: source(props).is_some_and(|s| id_at(props, at)
@@ -849,6 +857,11 @@ fn detail_list(
     .on_scroll(move |event: &ScrollEvent| {
         let next = event.offset.y.0 > 0.;
         if scrolled.replace(next) != next { cx.emit(TrackListEvent::ScrollChange(next)); }
+        let offset = event.offset.y.0.clamp(0., SCROLL_TRACK);
+        if (tracked.get() - offset).abs() >= 0.5 || (offset != tracked.get() && (offset == 0. || offset == SCROLL_TRACK)) {
+            tracked.set(offset);
+            cx.emit(TrackListEvent::ScrollOffset(offset));
+        }
     })
     .on_load_more(move || cx.emit(TrackListEvent::LoadMore))
     .footer(view().app_class("pl-(--content-inset-left) pr-(--content-inset-right)").child(props.footer.place(|s| s)))

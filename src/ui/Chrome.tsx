@@ -46,8 +46,10 @@ export const NavigationLayoutContext = context<{
   inset: () => number;
   /** Whether a page's content has scrolled beneath the bar; pages report false when inactive. */
   report: (page: object, scrolled: boolean) => void;
-  /** Whether a page draws a backdrop that should show through the resting bar. */
+  /** Whether a page draws a backdrop behind the bar; the bar's glass then follows `offset`. */
   backdrop: (page: object, shown: boolean) => void;
+  /** A page's scroll offset near the top (0..NAVIGATION_GLASS_RANGE), reported while it changes. */
+  offset: (page: object, offset: number) => void;
 } | undefined>(undefined);
 
 /** A list reaches behind the toolbar while its leading space scrolls with its content. */
@@ -67,33 +69,46 @@ export function navigationScroll(active: () => boolean) {
   return (value: boolean) => scrolled.set(value);
 }
 
-/** Lets the active page's decorative backdrop show through the bar while nothing is scrolled beneath it. */
+/** Scroll distance over which the bar's glass fades in on a backdrop page. */
+export const NAVIGATION_GLASS_RANGE = 64;
+/** The active page draws a backdrop behind the bar: the bar is clear at the top, and its usual
+ * glass fades in with the scroll distance itself (not a timed switch), so there is no moment
+ * where white glass visibly snaps on or off over the backdrop. */
 export function navigationBackdrop(shown: () => boolean) {
   const layout = NavigationLayoutContext(), page = {};
   effect(() => layout?.backdrop(page, shown()));
   cleanup(() => layout?.backdrop(page, false));
 }
+/** Returns the setter a backdrop page's list calls with its offset near the top. */
+export function navigationOffset(active: () => boolean) {
+  const layout = NavigationLayoutContext(), page = {}, offset = signal(0);
+  effect(() => layout?.offset(page, active() ? offset() : 0));
+  cleanup(() => layout?.offset(page, 0));
+  return (value: number) => offset.set(value);
+}
 
 /** The content's top bar. It carries the content's own colour, so it only reads as a bar once
  * something scrolls beneath it: on macOS that content shows through a blur, and a hairline appears. */
-export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean; backdrop?: boolean }) {
+export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean; backdrop?: boolean; offset?: number }) {
+  const glass = () => props.floating && props.backdrop;
   return <View testID="navigation-bar"
     class={`${props.floating ? "absolute top-0 inset-x-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) px-(--content-inset-left)`}
     style={{ height: token("navigation-bar-height") }}
     desktop={{ windowDrag: true }}>
-    <View class="absolute inset-0 overflow-hidden pointer-events-none transition-opacity duration-200 motion-reduce:transition-none"
-      style={{ opacity: props.floating && props.backdrop && !props.scrolled ? 0 : 1 }}>
+    {/* On a backdrop page the glass tracks the scroll distance, so it has no timed transition. */}
+    <View class="absolute inset-0 overflow-hidden pointer-events-none"
+      style={{ opacity: glass() ? Math.min(1, Math.max(0, (props.offset ?? 0) / NAVIGATION_GLASS_RANGE)) : 1 }}>
       <If when={props.floating}>
         <GlassSurface class="absolute inset-0 pointer-events-none" radius={0} material="header" dark={colorScheme() === "dark"} />
       </If>
       <View class={`absolute inset-0 ${props.floating ? "bg-navigation-backdrop-tint" : "bg-background"}`} />
-      <If when={props.floating}>
+      <If when={props.floating && !glass()}>
         <View class="absolute inset-0 bg-background transition-opacity duration-200 motion-reduce:transition-none"
           style={{ opacity: props.scrolled ? 0 : 1 }} />
       </If>
-      <View testID="navigation-bar-divider" class="absolute bottom-0 inset-x-0 h-px bg-navigation-backdrop-border transition-opacity duration-200 motion-reduce:transition-none"
-        style={{ opacity: props.scrolled ? 1 : 0 }} />
     </View>
+    <View testID="navigation-bar-divider" class="absolute bottom-0 inset-x-0 h-px bg-navigation-backdrop-border transition-opacity duration-200 motion-reduce:transition-none pointer-events-none"
+      style={{ opacity: props.scrolled ? 1 : 0 }} />
     {props.children}
   </View>;
 }
