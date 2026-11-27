@@ -889,6 +889,8 @@ mod imp {
                 COLLECTION_CAN_JOIN_ALL_SPACES | COLLECTION_STATIONARY | COLLECTION_FULLSCREEN_AUX;
             let _: () = msg_send![panel, setCollectionBehavior: collection];
             let _: () = msg_send![panel, setHidesOnDeactivate: NO];
+            // Cmd+H（NSApp hide:）默认会隐藏应用的所有窗口；桌面歌词需保持可见。
+            let _: () = msg_send![panel, setCanHide: NO];
             let _: () = msg_send![panel, setAcceptsMouseMovedEvents: YES];
 
             place_initial(panel);
@@ -2306,6 +2308,7 @@ mod imp {
         let _: () = msg_send![panel, setBackgroundColor: clear_color()];
         let _: () = msg_send![panel, setHasShadow: NO];
         let _: () = msg_send![panel, setHidesOnDeactivate: NO];
+        let _: () = msg_send![panel, setCanHide: NO];
         let _: () = msg_send![panel, setCollectionBehavior:
             COLLECTION_CAN_JOIN_ALL_SPACES | COLLECTION_STATIONARY | COLLECTION_FULLSCREEN_AUX];
         let content: id = msg_send![class!(NSView), alloc];
