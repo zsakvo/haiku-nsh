@@ -21,7 +21,7 @@ export interface SettingsSnapshot {
   downloadConcurrency: number; downloadCoverMode: string; downloadCoverHd: boolean;
   downloadLyricsMode: string; downloadLyricsTranslation: boolean; downloadReuseMediaCache: boolean;
   autoDownloadPlaylists: string[]; downloadFollowPlaylistRemoval: boolean;
-  schemaVersion: number; themeMode: "light" | "dark" | "system"; brandColor: string;
+  schemaVersion: number; themeMode: "light" | "dark" | "system"; brandColor: string; detailSky?: boolean;
   audioEffects: AudioEffects; volumeNormalization: boolean; preventScreenSleepOnPlayer: boolean;
   mediaCacheEnabled: boolean; mediaCacheMaxBytes: number;
   lyricsAutoSearch: boolean; lyricsProviderOrder: string[]; lyricsProvidersDisabled: string[];

@@ -2,7 +2,7 @@ import { Text, token, View } from "nsh";
 import { Radio, RadioGroup } from "nsh/base";
 import { brands, modes, type AppearanceMode, type createAppearance } from "./theme";
 import { focus } from "./Button";
-import { SettingRow, SettingSection, SettingSelect } from "./SettingsControls";
+import { SettingRow, SettingSection, SettingSelect, SettingSwitchRow } from "./SettingsControls";
 import { Tooltip } from "./Surfaces";
 
 /** Appearance controls share the native pop-up button and 7-color macOS-style accent dots. */
@@ -40,6 +40,10 @@ export function AppearanceOptions(props: { appearance: ReturnType<typeof createA
             })}
           </RadioGroup>
         </SettingRow>
+      </SettingSection>
+      <SettingSection title="装饰">
+        <SettingSwitchRow label="歌单字符云" description="在歌单详情页顶部绘制随封面着色的 ASCII 字符云。"
+          checked={props.appearance.detailSky()} onChange={(on) => void props.appearance.setDetailSky(on)} />
       </SettingSection>
     </View>
   );

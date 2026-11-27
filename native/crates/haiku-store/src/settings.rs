@@ -61,6 +61,8 @@ pub struct Settings {
     pub gist_id: String,
     pub theme_mode: String,
     pub brand_color: String,
+    /// Draws the ASCII sky behind playlist detail headers.
+    pub detail_sky: bool,
     pub audio_effects: AudioEffects,
     pub volume_normalization: bool,
     pub prevent_screen_sleep_on_player: bool,
@@ -100,6 +102,7 @@ impl Default for Settings {
             gist_id: String::new(),
             theme_mode: "light".into(),
             brand_color: "orange".into(),
+            detail_sky: false,
             audio_effects: AudioEffects::default(),
             volume_normalization: true,
             prevent_screen_sleep_on_player: false,

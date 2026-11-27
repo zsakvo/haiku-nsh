@@ -26,13 +26,14 @@ export function brandTheme(brand: Brand | string) {
 export function createAppearance(initialMode?: AppearanceMode) {
   const mode = signal<AppearanceMode>(initialMode ?? "light");
   const brand = signal<Brand>("orange");
+  const detailSky = signal(false);
   const error = signal("");
   let core: Core | undefined;
   let stop: (() => void) | undefined;
   cleanup(() => stop?.());
   function mirror(value: unknown) {
-    const s = value as { themeMode: AppearanceMode; brandColor: string };
-    mode.set(s.themeMode); brand.set(normalizeBrand(s.brandColor));
+    const s = value as { themeMode: AppearanceMode; brandColor: string; detailSky?: boolean };
+    mode.set(s.themeMode); brand.set(normalizeBrand(s.brandColor)); detailSky.set(!!s.detailSky);
   }
   effect(() => { let alive = true;
     Core.open().then(async (c) => { if (!alive) return;
@@ -43,9 +44,10 @@ export function createAppearance(initialMode?: AppearanceMode) {
     }).catch((e) => error.set(String(e)));
     return () => { alive = false; };
   });
-  async function update(patch: Partial<{ themeMode: AppearanceMode; brandColor: Brand }>) {
+  async function update(patch: Partial<{ themeMode: AppearanceMode; brandColor: Brand; detailSky: boolean }>) {
     if (patch.themeMode) mode.set(patch.themeMode);
     if (patch.brandColor) brand.set(patch.brandColor);
+    if (patch.detailSky !== undefined) detailSky.set(patch.detailSky);
     try { const c = core ?? await Core.open(); await c.settings.update(patch); error.set(""); }
     catch (e) { error.set(`无法保存外观：${String(e)}`); }
   }
@@ -53,6 +55,7 @@ export function createAppearance(initialMode?: AppearanceMode) {
   effect(() => {
     Core.applyTheme(JSON.stringify(brandTheme(brand()))).catch((error) => console.error("Theme update failed", error));
   });
-  return { mode, brand, error, setMode: (themeMode: AppearanceMode) => update({ themeMode }),
-    setBrand: (brandColor: Brand) => update({ brandColor }) };
+  return { mode, brand, detailSky, error, setMode: (themeMode: AppearanceMode) => update({ themeMode }),
+    setBrand: (brandColor: Brand) => update({ brandColor }),
+    setDetailSky: (detailSky: boolean) => update({ detailSky }) };
 }

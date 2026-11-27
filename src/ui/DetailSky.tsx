@@ -1,4 +1,4 @@
-import { Canvas, colorScheme, createAnimatedValue, effect, reduceMotion, resource, signal, token, untracked, View, type AnimatedNode, type CanvasRenderingContext2D, type CanvasSize } from "nsh";
+import { Canvas, cleanup, colorScheme, createAnimatedValue, effect, reduceMotion, resource, signal, token, untracked, View, type AnimatedNode, type CanvasRenderingContext2D, type CanvasSize } from "nsh";
 import type { Core } from "haiku/native";
 import { navigationBackdrop } from "./Chrome";
 
@@ -125,10 +125,13 @@ function paint(cx: CanvasRenderingContext2D, size: CanvasSize, cover: string, ti
  * (past the content insets) and from under the bar, so it scrolls away with the header. */
 export function DetailSky(props: { core: Core; active: boolean; cover?: string; source?: string }) {
   const width = signal(0);
-  const sky = resource(() => props.cover ? [props.source ?? "", props.cover] as const : undefined,
+  // Off by default; toggled in Settings → 外观.
+  const enabled = signal(!!(props.core.settings.get() as { detailSky?: boolean }).detailSky);
+  cleanup(props.core.settings.onChange((next) => enabled.set(!!(next as { detailSky?: boolean }).detailSky)));
+  const sky = resource(() => enabled() && props.cover ? [props.source ?? "", props.cover] as const : undefined,
     async ([source, cover]) => await props.core.coverSky(source, cover) as Sky | null);
   const dark = () => colorScheme() === "dark";
-  const ink = () => sky() ? (dark() ? sky()!.dark : sky()!.light) : null;
+  const ink = () => enabled() && sky() ? (dark() ? sky()!.dark : sky()!.light) : null;
   // The bar is clear at the top so the sky shows behind it; its glass follows the scroll.
   navigationBackdrop(() => props.active && !!ink());
 
