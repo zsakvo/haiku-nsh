@@ -22,8 +22,10 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-const ROW_HEIGHT: f64 = 48.;
-const QUEUE_WIDTH: f64 = 360.;
+const ROW_HEIGHT: f64 = 56.;
+const QUEUE_WIDTH: f64 = 300.;
+/// Rows visible before scrolling; keeps the popup taller than it is wide.
+const QUEUE_ROWS: usize = 8;
 static REGISTERED: AtomicBool = AtomicBool::new(false);
 
 pub fn available() -> bool {
@@ -49,7 +51,8 @@ define_class!(
 struct Track {
     identity: String,
     title: String,
-    duration: String,
+    #[serde(default)]
+    artist: String,
 }
 
 struct State {
@@ -214,7 +217,7 @@ impl Anchor {
         let mtm = MainThreadMarker::new().unwrap();
         let queue = self.ivars().borrow().queue;
         let (width, height) = if queue {
-            (QUEUE_WIDTH, ROW_HEIGHT * 6. + 56.)
+            (QUEUE_WIDTH, ROW_HEIGHT * QUEUE_ROWS as f64 + 56.)
         } else {
             (72., 216.)
         };
@@ -409,7 +412,7 @@ impl Anchor {
             frame(8., 0., cell.bounds().size.width - 16., ROW_HEIGHT),
         );
         body.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
-        let cover = NSImageView::initWithFrame(NSImageView::alloc(mtm), frame(8., 8., 32., 32.));
+        let cover = NSImageView::initWithFrame(NSImageView::alloc(mtm), frame(8., 8., 40., 40.));
         let image = image.or_else(|| {
             NSImage::imageWithSystemSymbolName_accessibilityDescription(
                 &NSString::from_str("music.note"),
@@ -430,12 +433,10 @@ impl Anchor {
             color(&colors, "foreground", NSColor::labelColor())
         };
         let body_width = body.bounds().size.width;
-        let title = label(
-            &track.title,
-            frame(52., 13., body_width - 152., 22.),
-            13.,
-            mtm,
-        );
+        // Title above artist, with the pair centred on the cover.
+        let text_x = 60.;
+        let text_width = body_width - text_x - 40.;
+        let title = label(&track.title, frame(text_x, 28., text_width, 18.), 13., mtm);
         title.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
         title.setTextColor(Some(&foreground));
         title.setAccessibilityLabel(Some(&NSString::from_str(&format!(
@@ -444,23 +445,12 @@ impl Anchor {
             track.title
         ))));
         body.addSubview(&title);
-        let duration = label(
-            &track.duration,
-            frame(body_width - 96., 14., 48., 20.),
-            11.,
-            mtm,
-        );
-        duration.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
-        duration.setAlignment(NSTextAlignment::Right);
-        let duration_color = if active {
-            foreground
-        } else {
-            color(&colors, "muted", NSColor::secondaryLabelColor())
-        };
-        duration.setTextColor(Some(&duration_color));
-        body.addSubview(&duration);
+        let artist = label(&track.artist, frame(text_x, 10., text_width, 16.), 11., mtm);
+        artist.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        artist.setTextColor(Some(&color(&colors, "muted", NSColor::secondaryLabelColor())));
+        body.addSubview(&artist);
         let remove =
-            NSButton::initWithFrame(NSButton::alloc(mtm), frame(body_width - 35., 13., 22., 22.));
+            NSButton::initWithFrame(NSButton::alloc(mtm), frame(body_width - 35., 17., 22., 22.));
         remove.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
         remove.setBordered(false);
         remove.setImagePosition(NSCellImagePosition::ImageOnly);
@@ -561,7 +551,7 @@ impl NativeComponent for PlayerPopover {
         if name == "queue" {
             let (popup, rows) = {
                 let s = self.0.ivars().borrow();
-                (s.popup.clone(), s.tracks.len().clamp(1, 6))
+                (s.popup.clone(), s.tracks.len().clamp(1, QUEUE_ROWS))
             };
             popup.setContentSize(NSSize::new(QUEUE_WIDTH, rows as f64 * ROW_HEIGHT + 56.));
         }

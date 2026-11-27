@@ -23,13 +23,6 @@ enum Popup {
     Queue,
 }
 
-fn duration(seconds: Option<f64>) -> String {
-    seconds
-        .filter(|v| v.is_finite() && *v > 0.)
-        .map(|v| format!("{:02}:{:02}", v as u64 / 60, v as u64 % 60))
-        .unwrap_or_default()
-}
-
 pub(crate) fn controls() -> (AnyElement, AnyElement) {
     let p = presentation::get().expect("Core.open before dock popovers");
     let state = p.bridge.state;
@@ -90,7 +83,8 @@ pub(crate) fn controls() -> (AnyElement, AnyElement) {
             state.with_untracked(|s| json!({
             "version": s.queue_version,
             "tracks": s.tracks.iter().map(|t| json!({
-                "identity": t.entity_ref().encode(), "title": t.title, "duration": duration(t.duration),
+                "identity": t.entity_ref().encode(), "title": t.title,
+                "artist": haiku_library::service::artist_names(t).join(" / "),
             })).collect::<Vec<_>>(),
         }))
         });
@@ -256,7 +250,7 @@ pub(crate) fn controls() -> (AnyElement, AnyElement) {
         })
         .trigger(compact_surface_control("播放队列", "queue", false.into())
             .disabled(move || state.with(|s| s.tracks.is_empty())))
-        .child(view().w_80().gap_3()
+        .child(view().w_72().gap_3()
             .child(view().flex_row().items_center().gap_2()
                 .child(text("播放列表").text_sm().font_weight(FontWeight::SEMIBOLD).text_color(move || theme().popover_foreground))
                 .child(text(move || state.with(|s| s.tracks.len().to_string())).text_xs().text_color(move || theme().muted_foreground))
@@ -272,22 +266,23 @@ pub(crate) fn controls() -> (AnyElement, AnyElement) {
                 let host = host.clone();
                 let cover = computed(move || track.with(|t| t.as_ref().and_then(|t| t.cover.as_ref()
                     .map(|url| crate::sources::cover_url(&host, &t.source, url, 80))).unwrap_or_default()));
-                view().h_12().flex_row().items_center().gap_2()
+                view().h_14().flex_row().items_center().gap_2()
                     .child(nsh_base::button().flex_1().min_w_0().h_full().flex_row().items_center().gap_3().px_2()
                         .accessibility_label(move || Some(track.with(|t| t.as_ref().map(|t| format!("播放 {}", t.title)).unwrap_or_default()).into()))
                         .selected(active)
                         .app_class("rounded-(--radius) active:opacity-60 focus-visible:outline-2 focus-visible:outline-ring")
                         .on_press(move || send(&jump, Command::Jump(at.index() as i32)))
-                        .child(view().size_8().flex_shrink_0().rounded(move || theme().radius).overflow_hidden()
+                        .child(view().size_10().flex_shrink_0().rounded(move || theme().radius).overflow_hidden()
                             .items_center().justify_center().bg(move || theme().muted)
                             .child(when(move || !cover.get().is_empty(), move || image(move || cover.get()).size_full().object_fit(ResizeMode::Cover)))
                             .child(when(move || cover.get().is_empty(), || icon("music", false))))
-                        .child(text(move || track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default()))
-                            .flex_1().min_w_0().text_sm().truncate()
-                            .text_color(move || if active() { theme().primary } else { theme().popover_foreground }))
-                        .child(text(move || duration(track.with(|t| t.as_ref().and_then(|t| t.duration))))
-                            .text_xs().text_color(move || if active() { theme().primary } else { theme().muted_foreground })))
+                        .child(view().flex_1().min_w_0().gap_0p5()
+                            .child(text(move || track.with(|t| t.as_ref().map(|t| t.title.clone()).unwrap_or_default()))
+                                .text_sm().truncate()
+                                .text_color(move || if active() { theme().primary } else { theme().popover_foreground }))
+                            .child(text(move || track.with(|t| t.as_ref().map(|t| haiku_library::service::artist_names(t).join(" / ")).unwrap_or_default()))
+                                .text_xs().truncate().text_color(move || theme().muted_foreground))))
                     .child(small_control("从队列移除", "close").on_press(move || send(&remove, Command::Remove(at.index() as i32))))
-            }).element_ref(&list).estimated_item_size(px(48.)).h_80())).into_element();
+            }).element_ref(&list).estimated_item_size(px(56.)).h(px(448.)))).into_element();
     (volume, queue)
 }
