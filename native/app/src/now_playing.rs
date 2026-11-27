@@ -1,11 +1,13 @@
 //! App-owned full-window presentation over retained navigation and dock.
 use crate::{lyrics_view::lyrics_view, player_controls::close_on_dark, presentation};
 use nsh_base::theme;
-use nsh_core::{Hsla, JsonValue, Rgba, prelude::*};
+use nsh_core::{JsonValue, prelude::*};
 use std::time::Duration;
 
 const ENTER_MS: u64 = 320;
 const EXIT_MS: u64 = 240;
+/// Cover palette and artwork changes cross over at the same pace.
+const COVER_MS: f32 = 650.;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Phase {
@@ -210,7 +212,13 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
     };
     let state = p.bridge.state;
     let paused = computed(move || state.with(|s| s.status == haiku_playback::Status::Paused));
-    let background = cover_background();
+    let shade = crossfade(move || {
+        (
+            theme().color("now-playing-shade-top").unwrap(),
+            theme().color("now-playing-shade-bottom").unwrap(),
+        )
+    });
+    let artwork = crossfade(move || art.get());
     let keyboard = p.clone();
     effect(move || {
         if !props.open.get() {
@@ -253,12 +261,18 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
     view().absolute().inset_0().pointer_events(nsh_core::PointerEvents::BoxNone)
         .child(when(move || transition.mounted.get(), move || {
             transition.view().overflow_hidden()
-                .child(view().absolute().inset_0().bg(move || Hsla::from(background.get()))
+                // The engine interpolates the solid color natively from whatever is visible,
+                // so an interrupted switch continues from its current frame.
+                .child(view().absolute().inset_0()
+                    .style_with(move |s| s.transition_colors().duration(COVER_MS).ease_in_out()
+                        .bg(theme().color("now-playing-background").unwrap()))
                     .pointer_events(nsh_core::PointerEvents::None))
-                .child(view().absolute().inset_0().bg_linear_to_b()
-                    .gradient_from(move || theme().color("now-playing-shade-top").unwrap())
-                    .gradient_to(move || theme().color("now-playing-shade-bottom").unwrap())
-                    .pointer_events(nsh_core::PointerEvents::None))
+                // Gradients do not interpolate; two retained layers cross-fade instead.
+                .children([0, 1].map(|i| view().absolute().inset_0().bg_linear_to_b()
+                    .gradient_from(move || shade.slots[i].get().0)
+                    .gradient_to(move || shade.slots[i].get().1)
+                    .style_with(move |s| shade.layer(s, i))
+                    .pointer_events(nsh_core::PointerEvents::None)))
                 .child(content_root(content).test_id("now-playing").absolute().inset_0()
                     .focusable(true).min_h_0()
                     .child(view().h(header_height).flex_shrink_0()
@@ -297,7 +311,11 @@ pub fn NowPlaying(props: NowPlayingProps, cx: Scope<NowPlayingEvent>) -> impl In
                                             else { s.transition_transform().duration(400.).ease_in_out() };
                                         s.scale(if paused.get() { 0.8 } else { 1. })
                                     })
-                                    .child(when(move || !art.get().is_empty(), move || image(move || art.get()).size_full().object_fit(nsh_core::ResizeMode::Cover)))
+                                    .children([0, 1].map(|i| view().absolute().inset_0()
+                                        .style_with(move |s| artwork.layer(s, i))
+                                        .child(when(move || !artwork.slots[i].with(String::is_empty), move || {
+                                            image(move || artwork.slots[i].get()).size_full().object_fit(nsh_core::ResizeMode::Cover)
+                                        }))))
                                     .child(when(move || art.get().is_empty(), || text("♪").text_4xl()
                                         .text_color(move || theme().color("now-playing-foreground").unwrap())))))
                             .child(crate::now_playing_controls::controls(p.clone(), move || px((cover_size().0 * 0.8).min(280.)))))
@@ -313,38 +331,48 @@ fn header_height() -> Points {
     px(nsh_core::element::desktop::title_bar().top.0.max(min))
 }
 
-/// Effect-owned interpolation cancels on interruption and samples the visible RGB.
-fn cover_background() -> Signal<Rgba> {
-    let target = computed(move || color(theme().color("now-playing-background").unwrap()).to_rgb());
-    let visible = signal(target.get_untracked());
+/// Two retained slots: a new value lands in the hidden one, which then fades over the other.
+struct Crossfade<T: 'static> {
+    slots: [Signal<T>; 2],
+    front: Signal<usize>,
+}
+// Handles only; a derive would wrongly require `T: Copy`.
+impl<T> Clone for Crossfade<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T> Copy for Crossfade<T> {}
+
+impl<T: Clone + PartialEq + 'static> Crossfade<T> {
+    fn layer(self, s: nsh_core::element::StyleRefinement, i: usize) -> nsh_core::element::StyleRefinement {
+        s.transition_opacity()
+            .duration(COVER_MS)
+            .ease_in_out()
+            .opacity(if self.front.get() == i { 1. } else { 0. })
+    }
+}
+
+fn crossfade<T: Clone + PartialEq + 'static>(source: impl Fn() -> T + 'static) -> Crossfade<T> {
+    let source = computed(source);
+    let initial = source.get_untracked();
+    let this = Crossfade {
+        slots: [signal(initial.clone()), signal(initial)],
+        front: signal(0),
+    };
     effect(move || {
-        let target = target.get();
-        let reduced = reduce_motion();
-        let start = visible.get_untracked();
-        if reduced || start == target {
-            visible.set(target);
-            return;
-        }
-        spawn(async move {
-            let began = nsh_core::time::now();
-            loop {
-                let t = (nsh_core::time::now().duration_since(began).as_secs_f32() / 0.5).min(1.);
-                let eased = t * t * (3. - 2. * t);
-                let mix = |a: f32, b: f32| a + (b - a) * eased;
-                visible.set(Rgba {
-                    r: mix(start.r, target.r),
-                    g: mix(start.g, target.g),
-                    b: mix(start.b, target.b),
-                    a: mix(start.a, target.a),
-                });
-                if t >= 1. {
-                    break;
-                }
-                timer(Duration::from_millis(16)).await;
+        let value = source.get();
+        untracked(|| {
+            let front = this.front.get();
+            if this.slots[front].with(|v| *v == value) {
+                return;
             }
+            let back = 1 - front;
+            this.slots[back].set(value);
+            this.front.set(back);
         });
     });
-    visible
+    this
 }
 
 fn content_root(handle: ElementRef) -> nsh_core::element::View {

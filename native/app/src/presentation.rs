@@ -27,6 +27,9 @@ pub(crate) struct Presentation {
     pub open: Signal<bool>,
     cover_theme: RefCell<Option<CoverTheme>>,
     cache: RefCell<VecDeque<(String, Cover)>>,
+    /// Best cover known per track identity, so a switch to a prewarmed track resolves
+    /// synchronously instead of waiting on a key that needs a plugin call to compute.
+    by_track: RefCell<VecDeque<(String, String)>>,
     request: RefCell<RequestVersion>,
 }
 pub(crate) fn get() -> Option<Rc<Presentation>> {
@@ -91,6 +94,7 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             open: signal(false),
             cover_theme: RefCell::new(None),
             cache: RefCell::new(VecDeque::new()),
+            by_track: RefCell::new(VecDeque::new()),
             request: RefCell::new(RequestVersion::default()),
         })
     });
@@ -165,40 +169,62 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
             let selected = artwork_track.get();
             let Some(p) = weak.upgrade() else { return };
             let version = p.request.borrow_mut().advance();
-            p.artwork.set(String::new());
+            let Some(track) = selected else {
+                p.clear_cover();
+                return;
+            };
+            let identity = track_identity(&track);
+            // The system media center must not keep the previous track's image.
             p.artwork_path.set(None);
-            *p.cover_theme.borrow_mut() = None;
-            crate::player_theme::apply(None);
+            // A prewarmed successor switches in the same tick: artwork, palette and
+            // tokens change together, and the background transitions from the old colors.
+            // On a miss the previous cover stays visible until the new one is decoded,
+            // never degrading to the fallback palette in between.
+            let mut shown = p.cached_for(&identity).map(|(key, cover)| {
+                p.show(&identity, key.clone(), cover);
+                key
+            });
             let weak = Rc::downgrade(&p);
             spawn(async move {
-                let Some(track) = selected else { return };
                 let show = |key: String, cover: Cover| {
                     let Some(p) = weak.upgrade() else { return false };
                     if !p.request.borrow().accepts(version) {
                         return false;
                     }
-                    p.remember(key, cover.clone());
-                    p.artwork.set(cover.uri);
-                    p.artwork_path.set(Some(cover.path));
-                    *p.cover_theme.borrow_mut() = Some(cover.theme.clone());
-                    crate::player_theme::apply(Some(&cover.theme));
+                    p.show(&identity, key, cover);
                     true
                 };
                 // The track's own artwork needs no plugin call, so it is shown at once instead of
                 // queueing behind stream resolution in the source's serial runtime.
-                let mut shown = None;
-                if let Some((key, cover)) = direct_cover(weak.clone(), track.clone()).await {
-                    if !show(key.clone(), cover) {
-                        return;
+                // A cached cover is already the best one prewarming found; going back to the
+                // smaller direct artwork would visibly downgrade it.
+                let mut found = shown.is_some();
+                let direct = if found { None } else { direct_cover(weak.clone(), track.clone()).await };
+                if let Some((key, cover)) = direct {
+                    found = true;
+                    if shown.as_ref() != Some(&key) {
+                        let _ = prefetch_image(cover.uri.clone()).await;
+                        if !show(key.clone(), cover) {
+                            return;
+                        }
+                        shown = Some(key);
                     }
-                    shown = Some(key);
                 }
                 // A source may still provide larger artwork through track.cover.
-                let Some((key, cover)) = prepared_cover(weak.clone(), track).await else {
+                if let Some((key, cover)) = prepared_cover(weak.clone(), track).await {
+                    if shown.as_ref() != Some(&key) {
+                        let _ = prefetch_image(cover.uri.clone()).await;
+                        show(key, cover);
+                    }
                     return;
-                };
-                if shown.as_ref() != Some(&key) {
-                    show(key, cover);
+                }
+                // Only a track that truly has no artwork falls back to the default palette.
+                if !found {
+                    if let Some(p) = weak.upgrade() {
+                        if p.request.borrow().accepts(version) {
+                            p.clear_cover();
+                        }
+                    }
                 }
             });
         });
@@ -242,11 +268,19 @@ pub(crate) fn initialize(bridge: Rc<CoreBridge>, library: Library) {
         effect(move || {
             let Some(track) = next_track.get() else { return };
             let weak = weak.clone();
+            // Prewarm exactly what the switch will look up: the track's own artwork, the
+            // source's larger cover, and the decoded native image for each.
             spawn(async move {
-                if let Some((key, cover)) = prepared_cover(weak.clone(), track).await {
-                    if let Some(p) = weak.upgrade() {
-                        p.remember(key, cover);
-                    }
+                let identity = track_identity(&track);
+                for cover in [
+                    direct_cover(weak.clone(), track.clone()).await,
+                    prepared_cover(weak.clone(), track).await,
+                ] {
+                    let Some((key, cover)) = cover else { continue };
+                    let _ = prefetch_image(cover.uri.clone()).await;
+                    let Some(p) = weak.upgrade() else { return };
+                    p.remember(key.clone(), cover);
+                    p.associate(&identity, key);
                 }
             });
         });
@@ -264,6 +298,9 @@ async fn prepared_cover(
         .ok()??;
     track.cover = Some(url);
     load_artwork(weak, track).await
+}
+fn track_identity(track: &Track) -> String {
+    format!("{}:{}", track.source, track.id)
 }
 /// The track's own artwork only, without asking the source for a larger image.
 async fn direct_cover(weak: std::rc::Weak<Presentation>, mut track: Track) -> Option<(String, Cover)> {
@@ -325,6 +362,43 @@ impl Presentation {
                 0.
             }
         })
+    }
+    fn show(&self, identity: &str, key: String, cover: Cover) {
+        self.remember(key.clone(), cover.clone());
+        self.associate(identity, key);
+        self.artwork.set(cover.uri);
+        self.artwork_path.set(Some(cover.path));
+        *self.cover_theme.borrow_mut() = Some(cover.theme.clone());
+        crate::player_theme::apply(Some(&cover.theme));
+    }
+    fn clear_cover(&self) {
+        self.artwork.set(String::new());
+        self.artwork_path.set(None);
+        if self.cover_theme.borrow_mut().take().is_some() {
+            crate::player_theme::apply(None);
+        }
+    }
+    fn cached_for(&self, identity: &str) -> Option<(String, Cover)> {
+        let key = self
+            .by_track
+            .borrow()
+            .iter()
+            .find(|(id, _)| id == identity)
+            .map(|(_, key)| key.clone())?;
+        let cover = self
+            .cache
+            .borrow()
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, c)| c.clone())?;
+        Some((key, cover))
+    }
+    /// The later (larger, source-provided) cover replaces the direct one for the track.
+    fn associate(&self, identity: &str, key: String) {
+        let mut tracks = self.by_track.borrow_mut();
+        tracks.retain(|(id, _)| id != identity);
+        tracks.push_front((identity.to_owned(), key));
+        tracks.truncate(24);
     }
     fn remember(&self, key: String, cover: Cover) {
         let mut cache = self.cache.borrow_mut();
