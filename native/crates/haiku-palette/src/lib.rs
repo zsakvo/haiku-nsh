@@ -222,6 +222,22 @@ pub fn extract_cover_theme_rgba(
     height: u32,
     pixels: &[u8],
 ) -> Result<CoverTheme, String> {
+    Ok(match dominant_rgba(width, height, pixels)? {
+        Some(d) => build_cover_theme(d.hue, d.chroma, d.tone, d.average_tone),
+        None => cover_theme_from_rgb(20, 22, 25),
+    })
+}
+
+/// The cover's visual dominant color in HCT, with the population-weighted average tone.
+#[derive(Clone, Copy, Debug)]
+struct Dominant {
+    hue: f64,
+    chroma: f64,
+    tone: f64,
+    average_tone: f64,
+}
+
+fn dominant_rgba(width: u32, height: u32, pixels: &[u8]) -> Result<Option<Dominant>, String> {
     let expected_len = u64::from(width)
         .checked_mul(u64::from(height))
         .and_then(|length| length.checked_mul(4));
@@ -230,7 +246,7 @@ pub fn extract_cover_theme_rgba(
     }
     let sampled = sample_pixels(width, height, pixels, None);
     if sampled.is_empty() {
-        return Ok(cover_theme_from_rgb(20, 22, 25));
+        return Ok(None);
     }
     let quantized = QuantizerCelebi::quantize(&sampled, 128);
     let mut entries: Vec<(Hct, u32)> = quantized
@@ -240,7 +256,7 @@ pub fn extract_cover_theme_rgba(
         .map(|(rgb, count)| (Hct::new(rgb), count))
         .collect();
     if entries.is_empty() {
-        return Ok(cover_theme_from_rgb(20, 22, 25));
+        return Ok(None);
     }
     entries.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -321,22 +337,75 @@ pub fn extract_cover_theme_rgba(
     };
     let chroma = winner.chroma_sum / winner.weight;
     let tone = winner.tone_sum / winner.weight;
-    Ok(build_cover_theme(hue, chroma, tone, average_tone))
+    Ok(Some(Dominant { hue, chroma, tone, average_tone }))
 }
 
-/// File decoding and adaptive cover theme extraction.
-pub fn extract_cover_theme_file(path: impl AsRef<Path>) -> Result<CoverTheme, String> {
-    let mut reader = image::ImageReader::open(path)
-        .map_err(|e| e.to_string())?
-        .with_guessed_format()
-        .map_err(|e| e.to_string())?;
+fn decode_limited<R: std::io::BufRead + std::io::Seek>(
+    mut reader: image::ImageReader<R>,
+) -> Result<image::RgbaImage, String> {
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(8192);
     limits.max_image_height = Some(8192);
     limits.max_alloc = Some(128 * 1024 * 1024);
     reader.limits(limits);
-    let image = reader.decode().map_err(|e| e.to_string())?.to_rgba8();
+    Ok(reader.decode().map_err(|e| e.to_string())?.to_rgba8())
+}
+
+/// File decoding and adaptive cover theme extraction.
+pub fn extract_cover_theme_file(path: impl AsRef<Path>) -> Result<CoverTheme, String> {
+    let reader = image::ImageReader::open(path)
+        .map_err(|e| e.to_string())?
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?;
+    let image = decode_limited(reader)?;
     extract_cover_theme_rgba(image.width(), image.height(), image.as_raw())
+}
+
+/// One appearance of a decorative cover-tinted backdrop: `ink` draws faint marks,
+/// `glow` washes the area behind them. Both are meant to be used at low opacity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SkyInk {
+    pub ink: String,
+    pub glow: String,
+}
+
+/// Restrained light/dark tints derived from a cover's dominant hue, for backdrops
+/// that must never compete with the content drawn over them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CoverSky {
+    pub light: SkyInk,
+    pub dark: SkyInk,
+}
+
+fn hex(hue: f64, chroma: f64, tone: f64) -> String {
+    let c = RgbaColor::from_hct(hue, chroma, tone, 1.0);
+    format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
+}
+
+fn build_cover_sky(d: Dominant) -> CoverSky {
+    // Near-neutral covers stay neutral rather than inventing a hue; colorful covers are
+    // capped so the backdrop reads as a tint of the cover, never as a second accent.
+    let neutral = d.chroma < 6.0;
+    let ink = if neutral { d.chroma } else { d.chroma.clamp(18.0, 40.0) };
+    let glow = if neutral { d.chroma } else { (d.chroma * 0.4).clamp(6.0, 14.0) };
+    CoverSky {
+        light: SkyInk { ink: hex(d.hue, ink, 52.0), glow: hex(d.hue, glow, 90.0) },
+        dark: SkyInk { ink: hex(d.hue, ink * 0.85, 80.0), glow: hex(d.hue, glow, 28.0) },
+    }
+}
+
+/// Backdrop tints from RGBA pixels; `None` when the image has no opaque pixels.
+pub fn extract_cover_sky_rgba(width: u32, height: u32, pixels: &[u8]) -> Result<Option<CoverSky>, String> {
+    Ok(dominant_rgba(width, height, pixels)?.map(build_cover_sky))
+}
+
+/// Backdrop tints from encoded image bytes (any format the `image` crate decodes).
+pub fn extract_cover_sky_bytes(bytes: &[u8]) -> Result<Option<CoverSky>, String> {
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?;
+    let image = decode_limited(reader)?;
+    extract_cover_sky_rgba(image.width(), image.height(), image.as_raw())
 }
 
 fn tonal_palette(source: Rgb) -> Vec<Color> {
@@ -471,6 +540,32 @@ pub fn extract_file(path: impl AsRef<Path>) -> Result<Vec<Color>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn solid(r: u8, g: u8, b: u8) -> Vec<u8> {
+        [r, g, b, 255].repeat(32 * 32)
+    }
+
+    #[test]
+    fn sky_tints_stay_neutral_for_grey_covers_and_keep_the_hue_of_colorful_ones() {
+        let grey = extract_cover_sky_rgba(32, 32, &solid(128, 128, 128)).unwrap().unwrap();
+        let rgb = |hex: &str| u32::from_str_radix(&hex[1..], 16).unwrap();
+        let spread = |hex: &str| {
+            let n = rgb(hex);
+            let (r, g, b) = ((n >> 16) & 255, (n >> 8) & 255, n & 255);
+            r.max(g).max(b) - r.min(g).min(b)
+        };
+        assert!(spread(&grey.light.ink) <= 6, "{}", grey.light.ink);
+        let blue = extract_cover_sky_rgba(32, 32, &solid(30, 80, 200)).unwrap().unwrap();
+        let n = rgb(&blue.light.ink);
+        assert!(n & 255 > (n >> 16) & 255, "{}", blue.light.ink);
+        // Dark ink is lighter than light ink, and each glow sits near its background.
+        let tone = |hex: &str| {
+            let n = rgb(hex);
+            Hct::new(Rgb::new((n >> 16) as u8, (n >> 8) as u8, n as u8)).get_tone()
+        };
+        assert!(tone(&blue.dark.ink) > 70.0);
+        assert!(tone(&blue.light.glow) > 85.0);
+    }
 
     #[test]
     fn stale_palette_results_never_replace_the_selected_cover() {

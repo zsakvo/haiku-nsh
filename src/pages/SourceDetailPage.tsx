@@ -1,4 +1,4 @@
-import { cleanup, effect, resource, Scroll, signal, Text, untracked, View } from "nsh";
+import { cleanup, effect, resource, Scroll, signal, Text, token, untracked, View } from "nsh";
 import type { Core } from "haiku/native";
 import type { Route } from "../shell/navigation";
 import { mirrorCollections } from "../state/collections";
@@ -8,6 +8,7 @@ import { SourceGrid, SourceTracks } from "./SourceContent";
 import { ActionMenu, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { AutoDownloadControls } from "../ui/AutoDownloadControls";
 import { DetailAction, DetailHeader, DetailLoadingSkeleton } from "../ui/DetailHeader";
+import { DetailSky } from "../ui/DetailSky";
 import { usePageRefresh } from "../shell/pageRefresh";
 import { navigationScroll, NavigationScrollArea, NavigationScrollHeader } from "../ui/Chrome";
 
@@ -156,6 +157,10 @@ export function SourceDetailPage(props: { core: Core; reference: string; active:
         <SourceTracks core={props.core} tracks={tracks()} active={props.active && !unfavorite() && !expanded()} detail onScrolled={scrolled}
           onLoadMore={() => wantMore.set(true)}
           header={<NavigationScrollHeader class="gap-2">
+            <If when={isPlaylist()}>
+              <DetailSky core={props.core} active={props.active} cover={info().cover} source={info().reference?.source}
+                insetLeft={token("content-inset-left")} insetRight={token("content-inset-right")} />
+            </If>
             <If when={!!first.error() || !!error()}>
               <Text class="text-sm text-destructive">{error() || String(first.error())}</Text>
               <Button label="重试详情" size="sm" onPress={() => { error.set(""); first.refetch(); }} />

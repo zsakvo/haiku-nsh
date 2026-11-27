@@ -89,11 +89,18 @@ impl LyricsService {
     pub(crate) fn new(bridge: Rc<CoreBridge>) -> Instance<Self> {
         let listeners = Listeners::default();
         let callbacks = listeners.clone();
-        let service = bridge.lyrics.clone();
+        let changes = std::cell::RefCell::new(bridge.lyrics.subscribe());
+        let first = std::cell::Cell::new(true);
         let last = std::cell::RefCell::new(String::new());
         // Register under the engine owner; synchronous calls only mutate service state.
+        // Serialize only when the watch channel has a new value: the snapshot carries every
+        // lyric line, and encoding it on each 100 ms tick kept the engine thread busy.
         set_interval(Duration::from_millis(100), move || {
-            let value = serde_json::to_value(service.snapshot()).unwrap();
+            if !first.replace(false) && !changes.borrow().has_changed().unwrap_or(false) {
+                return;
+            }
+            let snapshot = changes.borrow_mut().borrow_and_update().clone();
+            let value = serde_json::to_value(snapshot).unwrap();
             let encoded = value.to_string();
             if *last.borrow() == encoded {
                 return;

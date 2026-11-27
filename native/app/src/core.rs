@@ -657,6 +657,51 @@ impl Core {
         set_tokens(tokens);
         Ok(())
     }
+    /// Faint cover-derived backdrop tints `{light:{ink,glow},dark:{ink,glow}}` (hex colors),
+    /// or null when the cover cannot be read. Remote covers reuse the shared artwork cache;
+    /// `source` supplies the plugin's request headers. Results are memoized per cover.
+    pub async fn cover_sky(this: Instance<Self>, source: String, cover: String) -> Result<Option<JsonValue>, String> {
+        thread_local! {
+            static SKIES: RefCell<std::collections::VecDeque<(String, JsonValue)>> = RefCell::default();
+        }
+        let key = format!("{source}\u{0}{cover}");
+        if let Some(hit) = SKIES.with(|c| c.borrow().iter().find(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
+            return Ok(Some(hit));
+        }
+        let bytes = if let Some(data) = cover.strip_prefix("data:") {
+            let Some((_, encoded)) = data.split_once(";base64,") else { return Ok(None) };
+            match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded) {
+                Ok(bytes) => bytes,
+                Err(_) => return Ok(None),
+            }
+        } else if cover.starts_with("http") || cover.starts_with("file://") || cover.starts_with('/') {
+            let bridge = this.with(|s| s.player.with(|p| p.bridge.clone()));
+            let mut track = haiku_model::Track::local(String::new());
+            track.source = source;
+            track.cover = Some(cover);
+            let (host, root) = (bridge.source_host.clone(), bridge.artwork_root.clone());
+            let Some(path) = background(crate::sources::artwork(host, root, track)).await.ok().flatten() else {
+                return Ok(None);
+            };
+            match blocking(move || std::fs::read(path)).await {
+                Ok(Ok(bytes)) => bytes,
+                _ => return Ok(None),
+            }
+        } else {
+            return Ok(None);
+        };
+        let sky = blocking(move || haiku_palette::extract_cover_sky_bytes(&bytes))
+            .await
+            .map_err(|e| e.to_string())?;
+        let Ok(Some(sky)) = sky else { return Ok(None) };
+        let value = serde_json::to_value(sky).map_err(|e| e.to_string())?;
+        SKIES.with(|c| {
+            let mut c = c.borrow_mut();
+            c.push_front((key, value.clone()));
+            c.truncate(32);
+        });
+        Ok(Some(value))
+    }
 }
 
 /// Low-frequency playback commands and state subscription. All business state belongs to Rust.

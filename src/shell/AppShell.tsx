@@ -268,15 +268,20 @@ export function AppShell(props: {
   // macOS: the bar floats over the page, whose content scrolls beneath it.
   const floatingNavigation = platform.os === "macos";
   const scrolledPages = new Set<object>(), contentScrolled = signal(false);
+  const backdropPages = new Set<object>(), contentBackdrop = signal(false);
   const navigationLayout = {
     inset: () => floatingNavigation ? token("navigation-bar-height") + token("navigation-content-gap") : 0,
     report: (page: object, scrolled: boolean) => {
       if (scrolled) scrolledPages.add(page); else scrolledPages.delete(page);
       contentScrolled.set(scrolledPages.size > 0);
     },
+    backdrop: (page: object, shown: boolean) => {
+      if (shown) backdropPages.add(page); else backdropPages.delete(page);
+      contentBackdrop.set(backdropPages.size > 0);
+    },
   };
   const hasSources = () => !!pageSource.current()?.items().length;
-  const navigationBar = () => <NavigationBar floating={floatingNavigation} scrolled={contentScrolled()}>
+  const navigationBar = () => <NavigationBar floating={floatingNavigation} scrolled={contentScrolled()} backdrop={contentBackdrop()}>
     <IconButton navigation testID="nav-back" icon="left" label="后退" hint={`后退 · ${keymap.label(binding("navigateBack",shortcuts.back))}`}
       disabled={!nav.canBack() || navigationBlocked()} onPress={goBack} />
     <IconButton navigation testID="nav-refresh" icon="sync" label="刷新" hint={`刷新 · ${keymap.label(shortcuts.refresh)}`}

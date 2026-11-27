@@ -46,6 +46,8 @@ export const NavigationLayoutContext = context<{
   inset: () => number;
   /** Whether a page's content has scrolled beneath the bar; pages report false when inactive. */
   report: (page: object, scrolled: boolean) => void;
+  /** Whether a page draws a backdrop that should show through the resting bar. */
+  backdrop: (page: object, shown: boolean) => void;
 } | undefined>(undefined);
 
 /** A list reaches behind the toolbar while its leading space scrolls with its content. */
@@ -65,14 +67,22 @@ export function navigationScroll(active: () => boolean) {
   return (value: boolean) => scrolled.set(value);
 }
 
+/** Lets the active page's decorative backdrop show through the bar while nothing is scrolled beneath it. */
+export function navigationBackdrop(shown: () => boolean) {
+  const layout = NavigationLayoutContext(), page = {};
+  effect(() => layout?.backdrop(page, shown()));
+  cleanup(() => layout?.backdrop(page, false));
+}
+
 /** The content's top bar. It carries the content's own colour, so it only reads as a bar once
  * something scrolls beneath it: on macOS that content shows through a blur, and a hairline appears. */
-export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean }) {
+export function NavigationBar(props: { children?: JSX.Element; floating: boolean; scrolled: boolean; backdrop?: boolean }) {
   return <View testID="navigation-bar"
     class={`${props.floating ? "absolute top-0 inset-x-0" : "shrink-0"} flex-row items-center gap-(--navigation-button-gap) px-(--content-inset-left)`}
     style={{ height: token("navigation-bar-height") }}
     desktop={{ windowDrag: true }}>
-    <View class="absolute inset-0 overflow-hidden pointer-events-none">
+    <View class="absolute inset-0 overflow-hidden pointer-events-none transition-opacity duration-200 motion-reduce:transition-none"
+      style={{ opacity: props.floating && props.backdrop && !props.scrolled ? 0 : 1 }}>
       <If when={props.floating}>
         <GlassSurface class="absolute inset-0 pointer-events-none" radius={0} material="header" dark={colorScheme() === "dark"} />
       </If>

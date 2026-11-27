@@ -4,6 +4,7 @@ import { mirrorCollections } from "../state/collections";
 import { mirrorCore } from "../state/core";
 import { Button } from "../ui/Button";
 import { DetailAction, DetailHeader, DetailLoadingSkeleton } from "../ui/DetailHeader";
+import { DetailSky } from "../ui/DetailSky";
 import { ActionMenu, Menu, MenuItem, Dialog, type ActionMenuItem } from "../ui/Surfaces";
 import { SearchField } from "../ui/SearchField";
 import { PlaylistEditor } from "./PlaylistEditor";
@@ -86,9 +87,12 @@ export function CollectionPage(props: { core: Core; id: string; active: boolean;
       }
     });
   }
+  const cover = () => collection()?.cover || covers().find((cover):cover is string=>!!cover);
   const header = () => <NavigationScrollHeader class="gap-3 pb-2">
+      <DetailSky core={props.core} active={props.active} cover={cover()} source={sources()[0]}
+        insetLeft={token("content-inset-left")} insetRight={token("content-inset-right")} />
       <DetailHeader playlist title={collection()?.title ?? (liked ? "喜欢" : "歌单已删除")}
-        cover={collection()?.cover || covers().find((cover):cover is string=>!!cover)}
+        cover={cover()}
         description={collection()?.description} metadata={`${collection()?.trackCount ?? 0} 首`}>
         <DetailAction label="播放全部" icon="play" primary pill disabled={!collection()?.trackCount || !source()}
           onPress={() => void act(() => service.playSource(source()!, ""))} />
