@@ -5,7 +5,7 @@ test("Gist PAT save, create, manual sync and disconnect confirmation", async () 
     platform: "macos", width: 1200, height: 900, network: "live",
   });
   await app.waitFor("id:sync-settings");
-  await app.waitFor("text:尚未连接 GitHub");
+  await app.waitFor("text:未连接 GitHub");
   await app.type("label:GitHub PAT", "fixture-token");
   await app.press("role:button[保存 PAT]");
   await app.waitFor("text:PAT 已保存。");
@@ -25,6 +25,6 @@ test("Gist PAT save, create, manual sync and disconnect confirmation", async () 
   await app.press("role:button[断开同步…]");
   await app.press("role:button[确认断开]");
   await app.waitFor("text:已断开同步。");
-  await app.waitFor("text:尚未连接 GitHub");
+  await app.waitFor("text:未连接 GitHub");
   expect(app.shows("text:Gist：abc123")).toBe(false);
 });
