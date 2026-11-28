@@ -49,3 +49,14 @@ use an isolated `HAIKU_DATA_DIR` to avoid changing the normal application data.
 
 Verification evidence and known gaps are recorded in `specs/STATUS.md`.
 Generated hosts and output live in `.nsh/`; local evidence lives in `.artifacts/`.
+
+## License
+
+Haiku is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See [LICENSE](LICENSE) for the full text.
+
+Bundled third-party assets keep their own licenses; see `assets/**/LICENSE*`,
+`assets/player/desktop-disc.NOTICE.txt` and
+`native/app/assets/THIRD_PARTY_NOTICES.txt`.
