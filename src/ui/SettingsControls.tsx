@@ -151,6 +151,133 @@ export function SettingSlider(props: {
   );
 }
 
+const sliderRail = "rounded-full bg-settings-switch-track";
+const sliderThumb = `rounded-full border border-border bg-card shadow-sm active:bg-muted ${focus}`;
+
+/**
+ * A System Settings style row: title on the leading edge, a fixed-width slider and its value on the trailing edge.
+ * `centered` drops the fill for bipolar values (balance) whose origin is the middle, not the minimum.
+ */
+export function SettingSliderRow(props: {
+  label: string;
+  description?: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+  centered?: boolean;
+  startLabel?: string;
+  endLabel?: string;
+  format: (value: number) => string;
+  onChange: (value: number) => void;
+  divider?: boolean;
+  testID?: string;
+}) {
+  const hint = { fontSize: token("setting-value-size") };
+  return (
+    <SettingRow title={props.label} description={props.description} divider={props.divider}>
+      <View class={`flex-row items-center gap-2 ${props.disabled ? "opacity-40" : ""}`}>
+        <If when={!!props.startLabel}>
+          <Text class="text-muted-foreground" style={hint}>{props.startLabel}</Text>
+        </If>
+        <BaseSlider
+          testID={props.testID}
+          accessibilityLabel={props.label}
+          value={props.value}
+          min={props.min}
+          max={props.max}
+          step={props.step ?? 0.5}
+          disabled={props.disabled}
+          onChange={(e) => {
+            if (typeof e.value === "number") props.onChange(e.value);
+          }}
+          class="w-44"
+          trackClass="h-4 justify-center"
+          indicatorClass={`h-1 ${sliderRail}`}
+          rangeClass={props.centered ? "opacity-0" : "rounded-full bg-primary"}
+          thumbClass={`size-3.5 ${sliderThumb}`}
+        />
+        <If when={!!props.endLabel}>
+          <Text class="text-muted-foreground" style={hint}>{props.endLabel}</Text>
+        </If>
+        <Text class="w-14 text-right text-muted-foreground" style={{ ...hint, numberOfLines: 1 }}>
+          {props.format(props.value)}
+        </Text>
+      </View>
+    </SettingRow>
+  );
+}
+
+/** One band of a graphic equalizer: value above, a vertical fader, the frequency below. */
+export function EqualizerBand(props: {
+  label: string;
+  accessibilityLabel: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+  testID?: string;
+}) {
+  const hint = { fontSize: token("setting-value-size") };
+  const formatted = () => {
+    const v = props.value;
+    if (Math.abs(v) < 0.05) return "0";
+    const text = Math.abs(v).toFixed(1).replace(/\.0$/, "");
+    return `${v > 0 ? "+" : "−"}${text}`;
+  };
+  return (
+    <View class={`min-w-0 flex-1 items-center gap-2 ${props.disabled ? "opacity-40" : ""}`}>
+      <Text class={Math.abs(props.value) < 0.05 ? "text-muted-foreground" : "text-foreground"} style={hint}>
+        {formatted()}
+      </Text>
+      <View class="h-36 w-full items-center">
+        {/* Adjacent bands join these into one continuous 0 dB reference line. */}
+        <View class="pointer-events-none absolute inset-0 justify-center">
+          <View class="h-px bg-settings-divider" />
+        </View>
+        <BaseSlider
+          testID={props.testID}
+          axis="vertical"
+          accessibilityLabel={props.accessibilityLabel}
+          value={props.value}
+          min={props.min}
+          max={props.max}
+          step={props.step ?? 0.5}
+          disabled={props.disabled}
+          onChange={(e) => {
+            if (typeof e.value === "number") props.onChange(e.value);
+          }}
+          class="h-full w-6 items-center"
+          trackClass="h-full w-6 items-center"
+          indicatorClass={`h-full w-1 ${sliderRail}`}
+          rangeClass="opacity-0"
+          thumbClass={`h-2.5 w-5 ${sliderThumb}`}
+        />
+      </View>
+      <Text class="text-muted-foreground" style={hint}>{props.label}</Text>
+    </View>
+  );
+}
+
+/** The dB scale that sits on the leading edge of a row of `EqualizerBand`s, aligned to their faders. */
+export function EqualizerScale(props: { max: number; unit: string }) {
+  const hint = { fontSize: token("setting-value-size") };
+  return (
+    <View class="w-9 items-end gap-2">
+      <Text class="text-muted-foreground opacity-0" style={hint}>0</Text>
+      <View class="h-36 justify-between">
+        <Text class="text-muted-foreground" style={hint}>+{props.max}</Text>
+        <Text class="text-muted-foreground" style={hint}>0</Text>
+        <Text class="text-muted-foreground" style={hint}>−{props.max}</Text>
+      </View>
+      <Text class="text-muted-foreground" style={hint}>{props.unit}</Text>
+    </View>
+  );
+}
+
 /**
  * A pop-up button: the system NSMenu on macOS, a drawn Select elsewhere.
  * `inline` is the borderless System Settings form whose value reads one step below the row title.

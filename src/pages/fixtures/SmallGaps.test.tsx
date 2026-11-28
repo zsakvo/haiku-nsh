@@ -16,8 +16,10 @@ test("EQ overwrite, delete confirmation and full reset retain enabled and custom
       effects: AudioEffects;
       dsp: AudioEffects;
     };
+  await app.press("label:预设操作");
   await app.press("覆盖当前预设");
   await app.waitUntil(() => snapshot().effects.customPresets[0].gains[0] === 4);
+  await app.press("label:预设操作");
   await app.press("删除预设…");
   await app.waitFor("text:删除预设？");
   expect(snapshot().effects.customPresets.length).toBe(1);
@@ -37,6 +39,7 @@ test("EQ overwrite, delete confirmation and full reset retain enabled and custom
   expect(snapshot().dsp).toEqual(reset);
   await app.press("label:均衡器预设");
   await app.press("role:option[晚间聆听]");
+  await app.press("label:预设操作");
   await app.press("删除预设…");
   await app.press("确认删除预设");
   await app.waitUntil(() => snapshot().effects.customPresets.length === 0);
